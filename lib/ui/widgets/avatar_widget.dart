@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../core/constants/app_colors.dart';
 
 class AvatarWidget extends StatelessWidget {
@@ -42,12 +43,14 @@ class AvatarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double responsiveSize = size.r;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
-          width: size,
-          height: size,
+          width: responsiveSize,
+          height: responsiveSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _backgroundColor,
@@ -57,12 +60,15 @@ class AvatarWidget extends StatelessWidget {
                 ? CachedNetworkImage(
                     imageUrl: avatarUrl!,
                     fit: BoxFit.cover,
+                    // Performance optimization: limit decoded image resolution in memory
+                    memCacheWidth: (responsiveSize * 2.5).round(),
+                    memCacheHeight: (responsiveSize * 2.5).round(),
                     placeholder: (context, url) => Center(
                       child: Text(
                         _initials,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: size * 0.4,
+                          fontSize: responsiveSize * 0.4,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -72,7 +78,7 @@ class AvatarWidget extends StatelessWidget {
                         _initials,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: size * 0.4,
+                          fontSize: responsiveSize * 0.4,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -83,7 +89,7 @@ class AvatarWidget extends StatelessWidget {
                       _initials,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: size * 0.4,
+                        fontSize: responsiveSize * 0.4,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -92,22 +98,24 @@ class AvatarWidget extends StatelessWidget {
         ),
         if (channel != null)
           Positioned(
-            right: -2,
-            bottom: -2,
-            child: Container(
-              padding: const EdgeInsets.all(2.5),
-              decoration: BoxDecoration(
-                color: _getChannelColor(channel!),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  width: 1.5,
+            right: -2.w,
+            bottom: -2.h,
+            child: RepaintBoundary(
+              child: Container(
+                padding: EdgeInsets.all(2.5.r),
+                decoration: BoxDecoration(
+                  color: _getChannelColor(channel!),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    width: 1.5.r,
+                  ),
                 ),
-              ),
-              child: Icon(
-                _getChannelIcon(channel!),
-                size: size * 0.28,
-                color: Colors.white,
+                child: Icon(
+                  _getChannelIcon(channel!),
+                  size: responsiveSize * 0.28,
+                  color: Colors.white,
+                ),
               ),
             ),
           )
@@ -115,15 +123,17 @@ class AvatarWidget extends StatelessWidget {
           Positioned(
             right: 0,
             bottom: 0,
-            child: Container(
-              width: size * 0.28,
-              height: size * 0.28,
-              decoration: BoxDecoration(
-                color: isOnline ? AppColors.success : Colors.grey,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  width: 1.5,
+            child: RepaintBoundary(
+              child: Container(
+                width: responsiveSize * 0.28,
+                height: responsiveSize * 0.28,
+                decoration: BoxDecoration(
+                  color: isOnline ? AppColors.success : Colors.grey,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    width: 1.5.r,
+                  ),
                 ),
               ),
             ),

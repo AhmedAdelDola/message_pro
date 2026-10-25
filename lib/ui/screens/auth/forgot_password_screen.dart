@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/di/injection_container.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../widgets/custom_button.dart';
 
@@ -37,20 +39,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _message = null;
     });
 
-    try {
-      await AuthRepository().resetPassword(email);
-      setState(() {
-        _isLoading = false;
-        _isSuccess = true;
-        _message = 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح.';
-      });
-    } catch (_) {
-      setState(() {
-        _isLoading = false;
-        _isSuccess = false;
-        _message = 'تعذر إرسال الرابط. تأكد من صحة البريد الإلكتروني.';
-      });
-    }
+    final result = await sl<IAuthRepository>().resetPassword(email);
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        setState(() {
+          _isLoading = false;
+          _isSuccess = false;
+          _message = failure.message;
+        });
+      },
+      (_) {
+        setState(() {
+          _isLoading = false;
+          _isSuccess = true;
+          _message = 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح.';
+        });
+      },
+    );
   }
 
   @override
@@ -61,37 +68,37 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(24.0.r),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 20),
-              const Icon(
+              SizedBox(height: 20.h),
+              Icon(
                 Icons.lock_reset_rounded,
-                size: 64,
+                size: 64.r,
                 color: AppColors.primaryLight,
               ),
-              const SizedBox(height: 20),
-              const Text(
+              SizedBox(height: 20.h),
+              Text(
                 'هل نسيت كلمة المرور؟',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8.h),
+              Text(
                 'أدخل بريدك الإلكتروني وسنرسل لك تعليمات استعادة كلمة المرور.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+                style: TextStyle(color: Colors.grey, fontSize: 14.sp),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32.h),
               if (_message != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12.r),
                   decoration: BoxDecoration(
                     color: _isSuccess
                         ? AppColors.success.withValues(alpha: 0.1)
                         : AppColors.danger.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10.r),
                     border: Border.all(
                       color: _isSuccess
                           ? AppColors.success.withValues(alpha: 0.3)
@@ -102,11 +109,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     _message!,
                     style: TextStyle(
                       color: _isSuccess ? AppColors.success : AppColors.danger,
-                      fontSize: 13,
+                      fontSize: 13.sp,
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20.h),
               ],
               TextFormField(
                 controller: _emailController,
@@ -117,7 +124,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24.h),
               CustomButton(
                 text: 'إرسال رابط الاستعادة',
                 isLoading: _isLoading,

@@ -1,51 +1,71 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../providers/settings_provider.dart';
+import '../../../logic/settings/settings_cubit.dart';
+import '../../../logic/settings/settings_state.dart';
 
-class LanguageScreen extends ConsumerWidget {
+class LanguageScreen extends StatelessWidget {
   const LanguageScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
-    final notifier = ref.read(settingsProvider.notifier);
-
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('اللغة (Language)'),
+        title: Text(
+          'اللغة (Language)',
+          style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold),
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Column(
-              children: [
-                RadioListTile<String>(
-                  value: 'ar',
-                  groupValue: settings.locale.languageCode,
-                  activeColor: AppColors.primaryLight,
-                  title: const Text('العربية (Arabic)'),
-                  subtitle: const Text('واجهة من اليمين إلى اليسار (RTL)'),
-                  onChanged: (val) {
-                    if (val != null) notifier.setLocale(Locale(val));
-                  },
+      body: BlocBuilder<SettingsCubit, SettingsState>(
+        builder: (context, state) {
+          final cubit = context.read<SettingsCubit>();
+          return ListView(
+            padding: EdgeInsets.all(16.w),
+            children: [
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
-                const Divider(height: 1),
-                RadioListTile<String>(
-                  value: 'en',
-                  groupValue: settings.locale.languageCode,
-                  activeColor: AppColors.primaryLight,
-                  title: const Text('English (الإنجليزية)'),
-                  subtitle: const Text('Left-to-Right interface (LTR)'),
+                child: RadioGroup<String>(
+                  groupValue: state.locale.languageCode,
                   onChanged: (val) {
-                    if (val != null) notifier.setLocale(Locale(val));
+                    if (val != null) cubit.setLocale(Locale(val));
                   },
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        value: 'ar',
+                        activeColor: AppColors.primaryLight,
+                        title: Text(
+                          'العربية (Arabic)',
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'واجهة من اليمين إلى اليسار (RTL)',
+                          style: TextStyle(fontSize: 12.sp),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      RadioListTile<String>(
+                        value: 'en',
+                        activeColor: AppColors.primaryLight,
+                        title: Text(
+                          'English (الإنجليزية)',
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Left-to-Right interface (LTR)',
+                          style: TextStyle(fontSize: 12.sp),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }

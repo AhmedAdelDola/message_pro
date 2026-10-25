@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/contact.dart';
 import '../../widgets/avatar_widget.dart';
@@ -18,7 +19,7 @@ class ContactDetailsScreen extends StatelessWidget {
         title: const Text('تفاصيل جهة الاتصال (Contact)'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.r),
         child: Column(
           children: [
             Center(
@@ -29,22 +30,22 @@ class ContactDetailsScreen extends StatelessWidget {
                     name: contact.name,
                     size: 80,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12.h),
                   Text(
                     contact.name,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold),
                   ),
                   if (contact.email != null) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4.h),
                     Text(
                       contact.email!,
-                      style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                      style: TextStyle(fontSize: 14.sp, color: isDark ? Colors.grey[400] : Colors.grey[600]),
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24.h),
 
             // Action Quick Buttons
             Row(
@@ -59,7 +60,7 @@ class ContactDetailsScreen extends StatelessWidget {
                       if (await canLaunchUrl(uri)) await launchUrl(uri);
                     },
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16.w),
                   _buildActionButton(
                     icon: Icons.chat_rounded,
                     label: 'واتساب',
@@ -69,7 +70,7 @@ class ContactDetailsScreen extends StatelessWidget {
                       if (await canLaunchUrl(uri)) await launchUrl(uri);
                     },
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16.w),
                 ],
                 if (contact.email != null)
                   _buildActionButton(
@@ -82,18 +83,18 @@ class ContactDetailsScreen extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32.h),
 
             // Details List
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16.0.r),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'المعلومات الأساسية',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp),
                     ),
                     const Divider(),
                     _buildInfoRow('الاسم', contact.name),
@@ -107,16 +108,16 @@ class ContactDetailsScreen extends StatelessWidget {
             ),
 
             if (contact.customAttributes.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(16.0.r),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
+                      Text(
                         'البيانات المخصصة (Custom Attributes)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp),
                       ),
                       const Divider(),
                       ...contact.customAttributes.entries.map((entry) {
@@ -140,21 +141,21 @@ class ContactDetailsScreen extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primaryLight, size: 22),
-            const SizedBox(height: 4),
+            Icon(icon, color: AppColors.primaryLight, size: 22.r),
+            SizedBox(height: 4.h),
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 12,
+              style: TextStyle(
+                fontSize: 12.sp,
                 color: AppColors.primaryLight,
                 fontWeight: FontWeight.bold,
               ),
@@ -167,12 +168,12 @@ class ContactDetailsScreen extends StatelessWidget {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: 8.h),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(label, style: TextStyle(color: Colors.grey, fontSize: 13.sp)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp)),
         ],
       ),
     );

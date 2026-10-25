@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/constants/app_colors.dart';
 
 class ChatComposer extends StatefulWidget {
@@ -50,8 +51,8 @@ class ChatComposerState extends State<ChatComposer> {
   void _showAttachmentMenu() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
       ),
       builder: (context) {
         return SafeArea(
@@ -59,24 +60,24 @@ class ChatComposerState extends State<ChatComposer> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: AppColors.primaryLight),
-                title: const Text('معرض الصور (Gallery)'),
+                leading: Icon(Icons.photo_library_outlined, color: AppColors.primaryLight, size: 22.r),
+                title: Text('معرض الصور (Gallery)', style: TextStyle(fontSize: 14.sp)),
                 onTap: () {
                   Navigator.pop(context);
                   _pickImage(ImageSource.gallery);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primaryLight),
-                title: const Text('الكاميرا (Camera)'),
+                leading: Icon(Icons.camera_alt_outlined, color: AppColors.primaryLight, size: 22.r),
+                title: Text('الكاميرا (Camera)', style: TextStyle(fontSize: 14.sp)),
                 onTap: () {
                   Navigator.pop(context);
                   _pickImage(ImageSource.camera);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.attach_file_rounded, color: AppColors.primaryLight),
-                title: const Text('ملف / مستند (Document)'),
+                leading: Icon(Icons.attach_file_rounded, color: AppColors.primaryLight, size: 22.r),
+                title: Text('ملف / مستند (Document)', style: TextStyle(fontSize: 14.sp)),
                 onTap: () {
                   Navigator.pop(context);
                   _pickFile();
@@ -113,18 +114,18 @@ class ChatComposerState extends State<ChatComposer> {
     return Container(
       decoration: BoxDecoration(
         color: _isPrivateNote
-            ? (_isPrivateNote ? (isDark ? AppColors.privateNoteDark : AppColors.privateNoteLight) : Colors.transparent)
+            ? (isDark ? AppColors.privateNoteDark : AppColors.privateNoteLight)
             : (isDark ? AppColors.darkCard : Colors.white),
         border: Border(
           top: BorderSide(
             color: _isPrivateNote
                 ? AppColors.privateNoteBorder
                 : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-            width: _isPrivateNote ? 1.5 : 1,
+            width: _isPrivateNote ? 1.5.h : 1.h,
           ),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       child: SafeArea(
         top: false,
         child: Column(
@@ -134,14 +135,14 @@ class ChatComposerState extends State<ChatComposer> {
               children: [
                 InkWell(
                   onTap: () => setState(() => _isPrivateNote = !_isPrivateNote),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(6.r),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                     decoration: BoxDecoration(
                       color: _isPrivateNote
                           ? AppColors.privateNoteBorder.withValues(alpha: 0.2)
                           : Colors.grey.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(6.r),
                       border: Border.all(
                         color: _isPrivateNote ? AppColors.privateNoteBorder : Colors.transparent,
                       ),
@@ -151,14 +152,14 @@ class ChatComposerState extends State<ChatComposer> {
                       children: [
                         Icon(
                           _isPrivateNote ? Icons.lock : Icons.lock_open,
-                          size: 13,
+                          size: 13.r,
                           color: _isPrivateNote ? AppColors.privateNoteBorder : Colors.grey,
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 4.w),
                         Text(
                           _isPrivateNote ? 'ملاحظة داخلية (فريق العمل)' : 'رد على العميل',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 11.sp,
                             fontWeight: FontWeight.bold,
                             color: _isPrivateNote ? AppColors.privateNoteBorder : Colors.grey[700],
                           ),
@@ -169,7 +170,7 @@ class ChatComposerState extends State<ChatComposer> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.flash_on_rounded, size: 20, color: AppColors.primaryLight),
+                  icon: Icon(Icons.flash_on_rounded, size: 20.r, color: AppColors.primaryLight),
                   tooltip: 'الردود الجاهزة (Canned Responses)',
                   onPressed: widget.onOpenCannedResponses,
                 ),
@@ -178,9 +179,9 @@ class ChatComposerState extends State<ChatComposer> {
 
             // Attached Files Preview
             if (_attachedPaths.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              SizedBox(height: 6.h),
               SizedBox(
-                height: 48,
+                height: 48.h,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: _attachedPaths.length,
@@ -189,19 +190,19 @@ class ChatComposerState extends State<ChatComposer> {
                     return Stack(
                       children: [
                         Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.all(8),
+                          margin: EdgeInsets.only(right: 8.w),
+                          padding: EdgeInsets.all(8.r),
                           decoration: BoxDecoration(
                             color: Colors.grey.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(8.r),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.attachment, size: 16),
-                              const SizedBox(width: 4),
+                              Icon(Icons.attachment, size: 16.r),
+                              SizedBox(width: 4.w),
                               Text(
                                 path.split(RegExp(r'[\\/]')).last,
-                                style: const TextStyle(fontSize: 11),
+                                style: TextStyle(fontSize: 11.sp),
                               ),
                             ],
                           ),
@@ -216,7 +217,7 @@ class ChatComposerState extends State<ChatComposer> {
                                 color: Colors.red,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.close, size: 14, color: Colors.white),
+                              child: Icon(Icons.close, size: 14.r, color: Colors.white),
                             ),
                           ),
                         ),
@@ -227,13 +228,13 @@ class ChatComposerState extends State<ChatComposer> {
               ),
             ],
 
-            const SizedBox(height: 6),
+            SizedBox(height: 6.h),
             // Text Input & Action Buttons
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline_rounded, size: 24),
+                  icon: Icon(Icons.add_circle_outline_rounded, size: 24.r),
                   color: AppColors.primaryLight,
                   onPressed: _showAttachmentMenu,
                 ),
@@ -241,9 +242,9 @@ class ChatComposerState extends State<ChatComposer> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF262626) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(20.r),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
                     child: TextField(
                       controller: _controller,
                       maxLines: 4,
@@ -254,30 +255,30 @@ class ChatComposerState extends State<ChatComposer> {
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: EdgeInsets.symmetric(vertical: 10.h),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8.w),
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 40.r,
+                  height: 40.r,
                   decoration: BoxDecoration(
                     color: _isPrivateNote ? AppColors.privateNoteBorder : AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
                     icon: widget.isSending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
+                        ? SizedBox(
+                            width: 18.r,
+                            height: 18.r,
+                            child: const CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+                        : Icon(Icons.send_rounded, size: 20.r, color: Colors.white),
                     onPressed: widget.isSending ? null : _handleSend,
                   ),
                 ),

@@ -1,29 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'settings_state.dart';
 
-class SettingsState {
-  final ThemeMode themeMode;
-  final Locale locale;
-
-  const SettingsState({
-    this.themeMode = ThemeMode.system,
-    this.locale = const Locale('ar'),
-  });
-
-  SettingsState copyWith({
-    ThemeMode? themeMode,
-    Locale? locale,
-  }) {
-    return SettingsState(
-      themeMode: themeMode ?? this.themeMode,
-      locale: locale ?? this.locale,
-    );
-  }
-}
-
-class SettingsNotifier extends StateNotifier<SettingsState> {
-  SettingsNotifier() : super(const SettingsState()) {
+class SettingsCubit extends Cubit<SettingsState> {
+  SettingsCubit() : super(const SettingsState()) {
     _loadSettings();
   }
 
@@ -39,14 +20,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (themeStr == 'light') mode = ThemeMode.light;
     if (themeStr == 'dark') mode = ThemeMode.dark;
 
-    state = state.copyWith(
+    emit(state.copyWith(
       themeMode: mode,
       locale: Locale(langStr),
-    );
+    ));
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    state = state.copyWith(themeMode: mode);
+    emit(state.copyWith(themeMode: mode));
     final prefs = await SharedPreferences.getInstance();
     String val = 'system';
     if (mode == ThemeMode.light) val = 'light';
@@ -55,12 +36,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 
   Future<void> setLocale(Locale loc) async {
-    state = state.copyWith(locale: loc);
+    emit(state.copyWith(locale: loc));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_langKey, loc.languageCode);
   }
 }
-
-final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  return SettingsNotifier();
-});

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../widgets/custom_button.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -40,10 +41,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تغيير كلمة المرور'),
+        title: Text(
+          'تغيير كلمة المرور',
+          style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.w),
         child: Form(
           key: _formKey,
           child: Column(
@@ -52,39 +56,42 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               TextFormField(
                 controller: _currentController,
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'كلمة المرور الحالية',
-                  prefixIcon: Icon(Icons.lock_outline),
+                  labelStyle: TextStyle(fontSize: 14.sp),
+                  prefixIcon: Icon(Icons.lock_outline, size: 20.sp),
                 ),
                 validator: (val) => val == null || val.isEmpty ? 'يرجى إدخال كلمة المرور الحالية' : null,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               TextFormField(
                 controller: _newController,
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'كلمة المرور الجديدة',
-                  prefixIcon: Icon(Icons.lock_reset_rounded),
+                  labelStyle: TextStyle(fontSize: 14.sp),
+                  prefixIcon: Icon(Icons.lock_reset_rounded, size: 20.sp),
                 ),
                 validator: (val) {
                   if (val == null || val.length < 6) return 'يجب ألا تقل كلمة المرور عن 6 أحرف';
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               TextFormField(
                 controller: _confirmController,
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'تأكيد كلمة المرور الجديدة',
-                  prefixIcon: Icon(Icons.lock_reset_rounded),
+                  labelStyle: TextStyle(fontSize: 14.sp),
+                  prefixIcon: Icon(Icons.lock_reset_rounded, size: 20.sp),
                 ),
                 validator: (val) {
                   if (val != _newController.text) return 'كلمتا المرور غير متطابقتين';
                   return null;
                 },
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32.h),
               CustomButton(
                 text: 'حفظ كلمة المرور الجديدة',
                 isLoading: _isLoading,

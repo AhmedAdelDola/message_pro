@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../providers/conversation_provider.dart';
-import '../../../providers/auth_provider.dart';
+import '../../../logic/conversation/conversation_cubit.dart';
+import '../../../logic/conversation/conversation_state.dart';
+import '../../../logic/auth/auth_cubit.dart';
+import '../../../logic/auth/auth_state.dart';
 import '../../widgets/empty_state_widget.dart';
 import '../chat/chat_screen.dart';
 import '../search/search_screen.dart';
@@ -10,61 +13,60 @@ import '../contacts/add_contact_screen.dart';
 import 'widgets/conversation_tile.dart';
 import 'widgets/inbox_filter_bar.dart';
 
-class InboxScreen extends ConsumerWidget {
+class InboxScreen extends StatelessWidget {
   const InboxScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(conversationProvider);
-    final authState = ref.watch(authProvider);
-    final notifier = ref.read(conversationProvider.notifier);
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final user = authState.user;
-    final currentAccountName = user?.accounts.isNotEmpty == true
-        ? user!.accounts.firstWhere((a) => a.id == user.accountId, orElse: () => user.accounts.first).name
-        : 'Message Pro';
-
-    final conversations = notifier.filteredConversations;
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: user?.availabilityStatus == 'online'
-                    ? AppColors.success
-                    : Colors.grey,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    currentAccountName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        title: BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, authState) {
+            final user = authState is Authenticated ? authState.user : null;
+            final currentAccountName = user?.accounts.isNotEmpty == true
+                ? user!.accounts.firstWhere((a) => a.id == user.accountId, orElse: () => user.accounts.first).name
+                : 'Message Pro';
+
+            return Row(
+              children: [
+                Container(
+                  width: 10.r,
+                  height: 10.r,
+                  decoration: BoxDecoration(
+                    color: user?.availabilityStatus == 'online'
+                        ? AppColors.success
+                        : Colors.grey,
+                    shape: BoxShape.circle,
                   ),
-                  Text(
-                    user != null ? '${user.name} (${user.role})' : 'متصل',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    ),
+                ),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        currentAccountName,
+                        style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        user != null ? '${user.name} (${user.role})' : 'متصل',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_rounded),
+            icon: Icon(Icons.search_rounded, size: 22.r),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SearchScreen()),
@@ -72,8 +74,8 @@ class InboxScreen extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => notifier.loadConversations(),
+            icon: Icon(Icons.refresh_rounded, size: 22.r),
+            onPressed: () => context.read<ConversationCubit>().loadConversations(),
           ),
         ],
       ),
@@ -81,39 +83,47 @@ class InboxScreen extends ConsumerWidget {
         children: [
           const InboxFilterBar(),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => notifier.loadConversations(),
-              child: state.isLoading && conversations.isEmpty
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryLight),
-                      ),
-                    )
-                  : conversations.isEmpty
-                      ? EmptyStateWidget(
-                          icon: Icons.chat_bubble_outline_rounded,
-                          title: 'لا توجد محادثات هنا',
-                          description: 'لا توجد أي محادثات تطابق الفلتر الحالي حالياً.',
-                          buttonText: 'تحديث المحادثات',
-                          onButtonPressed: () => notifier.loadConversations(),
+            child: BlocBuilder<ConversationCubit, ConversationState>(
+              builder: (context, state) {
+                final cubit = context.read<ConversationCubit>();
+                final conversations = cubit.filteredConversations;
+
+                return RefreshIndicator(
+                  onRefresh: () => cubit.loadConversations(),
+                  child: state.isLoading && conversations.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryLight),
+                          ),
                         )
-                      : ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: conversations.length,
-                          itemBuilder: (context, index) {
-                            final conv = conversations[index];
-                            return ConversationTile(
-                              conversation: conv,
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatScreen(conversation: conv),
-                                  ),
+                      : conversations.isEmpty
+                          ? EmptyStateWidget(
+                              icon: Icons.chat_bubble_outline_rounded,
+                              title: 'لا توجد محادثات هنا',
+                              description: 'لا توجد أي محادثات تطابق الفلتر الحالي حالياً.',
+                              buttonText: 'تحديث المحادثات',
+                              onButtonPressed: () => cubit.loadConversations(),
+                            )
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              addRepaintBoundaries: true,
+                              itemCount: conversations.length,
+                              itemBuilder: (context, index) {
+                                final conv = conversations[index];
+                                return ConversationTile(
+                                  conversation: conv,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ChatScreen(conversation: conv),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        ),
+                            ),
+                );
+              },
             ),
           ),
         ],
@@ -121,7 +131,7 @@ class InboxScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        child: const Icon(Icons.add_comment_rounded),
+        child: Icon(Icons.add_comment_rounded, size: 24.r),
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AddContactScreen()),

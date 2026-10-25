@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../core/di/injection_container.dart';
 import '../../../data/repositories/contact_repository.dart';
 import '../../widgets/custom_button.dart';
 
@@ -28,26 +30,28 @@ class _AddContactScreenState extends State<AddContactScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    try {
-      await ContactRepository().createContact(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-      );
-      if (mounted) {
+    final result = await sl<IContactRepository>().createContact(
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+      phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+    );
+
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+      },
+      (contact) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم إنشاء جهة الاتصال بنجاح')),
         );
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر إنشاء جهة الاتصال. حاول مرة أخرى')),
-        );
-      }
-    }
+      },
+    );
   }
 
   @override
@@ -57,7 +61,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
         title: const Text('إضافة جهة اتصال جديدة'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.r),
         child: Form(
           key: _formKey,
           child: Column(
@@ -65,36 +69,36 @@ class _AddContactScreenState extends State<AddContactScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'الاسم الكامل *',
-                  prefixIcon: Icon(Icons.person_outline),
+                  prefixIcon: Icon(Icons.person_outline, size: 20.r),
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) return 'يرجى إدخال اسم جهة الاتصال';
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'رقم الهاتف',
                   hintText: '+20 100 000 0000',
-                  prefixIcon: Icon(Icons.phone_outlined),
+                  prefixIcon: Icon(Icons.phone_outlined, size: 20.r),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'البريد الإلكتروني',
                   hintText: 'name@example.com',
-                  prefixIcon: Icon(Icons.email_outlined),
+                  prefixIcon: Icon(Icons.email_outlined, size: 20.r),
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32.h),
               CustomButton(
                 text: 'حفظ جهة الاتصال',
                 isLoading: _isLoading,

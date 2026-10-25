@@ -59,6 +59,28 @@ class NotificationItem {
       createdAt: dt,
     );
   }
+
+  NotificationItem copyWith({
+    int? id,
+    String? notificationType,
+    int? primaryActorId,
+    String? primaryActorType,
+    String? title,
+    String? message,
+    bool? isRead,
+    DateTime? createdAt,
+  }) {
+    return NotificationItem(
+      id: id ?? this.id,
+      notificationType: notificationType ?? this.notificationType,
+      primaryActorId: primaryActorId ?? this.primaryActorId,
+      primaryActorType: primaryActorType ?? this.primaryActorType,
+      title: title ?? this.title,
+      message: message ?? this.message,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 class CallItem {

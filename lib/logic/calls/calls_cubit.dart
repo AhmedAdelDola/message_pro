@@ -1,34 +1,14 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/models/notification_item.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../data/models/notification_item.dart';
+import 'calls_state.dart';
 
-class CallsState {
-  final List<CallItem> calls;
-  final bool isLoading;
-
-  const CallsState({
-    this.calls = const [],
-    this.isLoading = false,
-  });
-
-  CallsState copyWith({
-    List<CallItem>? calls,
-    bool? isLoading,
-  }) {
-    return CallsState(
-      calls: calls ?? this.calls,
-      isLoading: isLoading ?? this.isLoading,
-    );
-  }
-}
-
-class CallsNotifier extends StateNotifier<CallsState> {
-  CallsNotifier() : super(const CallsState()) {
+class CallsCubit extends Cubit<CallsState> {
+  CallsCubit() : super(const CallsState()) {
     loadCalls();
   }
 
   void loadCalls() {
-    state = state.copyWith(isLoading: true);
-    // Standard mock/synced call log for customer conversations
+    emit(state.copyWith(isLoading: true));
     final sampleCalls = [
       CallItem(
         id: '1',
@@ -63,10 +43,6 @@ class CallsNotifier extends StateNotifier<CallsState> {
         timestamp: DateTime.now().subtract(const Duration(days: 1)),
       ),
     ];
-    state = state.copyWith(calls: sampleCalls, isLoading: false);
+    emit(state.copyWith(calls: sampleCalls, isLoading: false));
   }
 }
-
-final callsProvider = StateNotifierProvider<CallsNotifier, CallsState>((ref) {
-  return CallsNotifier();
-});
