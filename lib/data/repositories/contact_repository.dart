@@ -6,6 +6,11 @@ import '../models/contact.dart';
 import '../models/conversation.dart';
 
 abstract class IContactRepository {
+  Future<Either<Failure, List<Contact>>> getContacts({
+    int page = 1,
+    int perPage = 25,
+    String sort = 'name',
+  });
   Future<Either<Failure, List<Contact>>> searchContacts(String query, {int page = 1});
   Future<Either<Failure, Contact>> getContact(int id);
   Future<Either<Failure, List<Conversation>>> getContactConversations(int contactId);
@@ -20,6 +25,37 @@ class ContactRepository implements IContactRepository {
   final ApiClient _api;
 
   ContactRepository({ApiClient? api}) : _api = api ?? ApiClient();
+
+  @override
+  Future<Either<Failure, List<Contact>>> getContacts({
+    int page = 1,
+    int perPage = 25,
+    String sort = 'name',
+  }) async {
+    try {
+      final response = await _api.get(
+        'contacts',
+        queryParameters: {
+          'page': page,
+          'per_page': perPage,
+          'sort': sort,
+          'include_contact_inboxes': false,
+        },
+      );
+      final data = response.data;
+      List list = [];
+      if (data is Map && data['payload'] != null) {
+        list = data['payload'];
+      } else if (data is List) {
+        list = data;
+      }
+      return Right(list.map((c) => Contact.fromJson(c as Map<String, dynamic>)).toList());
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل تحميل جهات الاتصال'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 
   @override
   Future<Either<Failure, List<Contact>>> searchContacts(String query, {int page = 1}) async {

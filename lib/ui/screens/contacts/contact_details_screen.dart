@@ -72,25 +72,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     );
   }
 
-  Future<void> _makePhoneCall(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'\s+'), '');
-    final uri = Uri.parse('tel:$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      _copyToClipboard(phone, 'Phone number');
-    }
-  }
-
-  Future<void> _openWhatsApp(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final uri = Uri.parse('https://wa.me/$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      _copyToClipboard(phone, 'WhatsApp number');
-    }
-  }
 
   Future<void> _sendEmail(String email) async {
     final uri = Uri.parse('mailto:$email');
@@ -210,16 +191,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
           ),
         ),
         centerTitle: false,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.share_outlined, color: textSecondary, size: 20),
-            tooltip: isArabic ? 'مشاركة' : 'Share',
-            onPressed: () {
-              final summary = '${contact.name}\n${contact.phoneNumber ?? ''}\n${contact.email ?? ''}';
-              _copyToClipboard(summary, 'Contact info');
-            },
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: borderColor, height: 1),
@@ -290,32 +261,12 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                     ),
                   ),
 
-                  // Quick Action Buttons Row
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        if (contact.phoneNumber != null && contact.phoneNumber!.isNotEmpty) ...[
-                          Expanded(
-                            child: _buildActionButton(
-                              icon: Icons.phone_rounded,
-                              label: isArabic ? 'اتصال' : 'Call',
-                              color: const Color(0xFF10B981),
-                              onTap: () => _makePhoneCall(contact.phoneNumber!),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildActionButton(
-                              icon: Icons.chat_bubble_rounded,
-                              label: 'WhatsApp',
-                              color: const Color(0xFF25D366),
-                              onTap: () => _openWhatsApp(contact.phoneNumber!),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (contact.email != null && contact.email!.isNotEmpty) ...[
+                  // Quick Action Buttons Row (WhatsApp, Call, and Copy removed)
+                  if (contact.email != null && contact.email!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
                           Expanded(
                             child: _buildActionButton(
                               icon: Icons.email_rounded,
@@ -324,22 +275,9 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                               onTap: () => _sendEmail(contact.email!),
                             ),
                           ),
-                          const SizedBox(width: 8),
                         ],
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: Icons.copy_rounded,
-                            label: isArabic ? 'نسخ' : 'Copy',
-                            color: const Color(0xFF64748B),
-                            onTap: () {
-                              final text = contact.phoneNumber ?? contact.email ?? contact.name;
-                              _copyToClipboard(text, 'Contact details');
-                            },
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
 
                   const SizedBox(height: 8),
                   Divider(color: borderColor, height: 1),
@@ -504,9 +442,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
           label: isArabic ? 'رقم الهاتف' : 'Phone Number',
           value: phone != null && phone.isNotEmpty ? phone : (isArabic ? 'غير متوفر' : 'Not available'),
           isPlaceholder: phone == null || phone.isEmpty,
-          onCopy: phone != null && phone.isNotEmpty ? () => _copyToClipboard(phone, 'Phone number') : null,
-          actionIcon: phone != null && phone.isNotEmpty ? Icons.phone_rounded : null,
-          onAction: phone != null && phone.isNotEmpty ? () => _makePhoneCall(phone) : null,
         ),
         _buildFieldTile(
           label: isArabic ? 'البريد الإلكتروني' : 'Email Address',

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hugeicons/hugeicons.dart';
-import '../../core/constants/app_svg_icons.dart';
 import '../../logic/conversation/conversation_cubit.dart';
 import '../../logic/conversation/conversation_state.dart';
 import '../../logic/notification/notification_cubit.dart';
@@ -9,6 +8,7 @@ import '../../logic/notification/notification_state.dart';
 import 'notifications/notifications_screen.dart';
 import 'inbox/inbox_screen.dart';
 import 'calls/calls_screen.dart';
+import 'contacts/contacts_screen.dart';
 import 'settings/settings_screen.dart';
 
 class MainLayout extends StatefulWidget {
@@ -19,13 +19,14 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  // Inbox is initial tab (index 1), matching C:\crm AppTabs.tsx
-  int _currentIndex = 1;
+  // Inbox is initial tab (index 2)
+  int _currentIndex = 2;
 
   final List<Widget> _screens = const [
-    NotificationsScreen(),
-    InboxScreen(),
     CallsScreen(),
+    ContactsScreen(),
+    InboxScreen(),
+    NotificationsScreen(),
     SettingsScreen(),
   ];
 
@@ -71,22 +72,6 @@ class _MainLayoutState extends State<MainLayout> {
                       children: [
                         _buildTabItem(
                           index: 0,
-                          label: isRTL ? 'الإشعارات' : 'Notifications',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: color, size: 22),
-                          badgeCount: unreadNotifs,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                        _buildTabItem(
-                          index: 1,
-                          label: isRTL ? 'المحادثات' : 'Inbox',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedBubbleChat, color: color, size: 22),
-                          badgeCount: unreadConvs,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                        _buildTabItem(
-                          index: 2,
                           label: isRTL ? 'المكالمات' : 'Calls',
                           iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedCall, color: color, size: 22),
                           badgeCount: 0,
@@ -94,8 +79,32 @@ class _MainLayoutState extends State<MainLayout> {
                           inactiveColor: inactiveColor,
                         ),
                         _buildTabItem(
+                          index: 1,
+                          label: isRTL ? 'جهات الاتصال' : 'Contact',
+                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedUserGroup, color: color, size: 22),
+                          badgeCount: 0,
+                          activeColor: activeColor,
+                          inactiveColor: inactiveColor,
+                        ),
+                        _buildTabItem(
+                          index: 2,
+                          label: isRTL ? 'المحادثات' : 'Inbox',
+                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedBubbleChat, color: color, size: 22),
+                          badgeCount: unreadConvs,
+                          activeColor: activeColor,
+                          inactiveColor: inactiveColor,
+                        ),
+                        _buildTabItem(
                           index: 3,
-                          label: isRTL ? 'الإعدادات' : 'Settings',
+                          label: isRTL ? 'الإشعارات' : 'Notification',
+                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: color, size: 22),
+                          badgeCount: unreadNotifs,
+                          activeColor: activeColor,
+                          inactiveColor: inactiveColor,
+                        ),
+                        _buildTabItem(
+                          index: 4,
+                          label: isRTL ? 'الإعدادات' : 'Setting',
                           iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedSettings01, color: color, size: 22),
                           badgeCount: 0,
                           activeColor: activeColor,

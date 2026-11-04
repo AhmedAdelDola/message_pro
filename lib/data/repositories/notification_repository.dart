@@ -185,8 +185,12 @@ class NotificationRepository implements INotificationRepository {
           'subscription_type': 'fcm',
           'subscription_attributes': {
             'push_token': token,
+            'fcm_token': token,
             'device_name': deviceName,
           },
+          'push_token': token,
+          'fcm_token': token,
+          'device_name': deviceName,
         },
       );
       return const Right(null);

@@ -33,11 +33,6 @@ class SoundService {
     }
   }
 
-  AudioPlayer get _audioPlayer {
-    _player ??= AudioPlayer()..setReleaseMode(ReleaseMode.stop);
-    return _player!;
-  }
-
   /// Play incoming message sound (like WhatsApp incoming chime)
   Future<void> playIncomingSound() async {
     if (!_soundEnabled) return;

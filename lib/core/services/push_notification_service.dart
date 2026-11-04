@@ -101,11 +101,13 @@ class PushNotificationService {
         },
       );
 
-      // 6. Create Android Notification Channel
+      // 6. Create Android Notification Channel and request runtime notification permission (Android 13+)
       final androidImplementation =
           _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       if (androidImplementation != null) {
         await androidImplementation.createNotificationChannel(_defaultChannel);
+        final granted = await androidImplementation.requestNotificationsPermission();
+        debugPrint('[PushNotification] Android notification permission granted: $granted');
       }
 
       // 7. Setup Foreground message listener
@@ -337,9 +339,35 @@ class PushNotificationService {
         (failure) {
           debugPrint('[PushNotification] Failed to register push token: ${failure.message}');
         },
-        (_) {
+        (_) async {
           debugPrint('[PushNotification] FCM token registered successfully with backend!');
           _lastRegisteredToken = token;
+
+          // Verify and activate push notification flags if empty
+          try {
+            final settingsResult = await notifRepo.getNotificationSettings();
+            settingsResult.fold(
+              (_) {},
+              (settings) async {
+                if (settings.selectedPushFlags.isEmpty) {
+                  debugPrint('[PushNotification] Enabling default mobile push flags...');
+                  final flagsToEnable = [
+                    'mobile_push_conversation_creation',
+                    'mobile_push_conversation_assignment',
+                    'mobile_push_assigned_conversation_new_message',
+                    'mobile_push_participating_conversation_new_message',
+                    'mobile_push_conversation_mention',
+                  ];
+                  await notifRepo.updateNotificationSettings(
+                    settings.copyWith(selectedPushFlags: flagsToEnable),
+                  );
+                  debugPrint('[PushNotification] Mobile push flags successfully activated');
+                }
+              },
+            );
+          } catch (e) {
+            debugPrint('[PushNotification] Note: Could not auto-sync notification flags: $e');
+          }
         },
       );
     } catch (e) {

@@ -317,7 +317,6 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildIncomingBubble(bool isDark, BuildContext context) {
     final bubbleBg = isDark ? const Color(0xFF161616) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF212121) : const Color(0xFFEAEAEA);
     final textColor = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
 
     return Padding(
