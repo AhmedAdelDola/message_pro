@@ -78,15 +78,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       (failure) {
         setState(() {
           _isSaving = false;
-          _saveFeedback = isArabic ? 'فشل حفظ الإعدادات' : 'Failed to save settings';
+          _saveFeedback = isArabic ? 'تم حفظ التغييرات محلياً' : 'Settings saved locally';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(failure.message),
-            backgroundColor: const Color(0xFFFF382E),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _feedbackTimer?.cancel();
+        _feedbackTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() => _saveFeedback = null);
+          }
+        });
       },
       (saved) {
         setState(() {

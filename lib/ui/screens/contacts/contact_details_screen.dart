@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/di/injection_container.dart';
 import '../../../data/models/contact.dart';
+import '../../../data/repositories/conversation_repository.dart';
 import '../../../logic/conversation/conversation_cubit.dart';
 import '../../../logic/conversation/conversation_state.dart';
 import '../../widgets/avatar_widget.dart';
@@ -80,6 +82,189 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     } else {
       _copyToClipboard(email, 'Email address');
     }
+  }
+
+  bool _isStartingConversation = false;
+
+  Future<void> _startNewConversation() async {
+    if (_isStartingConversation) return;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    setState(() => _isStartingConversation = true);
+
+    try {
+      final repo = sl<IConversationRepository>();
+      final inboxesResult = await repo.getContactableInboxes(widget.contact.id);
+
+      List<Map<String, dynamic>> inboxes = [];
+      inboxesResult.fold((_) {}, (list) => inboxes = list);
+
+      if (inboxes.isEmpty) {
+        final allInboxesResult = await repo.fetchInboxes();
+        allInboxesResult.fold((_) {}, (list) {
+          inboxes = list.map((inb) => {
+            'id': inb.id,
+            'name': inb.name,
+            'channel_type': inb.channelType,
+            'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
+          }).toList();
+        });
+      }
+
+      if (!mounted) return;
+
+      if (inboxes.isEmpty) {
+        setState(() => _isStartingConversation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isArabic ? 'لا توجد قنوات متاحة لبدء محادثة' : 'No inboxes available to start chat'),
+            backgroundColor: const Color(0xFFFF382E),
+          ),
+        );
+        return;
+      }
+
+      if (inboxes.length == 1) {
+        await _executeStartConversation(inboxes.first);
+      } else {
+        setState(() => _isStartingConversation = false);
+        _showInboxPicker(inboxes);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isStartingConversation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: const Color(0xFFFF382E),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _executeStartConversation(Map<String, dynamic> inbox) async {
+    setState(() => _isStartingConversation = true);
+    final repo = sl<IConversationRepository>();
+    final inboxId = inbox['id'] as int? ?? int.tryParse(inbox['id'].toString()) ?? 1;
+    final sourceId = inbox['source_id']?.toString() ??
+        widget.contact.phoneNumber ??
+        widget.contact.email ??
+        'contact_${widget.contact.id}';
+
+    final result = await repo.startNewConversation(
+      contactId: widget.contact.id,
+      inboxId: inboxId,
+      sourceId: sourceId,
+    );
+
+    if (!mounted) return;
+    setState(() => _isStartingConversation = false);
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(failure.message),
+            backgroundColor: const Color(0xFFFF382E),
+          ),
+        );
+      },
+      (conversation) {
+        context.read<ConversationCubit>().loadConversations(refresh: true);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(conversation: conversation),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showInboxPicker(List<Map<String, dynamic>> inboxes) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
+    final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  isArabic ? 'اختر قناة المراسلة' : 'Select Channel',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                    fontFamily: 'Gontserrat',
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: inboxes.length,
+                  itemBuilder: (_, index) {
+                    final inb = inboxes[index];
+                    final name = inb['name']?.toString() ?? 'Inbox #${inb['id']}';
+                    final channel = inb['channel_type']?.toString() ?? '';
+                    final isWhatsApp = channel.toLowerCase().contains('whatsapp');
+
+                    return ListTile(
+                      leading: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: isWhatsApp ? const Color(0xFF22C55E).withValues(alpha: 0.15) : const Color(0xFF4162E3).withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: isWhatsApp
+                              ? Image.asset('assets/images/channels/whatsapp.png', width: 20, height: 20, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.chat_bubble, size: 18, color: Color(0xFF22C55E)))
+                              : const Icon(Icons.forum_rounded, size: 18, color: Color(0xFF4162E3)),
+                        ),
+                      ),
+                      title: Text(
+                        name,
+                        style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 14, fontFamily: 'Gontserrat'),
+                      ),
+                      subtitle: Text(
+                        channel,
+                        style: TextStyle(color: textSecondary, fontSize: 12, fontFamily: 'Gontserrat'),
+                      ),
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        _executeStartConversation(inb);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showLifecyclePicker() {
@@ -261,23 +446,33 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                     ),
                   ),
 
-                  // Quick Action Buttons Row (WhatsApp, Call, and Copy removed)
-                  if (contact.email != null && contact.email!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
+                  // Action Buttons Row (Start conversation on system & optional email)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: Icons.chat_bubble_rounded,
+                            label: isArabic ? 'بدء محادثة' : 'Start Chat',
+                            color: const Color(0xFF4162E3),
+                            onTap: _startNewConversation,
+                          ),
+                        ),
+                        if (contact.email != null && contact.email!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
                           Expanded(
                             child: _buildActionButton(
                               icon: Icons.email_rounded,
                               label: isArabic ? 'بريد' : 'Email',
-                              color: const Color(0xFF4162E3),
+                              color: const Color(0xFF64748B),
                               onTap: () => _sendEmail(contact.email!),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
+                  ),
 
                   const SizedBox(height: 8),
                   Divider(color: borderColor, height: 1),
@@ -700,6 +895,28 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                       fontSize: 13,
                       color: textSecondary,
                       fontFamily: 'Gontserrat',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ElevatedButton.icon(
+                    onPressed: _startNewConversation,
+                    icon: _isStartingConversation
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.chat_bubble_rounded, size: 18),
+                    label: Text(
+                      isArabic ? 'بدء محادثة على السيستم' : 'Start Conversation',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4162E3),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
                     ),
                   ),
                 ],

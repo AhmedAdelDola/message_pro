@@ -106,7 +106,7 @@ class AvatarWidget extends StatelessWidget {
                   ),
           ),
         ),
-        if (channel != null && channel!.isNotEmpty)
+        if (channel != null && channel!.isNotEmpty && (avatarUrl == null || avatarUrl!.isEmpty))
           PositionedDirectional(
             end: -2.w,
             bottom: -2.h,
@@ -157,7 +157,7 @@ class AvatarWidget extends StatelessWidget {
     final badgeSize = (responsiveSize * 0.42).clamp(16.0, 22.0);
     final borderColor = Theme.of(context).cardColor;
 
-    // 1. WhatsApp: WhatsApp icon (green circle with white chat bubble matching CRM web exactly)
+    // 1. WhatsApp: WhatsApp icon (green circle with official WhatsApp logo)
     if (lower.contains('whatsapp')) {
       return Container(
         width: badgeSize,
@@ -177,8 +177,15 @@ class AvatarWidget extends StatelessWidget {
             ),
           ],
         ),
-        child: Center(
-          child: Icon(Icons.chat_bubble, size: badgeSize * 0.58, color: Colors.white),
+        padding: EdgeInsets.all(2.r),
+        child: ClipOval(
+          child: Image.asset(
+            'assets/images/channels/whatsapp.png',
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Center(
+              child: Icon(Icons.chat_bubble_rounded, size: badgeSize * 0.58, color: Colors.white),
+            ),
+          ),
         ),
       );
     }

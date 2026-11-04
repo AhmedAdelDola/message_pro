@@ -408,13 +408,25 @@ class ConversationTile extends StatelessWidget {
   Widget _buildChannelSmallIcon(String channelType) {
     final lower = channelType.toLowerCase();
     if (lower.contains('whatsapp')) {
-      return const Icon(Icons.chat_bubble_rounded, size: 11, color: Color(0xFF25D366));
+      return Image.asset(
+        'assets/images/channels/whatsapp.png',
+        width: 12,
+        height: 12,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(Icons.chat_bubble_rounded, size: 11, color: Color(0xFF25D366)),
+      );
     }
     if (lower.contains('instagram')) {
       return const Icon(Icons.camera_alt_rounded, size: 11, color: Color(0xFFDD2A7B));
     }
     if (lower.contains('facebook') || lower.contains('messenger')) {
-      return const Icon(Icons.bolt_rounded, size: 11, color: Color(0xFF0084FF));
+      return Image.asset(
+        'assets/images/channels/messenger.png',
+        width: 12,
+        height: 12,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(Icons.bolt_rounded, size: 11, color: Color(0xFF0084FF)),
+      );
     }
     if (lower.contains('telegram')) {
       return const Icon(Icons.send_rounded, size: 11, color: Color(0xFF229ED9));
