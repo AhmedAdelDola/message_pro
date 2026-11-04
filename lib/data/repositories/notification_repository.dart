@@ -6,8 +6,10 @@ import '../models/notification_item.dart';
 import '../models/notification_settings.dart';
 
 abstract class INotificationRepository {
-  Future<Either<Failure, List<NotificationItem>>> getNotifications({int page = 1});
+  Future<Either<Failure, List<NotificationItem>>> getNotifications({int page = 1, bool includeRead = false, bool includeSnoozed = false});
   Future<Either<Failure, void>> markAsRead(int id);
+  Future<Either<Failure, void>> markAsUnread(int id);
+  Future<Either<Failure, void>> archiveNotification(int id);
   Future<Either<Failure, void>> markAllAsRead();
   Future<Either<Failure, int>> getUnreadCount();
   Future<Either<Failure, NotificationSettings>> getNotificationSettings();
@@ -22,11 +24,22 @@ class NotificationRepository implements INotificationRepository {
   NotificationRepository({ApiClient? api}) : _api = api ?? ApiClient();
 
   @override
-  Future<Either<Failure, List<NotificationItem>>> getNotifications({int page = 1}) async {
+  Future<Either<Failure, List<NotificationItem>>> getNotifications({
+    int page = 1,
+    bool includeRead = false,
+    bool includeSnoozed = false,
+  }) async {
     try {
+      final query = <String, dynamic>{
+        'page': page,
+        'sort_order': 'desc',
+      };
+      if (includeRead) query['includes[]'] = 'read';
+      if (includeSnoozed) query['includes[]'] = 'snoozed';
+
       final response = await _api.get(
         'notifications',
-        queryParameters: {'page': page},
+        queryParameters: query,
       );
       final data = response.data;
       List list = [];
@@ -50,6 +63,28 @@ class NotificationRepository implements INotificationRepository {
     try {
       // Per spec: PATCH A/notifications/:id
       await _api.patch('notifications/$id');
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> markAsUnread(int id) async {
+    try {
+      // Per spec: POST A/notifications/:id/unread
+      await _api.post('notifications/$id/unread');
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> archiveNotification(int id) async {
+    try {
+      // Per spec: DELETE A/notifications/:id
+      await _api.delete('notifications/$id');
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -86,7 +121,15 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<Either<Failure, NotificationSettings>> getNotificationSettings() async {
     try {
-      final response = await _api.get('profile/notification_settings');
+      // 1. Try A/notification_settings per backend v4.13.0 contract
+      Response response;
+      try {
+        response = await _api.get('notification_settings');
+      } catch (_) {
+        // Fallback to legacy profile route
+        response = await _api.get('profile/notification_settings');
+      }
+
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return Right(NotificationSettings.fromJson(data));
@@ -104,10 +147,21 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<Either<Failure, NotificationSettings>> updateNotificationSettings(NotificationSettings settings) async {
     try {
-      final response = await _api.put(
-        'profile/notification_settings',
-        data: settings.toUpdatePayload(),
-      );
+      // 1. Try PATCH A/notification_settings per backend v4.13.0 contract
+      Response response;
+      try {
+        response = await _api.patch(
+          'notification_settings',
+          data: settings.toUpdatePayload(),
+        );
+      } catch (_) {
+        // Fallback to PUT profile/notification_settings
+        response = await _api.put(
+          'profile/notification_settings',
+          data: settings.toUpdatePayload(),
+        );
+      }
+
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return Right(NotificationSettings.fromJson(data));

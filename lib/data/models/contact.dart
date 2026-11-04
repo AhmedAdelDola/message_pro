@@ -8,6 +8,8 @@ class Contact {
   final String? avatarUrl;
   final String? identifier;
   final Map<String, dynamic> customAttributes;
+  final List<Collaborator> collaborators;
+  final bool canManageCollaborators;
 
   Contact({
     required this.id,
@@ -17,6 +19,8 @@ class Contact {
     this.avatarUrl,
     this.identifier,
     this.customAttributes = const {},
+    this.collaborators = const [],
+    this.canManageCollaborators = false,
   });
 
   factory Contact.fromJson(Map<String, dynamic> json) {
@@ -55,6 +59,16 @@ class Contact {
       }
     }
 
+    final rawCollabs = json['collaborators'];
+    final collabsList = <Collaborator>[];
+    if (rawCollabs is List) {
+      for (final c in rawCollabs) {
+        if (c is Map) {
+          collabsList.add(Collaborator.fromJson(Map<String, dynamic>.from(c)));
+        }
+      }
+    }
+
     return Contact(
       id: contactId,
       name: displayName,
@@ -65,6 +79,8 @@ class Contact {
       customAttributes: json['custom_attributes'] is Map<String, dynamic>
           ? json['custom_attributes']
           : {},
+      collaborators: collabsList,
+      canManageCollaborators: json['can_manage_collaborators'] == true,
     );
   }
 
@@ -76,8 +92,45 @@ class Contact {
     'avatar_url': avatarUrl,
     'identifier': identifier,
     'custom_attributes': customAttributes,
+    'collaborators': collaborators.map((c) => c.toJson()).toList(),
+    'can_manage_collaborators': canManageCollaborators,
   };
 }
+
+class Collaborator {
+  final int id;
+  final String name;
+  final String type;
+  final String? avatarUrl;
+  final String? thumbnail;
+
+  Collaborator({
+    required this.id,
+    required this.name,
+    this.type = 'user',
+    this.avatarUrl,
+    this.thumbnail,
+  });
+
+  factory Collaborator.fromJson(Map<String, dynamic> json) {
+    return Collaborator(
+      id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['name']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'user',
+      avatarUrl: (json['avatar_url'] ?? json['thumbnail'])?.toString(),
+      thumbnail: json['thumbnail']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'type': type,
+    if (avatarUrl != null) 'avatar_url': avatarUrl,
+    if (thumbnail != null) 'thumbnail': thumbnail,
+  };
+}
+
 
 class Inbox {
   final int id;

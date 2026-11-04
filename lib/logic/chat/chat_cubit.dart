@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:message_pro/data/models/contact.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/services/sound_service.dart';
 import '../../data/models/message.dart';
@@ -72,6 +73,8 @@ class ChatCubit extends Cubit<ChatState> {
             emit(state.copyWith(messages: updatedList));
           }
         }
+      } else if (name == 'contact.collaborators_changed') {
+        loadCollaborators();
       } else if (name == 'conversation.contact_last_seen_at' || name == 'conversation.read') {
         final convId = payload['id'] ?? payload['conversation_id'];
         if (convId != null && convId == conversationId) {
@@ -260,9 +263,33 @@ class ChatCubit extends Cubit<ChatState> {
     );
   }
 
-  Future<List<MessageTemplate>> fetchTemplates(int inboxId) async {
-    final result = await repo.fetchInboxTemplates(inboxId);
-    return result.getOrElse(() => []);
+  Future<List<MessageTemplate>> fetchTemplates([int? inboxId]) async {
+    // 1. First try new route: GET conversations/:conversationId/message_templates
+    final convResult = await repo.fetchConversationTemplates(conversationId);
+    if (convResult.isRight() && convResult.getOrElse(() => []).isNotEmpty) {
+      return convResult.getOrElse(() => []);
+    }
+    // 2. Fallback to inbox route
+    if (inboxId != null) {
+      final inboxResult = await repo.fetchInboxTemplates(inboxId);
+      return inboxResult.getOrElse(() => []);
+    }
+    return [];
+  }
+
+  Future<Contact?> loadCollaborators() async {
+    final result = await repo.getCollaborators(conversationId);
+    return result.fold((_) => null, (contact) => contact);
+  }
+
+  Future<bool> addCollaborator(int userId) async {
+    final result = await repo.addCollaborator(conversationId, userId);
+    return result.isRight();
+  }
+
+  Future<bool> removeCollaborator(int userId) async {
+    final result = await repo.removeCollaborator(conversationId, userId);
+    return result.isRight();
   }
 
   Future<bool> sendTemplate({

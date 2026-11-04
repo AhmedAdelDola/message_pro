@@ -219,22 +219,17 @@ class ChatComposerState extends State<ChatComposer> {
   Widget _buildChannelLogo({double size = 16}) {
     final lower = widget.channelType.toLowerCase();
 
-    // 1. WhatsApp
+    // 1. WhatsApp (Green circle with white speech bubble matching CRM web exactly)
     if (lower.contains('whatsapp')) {
-      return Image.asset(
-        'assets/images/channels/whatsapp.png',
+      return Container(
         width: size,
         height: size,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            color: Color(0xFF25D366),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.chat_bubble, size: size * 0.55, color: Colors.white),
+        decoration: const BoxDecoration(
+          color: Color(0xFF22C55E),
+          shape: BoxShape.circle,
         ),
+        alignment: Alignment.center,
+        child: Icon(Icons.chat_bubble, size: size * 0.58, color: Colors.white),
       );
     }
 
@@ -540,70 +535,6 @@ class ChatComposerState extends State<ChatComposer> {
           ),
         ],
       ),
-    );
-  }
-
-  void _handleSuggestReply() {
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final suggestions = isArabic
-            ? [
-                'أهلاً بك! كيف يمكنني مساعدتك اليوم؟',
-                'تم استلام طلبك وجاري مراجعته والرد عليك قريباً.',
-                'شكراً لتواصلك معنا، هل تود حجز موعد لتجربة المنصة؟',
-                'يسعدنا تقديم المساعدة، برجاء مشاركة تفاصيل أكثر.',
-              ]
-            : [
-                'Hello! How can I help you today?',
-                'Your request has been received and is being processed.',
-                'Thanks for reaching out! Would you like to schedule a quick demo?',
-                'Happy to help! Could you share a few more details?',
-              ];
-
-        return SafeArea(
-          child: Container(
-            color: isDark ? const Color(0xFF161616) : Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const HugeIcon(
-                      icon: HugeIcons.strokeRoundedSparkles,
-                      color: Color(0xFF7C3AED),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isArabic ? 'اقتراحات الرد الذكي' : 'AI Suggested Replies',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, fontFamily: 'Gontserrat'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...suggestions.map((s) {
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    title: Text(s, style: const TextStyle(fontSize: 13, fontFamily: 'Gontserrat')),
-                    onTap: () {
-                      insertText(s);
-                      Navigator.pop(ctx);
-                    },
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -973,27 +904,27 @@ class ChatComposerState extends State<ChatComposer> {
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: Row(
               children: [
-                // (B) WhatsApp Business Template Button
+                // (B Templates) WhatsApp Business Template Button (matching Crop 1 exactly)
                 InkWell(
                   onTap: widget.onOpenTemplates ?? _showTemplatesSheet,
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    width: 26,
-                    height: 26,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF132A1C) : const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                        width: 1.2,
+                        color: isDark ? const Color(0xFF166534) : const Color(0xFF86EFAC),
+                        width: 1,
                       ),
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      'B',
+                      'B Templates',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                        color: isDark ? const Color(0xFF22C55E) : const Color(0xFF15803D),
                         fontFamily: 'Gontserrat',
                       ),
                     ),
@@ -1147,25 +1078,45 @@ class ChatComposerState extends State<ChatComposer> {
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
               child: Row(
                 children: [
-                  // Smart reply prediction into text field (Selection 3)
-                  IconButton(
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedSparkles,
-                      size: 19,
-                      color: textSecondary,
+                  // Suggest reply chip (matching Crop 2 & Crop 3)
+                  InkWell(
+                    onTap: _handleSmartReplyPrediction,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const HugeIcon(
+                            icon: HugeIcons.strokeRoundedSparkles,
+                            size: 14,
+                            color: Color(0xFF8B5CF6),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isArabic ? 'اقتراح رد' : 'Suggest reply',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF8B5CF6),
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    padding: const EdgeInsets.all(5),
-                    constraints: const BoxConstraints(),
-                    tooltip: isArabic ? 'اقتراح رد في خانة الكتابة' : 'AI Suggested Reply',
-                    onPressed: _handleSmartReplyPrediction,
                   ),
-                  const SizedBox(width: 2),
+                  const SizedBox(width: 4),
 
-                  // Canned Responses with Old Logo (Lightning bolt ⚡ - Selection 4)
+                  // Canned Responses with Bubble & 3 dots (matching Crop 4)
                   IconButton(
                     icon: Icon(
-                      Icons.bolt_rounded,
-                      size: 21,
+                      Icons.sms_outlined,
+                      size: 20,
                       color: textSecondary,
                     ),
                     padding: const EdgeInsets.all(5),
@@ -1174,6 +1125,35 @@ class ChatComposerState extends State<ChatComposer> {
                     onPressed: widget.onOpenCannedResponses,
                   ),
                   const SizedBox(width: 2),
+
+                  // B Templates chip when WhatsApp channel is active (matching Crop 1)
+                  if (widget.channelType.toLowerCase().contains('whatsapp')) ...[
+                    InkWell(
+                      onTap: widget.onOpenTemplates ?? _showTemplatesSheet,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF132A1C) : const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF166534) : const Color(0xFF86EFAC),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          'B Templates',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF22C55E) : const Color(0xFF15803D),
+                            fontFamily: 'Gontserrat',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                  ],
 
                   // Emoji picker
                   IconButton(
@@ -1203,7 +1183,7 @@ class ChatComposerState extends State<ChatComposer> {
                   ),
                   const SizedBox(width: 2),
 
-                  // Microphone Voice Note (Selection 5 - Now fully functional)
+                  // Microphone Voice Note (matching Crop 5)
                   IconButton(
                     icon: HugeIcon(
                       icon: HugeIcons.strokeRoundedMic01,

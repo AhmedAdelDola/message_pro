@@ -35,7 +35,9 @@ class NotificationSettings extends Equatable {
   }
 
   bool hasPushFlag(String eventKey) {
-    return selectedPushFlags.contains('push_$eventKey') || selectedPushFlags.contains(eventKey);
+    return selectedPushFlags.contains('mobile_push_$eventKey') ||
+        selectedPushFlags.contains('push_$eventKey') ||
+        selectedPushFlags.contains(eventKey);
   }
 
   NotificationSettings toggleEmailFlag(String eventKey, bool enable) {
@@ -116,8 +118,9 @@ class NotificationSettings extends Equatable {
     }
 
     final pushList = <String>[];
-    if (source['selected_push_flags'] is List) {
-      for (final item in source['selected_push_flags']) {
+    final rawPush = source['selected_mobile_push_flags'] ?? source['selected_push_flags'];
+    if (rawPush is List) {
+      for (final item in rawPush) {
         if (item != null) pushList.add(item.toString());
       }
     }
@@ -142,9 +145,16 @@ class NotificationSettings extends Equatable {
   }
 
   Map<String, dynamic> toUpdatePayload() {
+    final mobileFlags = selectedPushFlags.map((f) {
+      if (f.startsWith('mobile_push_')) return f;
+      if (f.startsWith('push_')) return f.replaceFirst('push_', 'mobile_push_');
+      return 'mobile_push_$f';
+    }).toList();
+
     final flags = {
       'selected_email_flags': selectedEmailFlags,
       'selected_push_flags': selectedPushFlags,
+      'selected_mobile_push_flags': mobileFlags,
     };
     return {
       'notification_settings': flags,

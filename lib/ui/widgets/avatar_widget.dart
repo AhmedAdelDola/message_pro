@@ -157,13 +157,13 @@ class AvatarWidget extends StatelessWidget {
     final badgeSize = (responsiveSize * 0.42).clamp(16.0, 22.0);
     final borderColor = Theme.of(context).cardColor;
 
-    // 1. WhatsApp: WhatsApp icon (green background with phone/chat icon or WhatsApp badge)
+    // 1. WhatsApp: WhatsApp icon (green circle with white chat bubble matching CRM web exactly)
     if (lower.contains('whatsapp')) {
       return Container(
         width: badgeSize,
         height: badgeSize,
         decoration: BoxDecoration(
-          color: const Color(0xFF25D366),
+          color: const Color(0xFF22C55E),
           shape: BoxShape.circle,
           border: Border.all(
             color: borderColor,
@@ -171,20 +171,14 @@ class AvatarWidget extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF25D366).withValues(alpha: 0.35),
+              color: const Color(0xFF22C55E).withValues(alpha: 0.35),
               blurRadius: 2,
               offset: const Offset(0, 1),
             ),
           ],
         ),
-        child: ClipOval(
-          child: Image.asset(
-            'assets/images/channels/whatsapp.png',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Center(
-              child: Icon(Icons.chat_bubble_rounded, size: badgeSize * 0.58, color: Colors.white),
-            ),
-          ),
+        child: Center(
+          child: Icon(Icons.chat_bubble, size: badgeSize * 0.58, color: Colors.white),
         ),
       );
     }

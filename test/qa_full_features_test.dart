@@ -164,6 +164,36 @@ class FakeConversationRepository implements IConversationRepository {
 
   @override
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses() async => const Right([]);
+
+  @override
+  Future<Either<Failure, List<MessageTemplate>>> fetchConversationTemplates(int conversationId) async => const Right([]);
+
+  @override
+  Future<Either<Failure, Message>> sendBrowserWhatsAppList({
+    required int conversationId,
+    required String templateId,
+    required Map<String, dynamic> variables,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Contact>> getCollaborators(int conversationId) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId) async => const Right([]);
+
+  @override
+  Future<Either<Failure, Conversation>> startNewConversation({
+    required int contactId,
+    required int inboxId,
+    required String sourceId,
+    String? message,
+  }) async => throw UnimplementedError();
 }
 
 class FakeAuthRepository implements IAuthRepository {
@@ -230,10 +260,16 @@ class FakeNotificationRepository implements INotificationRepository {
   String? lastRegisteredToken;
 
   @override
-  Future<Either<Failure, List<NotificationItem>>> getNotifications({int page = 1}) async => Right(notifications);
+  Future<Either<Failure, List<NotificationItem>>> getNotifications({int page = 1, bool includeRead = false, bool includeSnoozed = false}) async => Right(notifications);
 
   @override
   Future<Either<Failure, void>> markAsRead(int id) async => const Right(null);
+
+  @override
+  Future<Either<Failure, void>> markAsUnread(int id) async => const Right(null);
+
+  @override
+  Future<Either<Failure, void>> archiveNotification(int id) async => const Right(null);
 
   @override
   Future<Either<Failure, void>> markAllAsRead() async {

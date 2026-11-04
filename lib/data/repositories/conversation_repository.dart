@@ -38,6 +38,22 @@ abstract class IConversationRepository {
     Map<String, dynamic>? processedParams,
   });
   Future<Either<Failure, List<MessageTemplate>>> fetchInboxTemplates(int inboxId);
+  Future<Either<Failure, List<MessageTemplate>>> fetchConversationTemplates(int conversationId);
+  Future<Either<Failure, Message>> sendBrowserWhatsAppList({
+    required int conversationId,
+    required String templateId,
+    required Map<String, dynamic> variables,
+  });
+  Future<Either<Failure, Contact>> getCollaborators(int conversationId);
+  Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId);
+  Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId);
+  Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId);
+  Future<Either<Failure, Conversation>> startNewConversation({
+    required int contactId,
+    required int inboxId,
+    required String sourceId,
+    String? message,
+  });
   Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil});
   Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType});
   Future<Either<Failure, void>> pinConversation(int conversationId);
@@ -378,6 +394,172 @@ class ConversationRepository implements IConversationRepository {
       return Right(_getDefaultApprovedTemplates());
     } catch (_) {
       return Right(_getDefaultApprovedTemplates());
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MessageTemplate>>> fetchConversationTemplates(int conversationId) async {
+    try {
+      // Endpoint: GET /api/v1/accounts/:account_id/conversations/:conversation_id/message_templates
+      final response = await _api.get('conversations/$conversationId/message_templates');
+      final data = response.data;
+      final rawTemplates = data is Map ? (data['payload'] ?? data['data']) : (data is List ? data : null);
+
+      final list = <MessageTemplate>[];
+      if (rawTemplates is List) {
+        for (final t in rawTemplates) {
+          if (t is Map) {
+            try {
+              final tpl = MessageTemplate.fromJson(Map<String, dynamic>.from(t));
+              if (tpl.name.isNotEmpty) list.add(tpl);
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (list.isNotEmpty) {
+        MessageTemplateRegistry.registerAll(list);
+        return Right(list);
+      }
+      return Right(_getDefaultApprovedTemplates());
+    } catch (_) {
+      return Right(_getDefaultApprovedTemplates());
+    }
+  }
+
+  @override
+  Future<Either<Failure, Message>> sendBrowserWhatsAppList({
+    required int conversationId,
+    required String templateId,
+    required Map<String, dynamic> variables,
+  }) async {
+    try {
+      final response = await _api.post(
+        'conversations/$conversationId/messages/send_browser_whatsapp_list',
+        data: {
+          'template_id': templateId,
+          'variables': variables,
+        },
+      );
+      final resData = response.data;
+      final msgMap = (resData is Map && resData['payload'] is Map)
+          ? resData['payload']
+          : (resData is Map ? resData : <String, dynamic>{});
+      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
+      return Right(message);
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل إرسال قائمة واتساب'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Contact>> getCollaborators(int conversationId) async {
+    try {
+      final response = await _api.get('conversations/$conversationId/collaborators');
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return Right(Contact.fromJson(data));
+      } else if (data is Map) {
+        return Right(Contact.fromJson(Map<String, dynamic>.from(data)));
+      }
+      return Left(ServerFailure('Invalid response for collaborators'));
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل تحميل المتعاونين'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId) async {
+    try {
+      final response = await _api.post(
+        'conversations/$conversationId/collaborators',
+        data: {'user_id': userId},
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return Right(Contact.fromJson(data));
+      } else if (data is Map) {
+        return Right(Contact.fromJson(Map<String, dynamic>.from(data)));
+      }
+      return Left(ServerFailure('Invalid response'));
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل إضافة المتعاون'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId) async {
+    try {
+      final response = await _api.delete('conversations/$conversationId/collaborators/$userId');
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return Right(Contact.fromJson(data));
+      } else if (data is Map) {
+        return Right(Contact.fromJson(Map<String, dynamic>.from(data)));
+      }
+      return Left(ServerFailure('Invalid response'));
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل حذف المتعاون'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId) async {
+    try {
+      final response = await _api.get('contacts/$contactId/contactable_inboxes');
+      final data = response.data;
+      final raw = data is Map ? (data['payload'] ?? data['data']) : (data is List ? data : null);
+      if (raw is List) {
+        return Right(raw.map((item) => Map<String, dynamic>.from(item as Map)).toList());
+      }
+      return const Right([]);
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل جلب القنوات المتاحة للعميل'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Conversation>> startNewConversation({
+    required int contactId,
+    required int inboxId,
+    required String sourceId,
+    String? message,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'contact_id': contactId,
+        'inbox_id': inboxId,
+        'source_id': sourceId,
+        'status': 'open',
+      };
+      if (message != null && message.trim().isNotEmpty) {
+        payload['message'] = {
+          'content': message.trim(),
+          'message_type': 'outgoing',
+          'private': false,
+        };
+      }
+      final response = await _api.post('conversations', data: payload);
+      final data = response.data;
+      final rawConv = data is Map ? (data['payload'] ?? data['data'] ?? data) : null;
+      if (rawConv is Map) {
+        return Right(Conversation.fromJson(Map<String, dynamic>.from(rawConv)));
+      }
+      return Left(ServerFailure('فشل بدء المحادثة'));
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل إنشاء المحادثة'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
     }
   }
 
