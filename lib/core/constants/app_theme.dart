@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
@@ -7,6 +6,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: 'Gontserrat',
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.lightBackground,
       colorScheme: const ColorScheme.light(
@@ -24,6 +24,7 @@ class AppTheme {
         scrolledUnderElevation: 0.5,
         iconTheme: IconThemeData(color: AppColors.textDarkPrimary),
         titleTextStyle: TextStyle(
+          fontFamily: 'Gontserrat',
           color: AppColors.textDarkPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -38,9 +39,19 @@ class AppTheme {
           side: const BorderSide(color: AppColors.lightBorder, width: 1),
         ),
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme).apply(
-        bodyColor: AppColors.textDarkPrimary,
-        displayColor: AppColors.textDarkPrimary,
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary),
+        headlineMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary),
+        headlineSmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
+        titleLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary),
+        titleMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
+        titleSmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
+        bodyLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w400, color: AppColors.textDarkPrimary),
+        bodyMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w400, color: AppColors.textDarkPrimary),
+        bodySmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w400, color: AppColors.textDarkSecondary),
+        labelLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
+        labelMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w500, color: AppColors.textDarkSecondary),
+        labelSmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w500, color: AppColors.textDarkMuted),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.lightBorder,
@@ -49,25 +60,29 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.lightSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: AppColors.lightInputBg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: AppColors.lightBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: AppColors.lightBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primaryLight, width: 1.5),
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.danger),
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: Color(0xFFFB7185)),
         ),
-        hintStyle: const TextStyle(color: AppColors.textDarkMuted, fontSize: 14),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: Color(0xFFFB7185), width: 1.5),
+        ),
+        hintStyle: const TextStyle(fontFamily: 'Gontserrat', color: AppColors.textDarkMuted, fontSize: 13),
       ),
     );
   }
@@ -76,6 +91,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'Gontserrat',
       primaryColor: AppColors.primaryLight,
       scaffoldBackgroundColor: AppColors.darkBackground,
       colorScheme: const ColorScheme.dark(
@@ -93,6 +109,7 @@ class AppTheme {
         scrolledUnderElevation: 0.5,
         iconTheme: IconThemeData(color: AppColors.textLightPrimary),
         titleTextStyle: TextStyle(
+          fontFamily: 'Gontserrat',
           color: AppColors.textLightPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -107,9 +124,19 @@ class AppTheme {
           side: const BorderSide(color: AppColors.darkBorder, width: 1),
         ),
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).apply(
-        bodyColor: AppColors.textLightPrimary,
-        displayColor: AppColors.textLightPrimary,
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w700, color: AppColors.textLightPrimary),
+        headlineMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w700, color: AppColors.textLightPrimary),
+        headlineSmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
+        titleLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w700, color: AppColors.textLightPrimary),
+        titleMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
+        titleSmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
+        bodyLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w400, color: AppColors.textLightPrimary),
+        bodyMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w400, color: AppColors.textLightPrimary),
+        bodySmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w400, color: AppColors.textLightSecondary),
+        labelLarge: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
+        labelMedium: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w500, color: AppColors.textLightSecondary),
+        labelSmall: TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w500, color: AppColors.textLightMuted),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.darkBorder,
@@ -118,25 +145,29 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.darkSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: AppColors.darkInputBg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: AppColors.darkBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: AppColors.darkBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primaryLight, width: 1.5),
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.danger),
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: Color(0xFFFB7185)),
         ),
-        hintStyle: const TextStyle(color: AppColors.textLightMuted, fontSize: 14),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: Color(0xFFFB7185), width: 1.5),
+        ),
+        hintStyle: const TextStyle(fontFamily: 'Gontserrat', color: AppColors.textLightMuted, fontSize: 13),
       ),
     );
   }

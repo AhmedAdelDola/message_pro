@@ -3,9 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:message_pro/firebase_options.dart';
 import 'core/config/app_config.dart';
 import 'core/constants/app_theme.dart';
 import 'core/di/injection_container.dart';
+import 'core/services/push_notification_service.dart';
+import 'core/services/sound_service.dart';
 import 'logic/auth/auth_cubit.dart';
 import 'logic/conversation/conversation_cubit.dart';
 import 'logic/notification/notification_cubit.dart';
@@ -13,15 +18,43 @@ import 'logic/calls/calls_cubit.dart';
 import 'logic/settings/settings_cubit.dart';
 import 'logic/settings/settings_state.dart';
 import 'logic/shorebird/shorebird_cubit.dart';
+import 'core/utils/app_bloc_observer.dart';
 import 'ui/screens/splash/splash_screen.dart';
+
+/// Top-level background message handler for Firebase Messaging
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      try {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      } catch (_) {
+        await Firebase.initializeApp();
+      }
+    }
+  } catch (e) {
+    debugPrint('[PushNotification] Error in background handler: $e');
+  }
+  debugPrint('[PushNotification] Background message: ${message.messageId}, data: ${message.data}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+);
+  // Set Bloc Observer for pretty state logs
+  Bloc.observer = AppBlocObserver();
   // Initialize Dependency Injection with GetIt
   await initDI();
+  await SoundService().init();
+
+  // Initialize Firebase and Push Notifications
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await PushNotificationService.initialize();
 
   // Set preferred orientations
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -55,6 +88,7 @@ class MessageProApp extends StatelessWidget {
                 previous.locale != current.locale,
             builder: (context, settingsState) {
               return MaterialApp(
+                navigatorKey: PushNotificationService.navigatorKey,
                 title: AppConfig.appName,
                 debugShowCheckedModeBanner: false,
                 theme: AppTheme.lightTheme(),

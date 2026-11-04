@@ -4,8 +4,11 @@ import 'user.dart';
 
 class Conversation {
   final int id;
+  final int? recordId;
   final int accountId;
   final int inboxId;
+  final String? inboxName;
+  final Inbox? inbox;
   final String status; // open, resolved, pending, snoozed
   final int unreadCount;
   final String? priority;
@@ -18,11 +21,21 @@ class Conversation {
   final LifecycleStage? lifecycleStage;
   final DateTime updatedAt;
   final DateTime createdAt;
+  final bool canReply;
+  final DateTime? snoozedUntil;
+  final DateTime? contactLastSeenAt;
+  final String? replyBlockReason;
+  final bool muted;
+
+  String get channelType => inbox?.channelType ?? channel;
 
   Conversation({
     required this.id,
+    this.recordId,
     required this.accountId,
     required this.inboxId,
+    this.inboxName,
+    this.inbox,
     this.status = 'open',
     this.unreadCount = 0,
     this.priority,
@@ -35,12 +48,20 @@ class Conversation {
     this.lifecycleStage,
     required this.updatedAt,
     required this.createdAt,
+    this.canReply = true,
+    this.snoozedUntil,
+    this.contactLastSeenAt,
+    this.replyBlockReason,
+    this.muted = false,
   });
 
   Conversation copyWith({
     int? id,
+    int? recordId,
     int? accountId,
     int? inboxId,
+    String? inboxName,
+    Inbox? inbox,
     String? status,
     int? unreadCount,
     String? priority,
@@ -53,11 +74,19 @@ class Conversation {
     LifecycleStage? lifecycleStage,
     DateTime? updatedAt,
     DateTime? createdAt,
+    bool? canReply,
+    DateTime? snoozedUntil,
+    DateTime? contactLastSeenAt,
+    String? replyBlockReason,
+    bool? muted,
   }) {
     return Conversation(
       id: id ?? this.id,
+      recordId: recordId ?? this.recordId,
       accountId: accountId ?? this.accountId,
       inboxId: inboxId ?? this.inboxId,
+      inboxName: inboxName ?? this.inboxName,
+      inbox: inbox ?? this.inbox,
       status: status ?? this.status,
       unreadCount: unreadCount ?? this.unreadCount,
       priority: priority ?? this.priority,
@@ -70,56 +99,99 @@ class Conversation {
       lifecycleStage: lifecycleStage ?? this.lifecycleStage,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
+      canReply: canReply ?? this.canReply,
+      snoozedUntil: snoozedUntil ?? this.snoozedUntil,
+      contactLastSeenAt: contactLastSeenAt ?? this.contactLastSeenAt,
+      replyBlockReason: replyBlockReason ?? this.replyBlockReason,
+      muted: muted ?? this.muted,
     );
   }
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    final rawId = json['id'] ?? json['conversation_id'] ?? json['display_id'];
+    final int convId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+
     // Contact extraction
     Contact parsedContact;
-    if (json['meta'] != null && json['meta']['sender'] is Map<String, dynamic>) {
-      parsedContact = Contact.fromJson(json['meta']['sender']);
-    } else if (json['contact'] is Map<String, dynamic>) {
-      parsedContact = Contact.fromJson(json['contact']);
+    if (json['meta'] != null && json['meta']['sender'] is Map) {
+      parsedContact = Contact.fromJson(Map<String, dynamic>.from(json['meta']['sender']));
+    } else if (json['contact'] is Map) {
+      parsedContact = Contact.fromJson(Map<String, dynamic>.from(json['contact']));
+    } else if (json['sender'] is Map) {
+      parsedContact = Contact.fromJson(Map<String, dynamic>.from(json['sender']));
     } else {
-      parsedContact = Contact(id: 0, name: 'Contact #${json['id']}');
+      parsedContact = Contact(
+        id: 0,
+        name: convId > 0 ? 'عميل #$convId' : 'عميل جديد',
+      );
     }
 
     // Last message
     Message? lastMsg;
-    final rawLast = json['last_non_activity_message'] ?? json['messages'] is List && (json['messages'] as List).isNotEmpty ? (json['messages'] as List).last : null;
-    if (rawLast is Map<String, dynamic>) {
-      lastMsg = Message.fromJson(rawLast);
+    dynamic rawLast = json['last_non_activity_message'];
+    if (rawLast == null && json['messages'] is List && (json['messages'] as List).isNotEmpty) {
+      rawLast = (json['messages'] as List).last;
+    }
+    if (rawLast is Map) {
+      try {
+        lastMsg = Message.fromJson(Map<String, dynamic>.from(rawLast));
+      } catch (_) {}
     }
 
     // Assignee
     User? parsedAssignee;
     final rawAssignee = json['meta']?['assignee'] ?? json['assignee'];
-    if (rawAssignee is Map<String, dynamic>) {
-      parsedAssignee = User.fromJson(rawAssignee);
+    if (rawAssignee is Map) {
+      try {
+        parsedAssignee = User.fromJson(Map<String, dynamic>.from(rawAssignee));
+      } catch (_) {}
     }
 
     // Team
     Team? parsedTeam;
     final rawTeam = json['meta']?['team'] ?? json['team'];
-    if (rawTeam is Map<String, dynamic>) {
-      parsedTeam = Team.fromJson(rawTeam);
+    if (rawTeam is Map) {
+      try {
+        parsedTeam = Team.fromJson(Map<String, dynamic>.from(rawTeam));
+      } catch (_) {}
+    }
+
+    // Inbox parsing
+    Inbox? parsedInbox;
+    final rawInbox = json['inbox'];
+    if (rawInbox is Map) {
+      try {
+        parsedInbox = Inbox.fromJson(Map<String, dynamic>.from(rawInbox));
+      } catch (_) {}
     }
 
     // Channel detection
     String ch = 'web';
-    final rawChannel = json['meta']?['channel'] ?? json['inbox']?['channel_type'];
+    final rawChannel = parsedInbox?.channelType ??
+        json['meta']?['channel'] ??
+        json['channel'] ??
+        json['channel_type'] ??
+        json['inbox']?['channel_type'];
     if (rawChannel is String) {
       final lower = rawChannel.toLowerCase();
       if (lower.contains('whatsapp')) {
         ch = 'whatsapp';
-      } else if (lower.contains('facebook')) {
+      } else if (lower.contains('instagram')) {
+        ch = 'instagram';
+      } else if (lower.contains('facebook') || lower.contains('messenger')) {
         ch = 'facebook';
       } else if (lower.contains('email')) {
         ch = 'email';
       } else if (lower.contains('telegram')) {
         ch = 'telegram';
+      } else if (lower.contains('sms')) {
+        ch = 'sms';
       } else if (lower.contains('api')) {
         ch = 'api';
+      } else if (lower.contains('line')) {
+        ch = 'line';
+      } else if (lower.contains('web') || lower.contains('widget')) {
+        ch = 'web';
       }
     }
 
@@ -138,43 +210,111 @@ class Conversation {
 
     // Lifecycle stage
     LifecycleStage? stage;
-    final rawStage = json['lifecycle_stage'];
-    if (rawStage is Map<String, dynamic>) {
-      stage = LifecycleStage.fromJson(rawStage);
-    }
-
-    DateTime dtUpdated = DateTime.now();
-    if (json['timestamp'] != null) {
-      final t = json['timestamp'];
-      if (t is int) {
-        dtUpdated = DateTime.fromMillisecondsSinceEpoch(t > 1e11 ? t : t * 1000);
-      }
-    } else if (json['last_activity_at'] != null) {
-      final t = json['last_activity_at'];
-      if (t is int) {
-        dtUpdated = DateTime.fromMillisecondsSinceEpoch(t > 1e11 ? t : t * 1000);
-      } else if (t is String) {
-        dtUpdated = DateTime.tryParse(t) ?? DateTime.now();
+    final rawStage = json['lifecycle_stage'] ??
+        json['meta']?['sender']?['lifecycle_stage'] ??
+        json['contact']?['lifecycle_stage'];
+    if (rawStage is Map) {
+      try {
+        stage = LifecycleStage.fromJson(Map<String, dynamic>.from(rawStage));
+      } catch (_) {}
+    } else {
+      final caStage = json['custom_attributes']?['lifecycle_stage'] ??
+          json['meta']?['sender']?['custom_attributes']?['lifecycle_stage'];
+      if (caStage is String && caStage.trim().isNotEmpty) {
+        final words = caStage.replaceAll('_', ' ').split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
+        final name = words.map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+        stage = LifecycleStage(id: 0, name: name, color: '#4162E3', icon: '🌱');
       }
     }
 
-    DateTime dtCreated = DateTime.now();
-    if (json['created_at'] != null) {
-      final c = json['created_at'];
-      if (c is int) {
-        dtCreated = DateTime.fromMillisecondsSinceEpoch(c > 1e11 ? c : c * 1000);
-      } else if (c is String) {
-        dtCreated = DateTime.tryParse(c) ?? DateTime.now();
+    DateTime dtCreated = DateTime.fromMillisecondsSinceEpoch(0);
+    final rawCreated = json['created_at'];
+    if (rawCreated != null) {
+      if (rawCreated is num) {
+        final val = rawCreated.toInt();
+        dtCreated = DateTime.fromMillisecondsSinceEpoch(val > 1e11 ? val : val * 1000);
+      } else if (rawCreated is String) {
+        dtCreated = DateTime.tryParse(rawCreated) ?? DateTime.fromMillisecondsSinceEpoch(0);
       }
     }
+
+    DateTime dtUpdated = dtCreated;
+    final rawUpdated = json['last_activity_at'] ?? json['updated_at'] ?? json['timestamp'];
+    if (rawUpdated != null) {
+      if (rawUpdated is num) {
+        final val = rawUpdated.toInt();
+        dtUpdated = DateTime.fromMillisecondsSinceEpoch(val > 1e11 ? val : val * 1000);
+      } else if (rawUpdated is String) {
+        dtUpdated = DateTime.tryParse(rawUpdated) ?? dtCreated;
+      }
+    }
+
+    final rawInboxId = json['inbox_id'] ?? json['inbox']?['id'];
+    final int inbId = rawInboxId is int ? rawInboxId : int.tryParse(rawInboxId?.toString() ?? '') ?? 0;
+    final String? inbName = json['inbox']?['name']?.toString() ?? json['meta']?['inbox']?['name']?.toString();
+
+    final rawAccountId = json['account_id'] ?? json['account']?['id'];
+    final int accId = rawAccountId is int ? rawAccountId : int.tryParse(rawAccountId?.toString() ?? '') ?? 0;
+
+    String cStatus = 'open';
+    final rawStatus = json['status'];
+    if (rawStatus is int) {
+      if (rawStatus == 1) {
+        cStatus = 'resolved';
+      } else if (rawStatus == 2) {
+        cStatus = 'pending';
+      } else if (rawStatus == 3) {
+        cStatus = 'snoozed';
+      } else {
+        cStatus = 'open';
+      }
+    } else if (rawStatus != null) {
+      cStatus = rawStatus.toString();
+    }
+
+    final rawUnread = json['unread_count'];
+    final int unread = rawUnread is int ? rawUnread : (int.tryParse(rawUnread?.toString() ?? '0') ?? 0);
+
+    final rawReplyBlockReason = json['reply_block_reason']?.toString() ?? json['meta']?['reply_block_reason']?.toString();
+    final bool rawCanReply = json['can_reply'] ?? json['meta']?['can_reply'] ?? true;
+    final bool canReply = rawCanReply && rawReplyBlockReason == null;
+
+    DateTime? dtContactLastSeen;
+    final rawContactSeen = json['contact_last_seen_at'] ?? json['meta']?['contact_last_seen_at'];
+    if (rawContactSeen != null) {
+      if (rawContactSeen is num && rawContactSeen > 0) {
+        final val = rawContactSeen.toInt();
+        dtContactLastSeen = DateTime.fromMillisecondsSinceEpoch(val > 1e11 ? val : val * 1000);
+      } else if (rawContactSeen is String) {
+        dtContactLastSeen = DateTime.tryParse(rawContactSeen);
+      }
+    }
+
+    DateTime? dtSnoozed;
+    final rawSnoozed = json['snoozed_until'];
+    if (rawSnoozed != null) {
+      if (rawSnoozed is num) {
+        final val = rawSnoozed.toInt();
+        dtSnoozed = DateTime.fromMillisecondsSinceEpoch(val > 1e11 ? val : val * 1000);
+      } else if (rawSnoozed is String) {
+        dtSnoozed = DateTime.tryParse(rawSnoozed);
+      }
+    }
+
+    final bool isMuted = json['muted'] == true ||
+        json['meta']?['muted'] == true ||
+        json['muted_at'] != null;
 
     return Conversation(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
-      accountId: json['account_id'] is int ? json['account_id'] : int.tryParse(json['account_id'].toString()) ?? 0,
-      inboxId: json['inbox_id'] is int ? json['inbox_id'] : int.tryParse(json['inbox_id'].toString()) ?? 0,
-      status: json['status'] ?? 'open',
-      unreadCount: json['unread_count'] is int ? json['unread_count'] : 0,
-      priority: json['priority'],
+      id: convId > 0 ? convId : (json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0),
+      recordId: json['record_id'] is int ? json['record_id'] : int.tryParse(json['record_id']?.toString() ?? ''),
+      accountId: accId,
+      inboxId: inbId,
+      inboxName: inbName,
+      inbox: parsedInbox,
+      status: cStatus,
+      unreadCount: unread,
+      priority: json['priority']?.toString(),
       channel: ch,
       contact: parsedContact,
       lastMessage: lastMsg,
@@ -184,6 +324,11 @@ class Conversation {
       lifecycleStage: stage,
       updatedAt: dtUpdated,
       createdAt: dtCreated,
+      canReply: canReply,
+      snoozedUntil: dtSnoozed,
+      contactLastSeenAt: dtContactLastSeen,
+      replyBlockReason: rawReplyBlockReason,
+      muted: isMuted,
     );
   }
 }

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../config/app_config.dart';
 import '../storage/secure_storage_service.dart';
 import 'auth_interceptor.dart';
@@ -23,6 +25,18 @@ class ApiClient {
       ),
     );
     _dio.interceptors.add(AuthInterceptor());
+    _dio.interceptors.add(
+      PrettyDioLogger(
+        requestHeader: true,
+        requestBody: true,
+        responseBody: true,
+        responseHeader: true,
+        error: true,
+        compact: false,
+        maxWidth: 120,
+        logPrint: (object) => debugPrint('$object'),
+      ),
+    );
     _initBaseUrl();
   }
 

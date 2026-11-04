@@ -31,7 +31,15 @@ class AuthInterceptor extends Interceptor {
       } else if (isNonAccount) {
         options.path = 'api/v1/$rawPath';
       } else {
-        final accountId = await _storage.getActiveAccountId();
+        var accountId = await _storage.getActiveAccountId();
+        if (accountId == null || accountId <= 0) {
+          final userData = await _storage.getUserData();
+          final userAcc = userData?['account_id'] ?? userData?['current_account_id'];
+          if (userAcc is int && userAcc > 0) {
+            accountId = userAcc;
+            await _storage.saveActiveAccountId(userAcc);
+          }
+        }
         if (accountId != null && accountId > 0) {
           options.path = 'api/v1/accounts/$accountId/$rawPath';
         } else {

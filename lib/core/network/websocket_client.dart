@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/app_config.dart';
@@ -22,9 +23,27 @@ class ActionCableClient {
   Timer? _reconnectTimer;
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _wasConnectedBefore = false;
+  int _reconnectAttempts = 0;
+
+  String? _lastPubSubToken;
+  int? _lastAccountId;
+  int? _lastUserId;
+  String? _lastCustomWsUrl;
 
   final _eventController = StreamController<RealtimeEvent>.broadcast();
   Stream<RealtimeEvent> get events => _eventController.stream;
+
+  final _reconnectedController = StreamController<void>.broadcast();
+  /// Fires whenever the WebSocket successfully reconnects after a disconnect.
+  /// Listeners should use this to refresh/reload conversations and messages.
+  Stream<void> get onReconnected => _reconnectedController.stream;
+
+  final _connectionStateController = StreamController<bool>.broadcast();
+  Stream<bool> get isConnectedStream => _connectionStateController.stream;
+
+  bool get isConnected => _isConnected;
+  bool get isConnecting => _isConnecting;
 
   final SecureStorageService _storage = SecureStorageService();
 
@@ -34,6 +53,11 @@ class ActionCableClient {
     required int userId,
     String? customWsUrl,
   }) async {
+    _lastPubSubToken = pubSubToken;
+    _lastAccountId = accountId;
+    _lastUserId = userId;
+    _lastCustomWsUrl = customWsUrl;
+
     if (_isConnecting || _isConnected) return;
     _isConnecting = true;
 
@@ -46,7 +70,7 @@ class ActionCableClient {
         wsUrl = '$scheme$host/cable';
       }
 
-      debugPrint('Connecting to WebSocket: $wsUrl');
+      debugPrint('Connecting to WebSocket: $wsUrl (attempt: $_reconnectAttempts)');
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
       _channel!.stream.listen(
@@ -54,25 +78,34 @@ class ActionCableClient {
           _handleMessage(rawMessage, pubSubToken, accountId, userId);
         },
         onDone: () {
-          _handleDisconnect(pubSubToken, accountId, userId);
+          debugPrint('WebSocket stream closed (onDone)');
+          _handleDisconnect();
         },
         onError: (error) {
           debugPrint('WebSocket error: $error');
-          _handleDisconnect(pubSubToken, accountId, userId);
+          _handleDisconnect();
         },
       );
 
       _isConnected = true;
       _isConnecting = false;
+      _connectionStateController.add(true);
 
       // Subscribe to RoomChannel
       _subscribe(pubSubToken, accountId, userId);
 
       // Start presence timer
       _startPresenceTimer(pubSubToken, accountId, userId);
+
+      if (_wasConnectedBefore) {
+        debugPrint('WebSocket reconnected successfully! Emitting onReconnected');
+        _reconnectedController.add(null);
+      }
+      _wasConnectedBefore = true;
+      _reconnectAttempts = 0;
     } catch (e) {
       debugPrint('WebSocket connection failed: $e');
-      _handleDisconnect(pubSubToken, accountId, userId);
+      _handleDisconnect();
     }
   }
 
@@ -91,7 +124,11 @@ class ActionCableClient {
       'identifier': identifier,
     });
 
-    _channel!.sink.add(payload);
+    try {
+      _channel!.sink.add(payload);
+    } catch (e) {
+      debugPrint('Error subscribing to RoomChannel: $e');
+    }
   }
 
   void _startPresenceTimer(String token, int accountId, int userId) {
@@ -111,7 +148,9 @@ class ActionCableClient {
           'data': jsonEncode({'action': 'update_presence'}),
         });
 
-        _channel!.sink.add(payload);
+        try {
+          _channel!.sink.add(payload);
+        } catch (_) {}
       }
     });
   }
@@ -140,23 +179,59 @@ class ActionCableClient {
     }
   }
 
-  void _handleDisconnect(String token, int accountId, int userId) {
+  void _handleDisconnect() {
     _isConnected = false;
     _isConnecting = false;
+    _connectionStateController.add(false);
     _presenceTimer?.cancel();
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
+
+    if (_lastPubSubToken == null || _lastAccountId == null || _lastUserId == null) {
+      return;
+    }
+
+    _reconnectAttempts++;
+    final delaySeconds = min(20, max(2, pow(2, min(_reconnectAttempts, 4)).toInt()));
+    debugPrint('WebSocket disconnected. Reconnecting in $delaySeconds seconds (attempt $_reconnectAttempts)...');
 
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 4), () {
-      connect(pubSubToken: token, accountId: accountId, userId: userId);
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      if (!_isConnected && !_isConnecting && _lastPubSubToken != null) {
+        connect(
+          pubSubToken: _lastPubSubToken!,
+          accountId: _lastAccountId!,
+          userId: _lastUserId!,
+          customWsUrl: _lastCustomWsUrl,
+        );
+      }
     });
+  }
+
+  /// Manually force a reconnect and refresh
+  Future<void> refreshConnection() async {
+    disconnect();
+    if (_lastPubSubToken != null && _lastAccountId != null && _lastUserId != null) {
+      await connect(
+        pubSubToken: _lastPubSubToken!,
+        accountId: _lastAccountId!,
+        userId: _lastUserId!,
+        customWsUrl: _lastCustomWsUrl,
+      );
+    }
   }
 
   void disconnect() {
     _presenceTimer?.cancel();
     _reconnectTimer?.cancel();
-    _channel?.sink.close();
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
     _isConnected = false;
     _isConnecting = false;
+    _connectionStateController.add(false);
   }
 }

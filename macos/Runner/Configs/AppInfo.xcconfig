@@ -8,7 +8,7 @@
 PRODUCT_NAME = message_pro
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.message.pro.messagePro
+PRODUCT_BUNDLE_IDENTIFIER = com.message.pro.com
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.message.pro. All rights reserved.

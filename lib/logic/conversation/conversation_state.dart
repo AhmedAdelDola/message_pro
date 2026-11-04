@@ -7,7 +7,7 @@ class ConversationState extends Equatable {
   final List<Conversation> conversations;
   final bool isLoading;
   final String? errorMessage;
-  final String status; // open, resolved, pending, snoozed
+  final String status; // all, open, resolved, pending, snoozed
   final String assigneeType; // all, me, unassigned
   final int? selectedInboxId;
   final int? selectedTeamId;
@@ -18,12 +18,15 @@ class ConversationState extends Equatable {
   final List<Team> teams;
   final List<User> agents;
   final List<LifecycleStage> lifecycleStages;
+  final int page;
+  final bool isLoadingMore;
+  final bool hasMore;
 
   const ConversationState({
     this.conversations = const [],
     this.isLoading = false,
     this.errorMessage,
-    this.status = 'open',
+    this.status = 'all',
     this.assigneeType = 'all',
     this.selectedInboxId,
     this.selectedTeamId,
@@ -34,6 +37,9 @@ class ConversationState extends Equatable {
     this.teams = const [],
     this.agents = const [],
     this.lifecycleStages = const [],
+    this.page = 1,
+    this.isLoadingMore = false,
+    this.hasMore = true,
   });
 
   ConversationState copyWith({
@@ -51,6 +57,9 @@ class ConversationState extends Equatable {
     List<Team>? teams,
     List<User>? agents,
     List<LifecycleStage>? lifecycleStages,
+    int? page,
+    bool? isLoadingMore,
+    bool? hasMore,
     bool clearInbox = false,
     bool clearTeam = false,
     bool clearLabel = false,
@@ -71,6 +80,9 @@ class ConversationState extends Equatable {
       teams: teams ?? this.teams,
       agents: agents ?? this.agents,
       lifecycleStages: lifecycleStages ?? this.lifecycleStages,
+      page: page ?? this.page,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
     );
   }
 
@@ -90,5 +102,8 @@ class ConversationState extends Equatable {
         teams,
         agents,
         lifecycleStages,
+        page,
+        isLoadingMore,
+        hasMore,
       ];
 }

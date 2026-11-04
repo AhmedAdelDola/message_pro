@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/config/app_config.dart';
 import '../../../logic/auth/auth_cubit.dart';
 import '../../../logic/auth/auth_state.dart';
-import '../../../logic/shorebird/shorebird_cubit.dart';
-import '../../../logic/shorebird/shorebird_state.dart';
 import '../../widgets/avatar_widget.dart';
 import '../auth/login_screen.dart';
 import 'profile_screen.dart';
@@ -14,289 +9,605 @@ import 'workspaces_screen.dart';
 import 'appearance_screen.dart';
 import 'language_screen.dart';
 import 'change_password_screen.dart';
+import 'notification_settings_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _hapticEnabled = true;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final bgColor = isDark ? const Color(0xFF0D0D0D) : const Color(0xFFFAFAFA);
+    final textPrimary = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F);
+    final borderColor = isDark ? const Color(0xFF212121) : const Color(0xFFF0F0F3);
+    final iconBg = isDark ? const Color(0xFF161616) : const Color(0xFFF0F0F3);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('الإعدادات (Settings)'),
-      ),
-      body: BlocBuilder<AuthCubit, AuthState>(
-        builder: (context, authState) {
-          final user = authState is Authenticated ? authState.user : null;
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, authState) {
+            final user = authState is Authenticated ? authState.user : null;
+            final availability = user?.availabilityStatus ?? 'online';
+            Color statusColor;
+            String statusLabel;
+            switch (availability) {
+              case 'busy':
+                statusColor = const Color(0xFFFA8900);
+                statusLabel = isArabic ? 'مشغول (Busy)' : 'Busy';
+                break;
+              case 'offline':
+                statusColor = const Color(0xFF80838D);
+                statusLabel = isArabic ? 'غير متصل (Offline)' : 'Offline';
+                break;
+              case 'online':
+              default:
+                statusColor = const Color(0xFF2CA54A);
+                statusLabel = isArabic ? 'متصل (Online)' : 'Online';
+                break;
+            }
+            final accounts = user?.accounts ?? [];
+            final matchingAccount = accounts.where((a) => a.id == user?.accountId);
+            final activeAccountName = matchingAccount.isNotEmpty
+                ? matchingAccount.first.name
+                : (accounts.isNotEmpty
+                    ? accounts.first.name
+                    : (isArabic ? 'مساحة العمل الخاصة بي' : 'My Workspace'));
 
-          return ListView(
-            padding: EdgeInsets.symmetric(vertical: 12.h),
-            children: [
-              // User Card
-              if (user != null)
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              children: [
+                // Header Title
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                  child: Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0.r),
+                  padding: const EdgeInsets.only(top: 8, bottom: 16),
+                  child: Text(
+                    isArabic ? 'الإعدادات' : 'Settings',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: textPrimary,
+                      fontFamily: 'Gontserrat',
+                    ),
+                  ),
+                ),
+
+                // User Profile Row
+                if (user != null)
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+                      ),
                       child: Row(
                         children: [
-                          AvatarWidget(
-                            avatarUrl: user.avatarUrl,
-                            name: user.name,
-                            size: 54,
-                            isOnline: user.availabilityStatus == 'online',
-                            showStatus: true,
+                          // 52x52 Avatar with status ring
+                          Container(
+                            width: 52,
+                            height: 52,
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: statusColor,
+                                width: 2,
+                              ),
+                            ),
+                            child: AvatarWidget(
+                              avatarUrl: user.avatarUrl,
+                              name: user.name,
+                              size: 44,
+                              showStatus: true,
+                              availabilityStatus: availability,
+                            ),
                           ),
-                          SizedBox(width: 14.w),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  user.name,
-                                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                                  user.displayName != null && user.displayName!.isNotEmpty && user.displayName != user.name
+                                      ? '${user.name} (${user.displayName})'
+                                      : user.name,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                    fontFamily: 'Gontserrat',
+                                  ),
                                 ),
-                                SizedBox(height: 2.h),
+                                const SizedBox(height: 2),
                                 Text(
                                   user.email,
                                   style: TextStyle(
-                                    fontSize: 13.sp,
-                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                  ),
-                                ),
-                                SizedBox(height: 6.h),
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6.r),
-                                  ),
-                                  child: Text(
-                                    user.role.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 10.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primaryLight,
-                                    ),
+                                    fontSize: 13,
+                                    color: textSecondary,
+                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          Icon(
+                            isArabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                            color: const Color(0xFF80838D),
+                          ),
                         ],
                       ),
                     ),
                   ),
+
+                // SECTION: GENERAL
+                _buildSectionHeader(isArabic ? 'عام' : 'GENERAL'),
+
+                // Set Availability
+                _buildSettingsRow(
+                  icon: Icon(Icons.person_outline_rounded, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'تحديد الحالة:' : 'Set availability:',
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                          fontFamily: 'Gontserrat',
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () => _showAvailabilityPicker(context, availability, isArabic),
                 ),
 
-              // Availability Selector
-              if (user != null)
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
-                  child: Card(
-                    child: Column(
+                // SECTION: ACCOUNT
+                _buildSectionHeader(isArabic ? 'الحساب' : 'ACCOUNT'),
+
+                _buildSettingsRow(
+                  icon: Icon(Icons.domain_rounded, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'تغيير مساحة العمل' : 'Change Workspace',
+                  subtitle: activeAccountName,
+                  trailing: Icon(
+                    isArabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                    color: const Color(0xFF80838D),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const WorkspacesScreen()),
+                    );
+                  },
+                ),
+
+                _buildSettingsRow(
+                  icon: Icon(Icons.lock_outline_rounded, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'تغيير كلمة المرور' : 'Change Password',
+                  trailing: Icon(
+                    isArabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                    color: const Color(0xFF80838D),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+                    );
+                  },
+                ),
+
+                // SECTION: PREFERENCES
+                _buildSectionHeader(isArabic ? 'التفضيلات' : 'PREFERENCES'),
+
+                _buildSettingsRow(
+                  icon: Icon(Icons.language_rounded, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'اللغة' : 'Language',
+                  subtitle: isArabic ? 'العربية (Arabic)' : 'English',
+                  trailing: Icon(
+                    isArabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                    color: const Color(0xFF80838D),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LanguageScreen()),
+                    );
+                  },
+                ),
+
+                _buildSettingsRow(
+                  icon: Icon(Icons.dark_mode_outlined, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'المظهر' : 'Theme',
+                  subtitle: isDark ? 'Dark' : 'Light',
+                  trailing: Icon(
+                    isArabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                    color: const Color(0xFF80838D),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AppearanceScreen()),
+                    );
+                  },
+                ),
+
+                _buildSettingsRow(
+                  icon: Icon(Icons.notifications_outlined, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'إعدادات الإشعارات' : 'Notification Settings',
+                  trailing: Icon(
+                    isArabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                    color: const Color(0xFF80838D),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+                    );
+                  },
+                ),
+
+                _buildSettingsRow(
+                  icon: Icon(Icons.vibration_rounded, color: textSecondary, size: 20),
+                  iconBg: iconBg,
+                  borderColor: borderColor,
+                  title: isArabic ? 'الاهتزاز والتفاعل اللمسي' : 'Haptic Feedback',
+                  trailing: Switch(
+                    value: _hapticEnabled,
+                    activeThumbColor: const Color(0xFF4162E3),
+                    onChanged: (val) => setState(() => _hapticEnabled = val),
+                  ),
+                  onTap: () => setState(() => _hapticEnabled = !_hapticEnabled),
+                ),
+
+                // LOGOUT
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: () => _confirmLogout(context, isArabic),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+                    ),
+                    child: Row(
                       children: [
-                        ListTile(
-                          leading: Icon(Icons.circle, color: AppColors.success, size: 16.r),
-                          title: Text('متصل (Online)', style: TextStyle(fontSize: 14.sp)),
-                          trailing: user.availabilityStatus == 'online'
-                              ? const Icon(Icons.check, color: AppColors.success)
-                              : null,
-                          onTap: () => context.read<AuthCubit>().updateAvailability('online'),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF382E).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.logout_rounded, color: Color(0xFFFF382E), size: 20),
                         ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: Icon(Icons.circle, color: AppColors.warning, size: 16.r),
-                          title: Text('مشغول (Busy)', style: TextStyle(fontSize: 14.sp)),
-                          trailing: user.availabilityStatus == 'busy'
-                              ? const Icon(Icons.check, color: AppColors.warning)
-                              : null,
-                          onTap: () => context.read<AuthCubit>().updateAvailability('busy'),
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: Icon(Icons.circle, color: Colors.grey, size: 16.r),
-                          title: Text('غير متصل (Offline)', style: TextStyle(fontSize: 14.sp)),
-                          trailing: user.availabilityStatus == 'offline'
-                              ? const Icon(Icons.check, color: Colors.grey)
-                              : null,
-                          onTap: () => context.read<AuthCubit>().updateAvailability('offline'),
+                        const SizedBox(width: 12),
+                        Text(
+                          isArabic ? 'تسجيل الخروج' : 'Log Out',
+                          style: const TextStyle(
+                            color: Color(0xFFFF382E),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            fontFamily: 'Gontserrat',
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-              SizedBox(height: 12.h),
-              // General Settings
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: Card(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: Icon(Icons.person_outline_rounded, size: 22.r),
-                        title: Text('الملف الشخصي (Profile)', style: TextStyle(fontSize: 14.sp)),
-                        trailing: Icon(Icons.chevron_left_rounded, size: 22.r),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                          );
-                        },
+                // Version Footer
+                Padding(
+                  padding: const EdgeInsets.only(top: 32, bottom: 24),
+                  child: Center(
+                    child: Text(
+                      'Version 3.3.0',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textSecondary,
+                        fontFamily: 'Gontserrat',
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.business_rounded, size: 22.r),
-                        title: Text('مساحات العمل (Workspaces)', style: TextStyle(fontSize: 14.sp)),
-                        subtitle: Text('${user?.accounts.length ?? 0} مساحة عمل مسجلة', style: TextStyle(fontSize: 12.sp)),
-                        trailing: Icon(Icons.chevron_left_rounded, size: 22.r),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const WorkspacesScreen()),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.dark_mode_outlined, size: 22.r),
-                        title: Text('المظهر والوضع الليلي (Appearance)', style: TextStyle(fontSize: 14.sp)),
-                        trailing: Icon(Icons.chevron_left_rounded, size: 22.r),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const AppearanceScreen()),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.translate_rounded, size: 22.r),
-                        title: Text('اللغة (Language)', style: TextStyle(fontSize: 14.sp)),
-                        trailing: Icon(Icons.chevron_left_rounded, size: 22.r),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const LanguageScreen()),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: Icon(Icons.lock_reset_rounded, size: 22.r),
-                        title: Text('تغيير كلمة المرور', style: TextStyle(fontSize: 14.sp)),
-                        trailing: Icon(Icons.chevron_left_rounded, size: 22.r),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              SizedBox(height: 12.h),
-              // Shorebird Code Push Section
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0.r),
-                    child: BlocBuilder<ShorebirdCubit, ShorebirdState>(
-                      builder: (context, shorebirdState) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.system_update_rounded, color: AppColors.primaryLight, size: 22.r),
-                                SizedBox(width: 10.w),
-                                Expanded(
-                                  child: Text(
-                                    'تحديثات Shorebird المباشرة (Code Push)',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp),
-                                  ),
-                                ),
-                                if (shorebirdState.status == ShorebirdStatus.checking ||
-                                    shorebirdState.status == ShorebirdStatus.updating)
-                                  SizedBox(
-                                    width: 16.r,
-                                    height: 16.r,
-                                    child: const CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                              ],
-                            ),
-                            SizedBox(height: 8.h),
-                            Text(
-                              shorebirdState.currentPatch != null
-                                  ? 'الترقيعة الحالية: #${shorebirdState.currentPatch}'
-                                  : 'إصدار التطبيق الأساسي: v${AppConfig.appVersion}',
-                              style: TextStyle(fontSize: 12.sp, color: isDark ? Colors.grey[400] : Colors.grey[600]),
-                            ),
-                            SizedBox(height: 10.h),
-                            OutlinedButton.icon(
-                              icon: Icon(Icons.refresh_rounded, size: 16.r),
-                              label: Text('التحقق من وجود تحديث الآن', style: TextStyle(fontSize: 12.sp)),
-                              onPressed: () => context.read<ShorebirdCubit>().checkForUpdate(),
-                            ),
-                          ],
-                        );
-                      },
                     ),
                   ),
                 ),
-              ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 
-              SizedBox(height: 12.h),
-              // Sign Out Button
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    side: BorderSide(color: AppColors.danger.withValues(alpha: 0.3)),
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF80838D),
+          letterSpacing: 1.0,
+          fontFamily: 'Gontserrat',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsRow({
+    required Widget icon,
+    required Color iconBg,
+    required Color borderColor,
+    required String title,
+    String? subtitle,
+    required Widget trailing,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F);
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: icon,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Gontserrat',
+                    ),
                   ),
-                  tileColor: AppColors.danger.withValues(alpha: 0.08),
-                  leading: Icon(Icons.logout_rounded, color: AppColors.danger, size: 22.r),
-                  title: Text(
-                    'تسجيل الخروج (Sign Out)',
-                    style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold, fontSize: 14.sp),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 13,
+                        fontFamily: 'Gontserrat',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            trailing,
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAvailabilityPicker(BuildContext context, String currentStatus, bool isArabic) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF161616) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB);
+
+    final statuses = [
+      {
+        'key': 'online',
+        'label': isArabic ? 'متصل (Online)' : 'Online',
+        'desc': isArabic ? 'متاح لاستقبال المحادثات الجديدة' : 'Available for new conversations',
+        'color': const Color(0xFF2CA54A),
+      },
+      {
+        'key': 'busy',
+        'label': isArabic ? 'مشغول (Busy)' : 'Busy',
+        'desc': isArabic ? 'غير متاح حالياً لاستقبال محادثات جديدة' : 'Currently not taking new conversations',
+        'color': const Color(0xFFFA8900),
+      },
+      {
+        'key': 'offline',
+        'label': isArabic ? 'غير متصل (Offline)' : 'Offline',
+        'desc': isArabic ? 'تسجيل الخروج من التواجد' : 'Not available to handle chats',
+        'color': const Color(0xFF80838D),
+      },
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('تسجيل الخروج'),
-                        content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج من Message Pro؟'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('إلغاء'),
+                ),
+                Text(
+                  isArabic ? 'تحديد حالة التواجد' : 'Set Availability',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                    fontFamily: 'Gontserrat',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                for (final item in statuses) ...[
+                  InkWell(
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      context.read<AuthCubit>().updateAvailability(item['key'] as String);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isArabic
+                                ? 'تم تغيير الحالة إلى: ${item['label']}'
+                                : 'Status updated to: ${item['label']}',
+                            style: const TextStyle(fontFamily: 'Gontserrat'),
                           ),
-                          TextButton(
-                            onPressed: () async {
-                              Navigator.pop(ctx);
-                              await context.read<AuthCubit>().logout();
-                              if (context.mounted) {
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                                  (route) => false,
-                                );
-                              }
-                            },
-                            child: const Text('خروج', style: TextStyle(color: Colors.red)),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: const Color(0xFF1E2024),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: currentStatus == item['key']
+                            ? (isDark ? const Color(0xFF1E222A) : const Color(0xFFF1F5F9))
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: currentStatus == item['key']
+                              ? (item['color'] as Color)
+                              : borderColor,
+                          width: currentStatus == item['key'] ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: item['color'] as Color,
+                              shape: BoxShape.circle,
+                            ),
                           ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['label'] as String,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                    fontFamily: 'Gontserrat',
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  item['desc'] as String,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: textSecondary,
+                                    fontFamily: 'Gontserrat',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (currentStatus == item['key'])
+                            Icon(Icons.check_circle_rounded, color: item['color'] as Color, size: 20),
                         ],
                       ),
-                    );
-                  },
-                ),
-              ),
-              SizedBox(height: 24.h),
-            ],
-          );
-        },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmLogout(BuildContext context, bool isArabic) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isArabic ? 'تسجيل الخروج' : 'Log Out', style: const TextStyle(fontFamily: 'Gontserrat')),
+        content: Text(
+          isArabic ? 'هل أنت متأكد أنك تريد تسجيل الخروج؟' : 'Are you sure you want to log out?',
+          style: const TextStyle(fontFamily: 'Gontserrat'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isArabic ? 'إلغاء' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthCubit>().logout();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: Text(
+              isArabic ? 'تسجيل الخروج' : 'Log Out',
+              style: const TextStyle(color: Color(0xFFFF382E), fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }

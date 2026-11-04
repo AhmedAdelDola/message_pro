@@ -1,3 +1,5 @@
+import '../../core/config/app_config.dart';
+
 class Contact {
   final int id;
   final String name;
@@ -18,13 +20,48 @@ class Contact {
   });
 
   factory Contact.fromJson(Map<String, dynamic> json) {
+    final rawName = json['name']?.toString().trim();
+    final rawPhone = json['phone_number']?.toString().trim();
+    final rawEmail = json['email']?.toString().trim();
+    final rawIdentifier = json['identifier']?.toString().trim();
+    final rawId = json['id'];
+    final int contactId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+
+    String displayName;
+    final isGeneric = rawName != null &&
+        (rawName.toLowerCase() == 'customer' ||
+            rawName.toLowerCase() == 'عميل' ||
+            rawName.toLowerCase() == 'visitor' ||
+            rawName.toLowerCase() == 'null');
+
+    if (rawName != null && rawName.isNotEmpty && !isGeneric) {
+      displayName = rawName;
+    } else if (rawPhone != null && rawPhone.isNotEmpty) {
+      displayName = rawPhone;
+    } else if (rawEmail != null && rawEmail.isNotEmpty) {
+      displayName = rawEmail;
+    } else if (rawIdentifier != null && rawIdentifier.isNotEmpty) {
+      displayName = rawIdentifier;
+    } else if (contactId > 0) {
+      displayName = 'عميل #$contactId';
+    } else {
+      displayName = 'عميل جديد';
+    }
+
+    String? avatar = (json['avatar_url'] ?? json['thumbnail'])?.toString();
+    if (avatar != null && avatar.isNotEmpty) {
+      if (avatar.startsWith('/')) {
+        avatar = '${AppConfig.defaultBaseUrl}$avatar';
+      }
+    }
+
     return Contact(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
-      name: json['name'] ?? 'Unknown Contact',
-      email: json['email'],
-      phoneNumber: json['phone_number'],
-      avatarUrl: json['avatar_url'] ?? json['thumbnail'],
-      identifier: json['identifier'],
+      id: contactId,
+      name: displayName,
+      email: rawEmail,
+      phoneNumber: rawPhone,
+      avatarUrl: avatar,
+      identifier: rawIdentifier,
       customAttributes: json['custom_attributes'] is Map<String, dynamic>
           ? json['custom_attributes']
           : {},

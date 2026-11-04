@@ -43,11 +43,12 @@ Future<void> initDI() async {
   sl.registerFactory<ConversationCubit>(
     () => ConversationCubit(repo: sl(), ws: sl()),
   );
-  sl.registerFactoryParam<ChatCubit, int, void>(
-    (conversationId, _) => ChatCubit(
+  sl.registerFactoryParam<ChatCubit, int, dynamic>(
+    (conversationId, param2) => ChatCubit(
       conversationId: conversationId,
       repo: sl(),
       ws: sl(),
+      contactLastSeenAt: param2 is DateTime ? param2 : null,
     ),
   );
   sl.registerFactory<NotificationCubit>(

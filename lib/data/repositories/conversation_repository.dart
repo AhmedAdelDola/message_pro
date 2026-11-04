@@ -1,33 +1,52 @@
+import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
+import '../../core/storage/secure_storage_service.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../models/contact.dart';
 import '../models/user.dart';
+import '../models/message_template.dart';
+import '../models/message_template_registry.dart';
 
 abstract class IConversationRepository {
   Future<Either<Failure, List<Conversation>>> getConversations({
     String status = 'open',
-    String assigneeType = 'all',
+    String assigneeType = 'me',
     int? inboxId,
     int? teamId,
     String? label,
     int page = 1,
   });
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId);
+  Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1});
+  Future<Either<Failure, Conversation>> getConversation(int conversationId);
+  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId});
   Future<Either<Failure, Message>> sendMessage({
     required int conversationId,
     required String content,
     bool isPrivate = false,
     List<String>? attachmentPaths,
   });
-  Future<Either<Failure, void>> toggleStatus(int conversationId, String status);
-  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId);
+  Future<Either<Failure, Message>> sendTemplateMessage({
+    required int conversationId,
+    required String templateName,
+    required String category,
+    required String language,
+    required String content,
+    Map<String, dynamic>? processedParams,
+  });
+  Future<Either<Failure, List<MessageTemplate>>> fetchInboxTemplates(int inboxId);
+  Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil});
+  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType});
+  Future<Either<Failure, void>> pinConversation(int conversationId);
+  Future<Either<Failure, void>> unpinConversation(int conversationId);
   Future<Either<Failure, void>> assignTeam(int conversationId, int? teamId);
   Future<Either<Failure, void>> updateLabels(int conversationId, List<String> labels);
   Future<Either<Failure, void>> updateLifecycleStage(int conversationId, int stageId);
+  Future<Either<Failure, void>> muteConversation(int conversationId);
+  Future<Either<Failure, void>> unmuteConversation(int conversationId);
   Future<Either<Failure, void>> markAsRead(int conversationId);
   Future<Either<Failure, List<Inbox>>> fetchInboxes();
   Future<Either<Failure, List<Label>>> fetchLabels();
@@ -39,13 +58,14 @@ abstract class IConversationRepository {
 
 class ConversationRepository implements IConversationRepository {
   final ApiClient _api;
+  final SecureStorageService _storage = SecureStorageService();
 
   ConversationRepository({ApiClient? api}) : _api = api ?? ApiClient();
 
   @override
   Future<Either<Failure, List<Conversation>>> getConversations({
     String status = 'open',
-    String assigneeType = 'all',
+    String assigneeType = 'me',
     int? inboxId,
     int? teamId,
     String? label,
@@ -56,11 +76,12 @@ class ConversationRepository implements IConversationRepository {
         'status': status,
         'assignee_type': assigneeType,
         'page': page,
+        'sort_by': 'last_activity_at_desc',
       };
 
       if (inboxId != null) params['inbox_id'] = inboxId;
       if (teamId != null) params['team_id'] = teamId;
-      if (label != null) params['labels'] = [label];
+      if (label != null) params['labels[]'] = label;
 
       final response = await _api.get('conversations', queryParameters: params);
       final data = response.data;
@@ -70,11 +91,29 @@ class ConversationRepository implements IConversationRepository {
         list = data['data']['payload'];
       } else if (data is Map && data['payload'] != null) {
         list = data['payload'];
+      } else if (data is Map && data['data'] is List) {
+        list = data['data'];
       } else if (data is List) {
         list = data;
       }
 
-      final conversations = list.map((c) => Conversation.fromJson(c as Map<String, dynamic>)).toList();
+      final activeAccId = await _storage.getActiveAccountId();
+      final conversations = <Conversation>[];
+      for (final item in list) {
+        if (item is Map) {
+          try {
+            final conv = Conversation.fromJson(Map<String, dynamic>.from(item));
+            if (conv.id > 0) {
+              if (activeAccId != null && activeAccId > 0 && conv.accountId > 0 && conv.accountId != activeAccId) {
+                continue; // Skip conversation belonging to another workspace!
+              }
+              conversations.add(conv);
+            }
+          } catch (e, stack) {
+            debugPrint('Error parsing conversation: $e\n$stack');
+          }
+        }
+      }
       return Right(conversations);
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل في تحميل المحادثات'));
@@ -84,19 +123,107 @@ class ConversationRepository implements IConversationRepository {
   }
 
   @override
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId) async {
+  Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1}) async {
     try {
-      final response = await _api.get('conversations/$conversationId/messages');
+      final response = await _api.get('conversations/search', queryParameters: {
+        'q': query,
+        'page': page,
+      });
       final data = response.data;
 
       List list = [];
-      if (data is Map && data['payload'] != null) {
+      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
+        list = data['data']['payload'];
+      } else if (data is Map && data['payload'] != null) {
         list = data['payload'];
+      } else if (data is Map && data['data'] is List) {
+        list = data['data'];
       } else if (data is List) {
         list = data;
       }
 
-      final messages = list.map((m) => Message.fromJson(m as Map<String, dynamic>)).toList();
+      final conversations = <Conversation>[];
+      for (final item in list) {
+        if (item is Map) {
+          try {
+            final conv = Conversation.fromJson(Map<String, dynamic>.from(item));
+            if (conv.id > 0) {
+              conversations.add(conv);
+            }
+          } catch (_) {
+            // Skip corrupted item
+          }
+        }
+      }
+      return Right(conversations);
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل في البحث عن المحادثات'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Conversation>> getConversation(int conversationId) async {
+    try {
+      final response = await _api.get('conversations/$conversationId');
+      final data = response.data;
+      Map<String, dynamic>? item;
+      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
+        item = Map<String, dynamic>.from(data['data']['payload']);
+      } else if (data is Map && data['payload'] != null) {
+        item = Map<String, dynamic>.from(data['payload']);
+      } else if (data is Map && data['data'] is Map) {
+        item = Map<String, dynamic>.from(data['data']);
+      } else if (data is Map) {
+        item = Map<String, dynamic>.from(data);
+      }
+      if (item != null) {
+        return Right(Conversation.fromJson(item));
+      }
+      return const Left(ServerFailure('المحادثة غير موجودة'));
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل في تحميل المحادثة'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (beforeId != null) {
+        params['before'] = beforeId;
+      }
+
+      final response = await _api.get(
+        'conversations/$conversationId/messages',
+        queryParameters: params.isNotEmpty ? params : null,
+      );
+      final data = response.data;
+
+      List list = [];
+      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
+        list = data['data']['payload'];
+      } else if (data is Map && data['payload'] != null) {
+        list = data['payload'];
+      } else if (data is Map && data['data'] is List) {
+        list = data['data'];
+      } else if (data is List) {
+        list = data;
+      }
+
+      final messages = <Message>[];
+      for (final item in list) {
+        if (item is Map) {
+          try {
+            messages.add(Message.fromJson(Map<String, dynamic>.from(item)));
+          } catch (e) {
+            // Skip corrupted message
+          }
+        }
+      }
       return Right(messages);
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل في تحميل الرسائل'));
@@ -117,6 +244,7 @@ class ConversationRepository implements IConversationRepository {
       if (attachmentPaths != null && attachmentPaths.isNotEmpty) {
         final formData = FormData();
         formData.fields.add(MapEntry('content', content));
+        formData.fields.add(const MapEntry('message_type', 'outgoing'));
         formData.fields.add(MapEntry('private', isPrivate.toString()));
         for (final path in attachmentPaths) {
           formData.files.add(MapEntry(
@@ -128,6 +256,7 @@ class ConversationRepository implements IConversationRepository {
       } else {
         postData = {
           'content': content,
+          'message_type': 'outgoing',
           'private': isPrivate,
         };
       }
@@ -137,7 +266,11 @@ class ConversationRepository implements IConversationRepository {
         data: postData,
       );
 
-      final message = Message.fromJson(response.data as Map<String, dynamic>);
+      final resData = response.data;
+      final msgMap = (resData is Map && resData['data'] is Map)
+          ? resData['data']
+          : (resData is Map ? resData : <String, dynamic>{});
+      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
       return Right(message);
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل في إرسال الرسالة'));
@@ -147,11 +280,298 @@ class ConversationRepository implements IConversationRepository {
   }
 
   @override
-  Future<Either<Failure, void>> toggleStatus(int conversationId, String status) async {
+  Future<Either<Failure, Message>> sendTemplateMessage({
+    required int conversationId,
+    required String templateName,
+    required String category,
+    required String language,
+    required String content,
+    Map<String, dynamic>? processedParams,
+  }) async {
     try {
+      final postData = {
+        'content': content,
+        'message_type': 'outgoing',
+        'private': false,
+        'echo_id': 'flutter-template-${DateTime.now().millisecondsSinceEpoch}',
+        'template_params': {
+          'name': templateName,
+          'category': category,
+          'language': language,
+          'processed_params': processedParams ?? {},
+        },
+      };
+
+      final response = await _api.post(
+        'conversations/$conversationId/messages',
+        data: postData,
+      );
+
+      final resData = response.data;
+      final msgMap = (resData is Map && resData['data'] is Map)
+          ? resData['data']
+          : (resData is Map ? resData : <String, dynamic>{});
+      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
+      return Right(message);
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل في إرسال رسالة القالب'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MessageTemplate>>> fetchInboxTemplates(int inboxId) async {
+    try {
+      // Direct endpoint: GET /api/v1/accounts/:account_id/inboxes/:inbox_id/message_templates
+      final response = await _api.get('inboxes/$inboxId/message_templates');
+      final data = response.data;
+
+      dynamic rawTemplates;
+      if (data is Map) {
+        rawTemplates = data['payload'] ??
+            data['message_templates'] ??
+            data['data']?['payload'] ??
+            data['data'];
+      } else if (data is List) {
+        rawTemplates = data;
+      }
+
+      final list = <MessageTemplate>[];
+      if (rawTemplates is List && rawTemplates.isNotEmpty) {
+        for (final t in rawTemplates) {
+          if (t is Map) {
+            try {
+              final tpl = MessageTemplate.fromJson(Map<String, dynamic>.from(t));
+              if (tpl.name.isNotEmpty) {
+                list.add(tpl);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      // If endpoint was empty or failed, also check inboxes/$inboxId fallback
+      if (list.isEmpty) {
+        try {
+          final resFallback = await _api.get('inboxes/$inboxId');
+          final dataFb = resFallback.data;
+          final rawFb = dataFb is Map ? (dataFb['message_templates'] ?? dataFb['payload']?['message_templates']) : null;
+          if (rawFb is List) {
+            for (final t in rawFb) {
+              if (t is Map) {
+                try {
+                  final tpl = MessageTemplate.fromJson(Map<String, dynamic>.from(t));
+                  if (tpl.name.isNotEmpty) list.add(tpl);
+                } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (list.isNotEmpty) {
+        MessageTemplateRegistry.registerAll(list);
+        return Right(list);
+      }
+
+      return Right(_getDefaultApprovedTemplates());
+    } catch (_) {
+      return Right(_getDefaultApprovedTemplates());
+    }
+  }
+
+  List<MessageTemplate> _getDefaultApprovedTemplates() {
+    return [
+      MessageTemplate(
+        id: 100,
+        name: 'first_subscription_25_nov2026',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'خصم 25% لفترة محدودة',
+        body: 'أهلًا 👋\nلسه بتفكّر تبدأ مع *Message Pro*؟\nابدأ دلوقتي ووفر *ربع قيمة أول اشتراك* 🎉\n\nاختار الاشتراك *الشهري أو النصف سنوي (6 شهور)* واستفيد بخصم *25% على أول اشتراك فقط*.\n\n⏳ اشترك لحد *1 نوفمبر* للاستفادة بالعرض.\n\nشوف الأسعار بعد الخصم، واختار الباقة المناسبة لشغلك 👇',
+        buttons: ['شوف الأسعار بعد الخصم', 'ساعدني أختار باقة', 'إيقاف العروض'],
+        labels: ['marketing', 'offers'],
+      ),
+      MessageTemplate(
+        id: 99,
+        name: 'messagepro_connection_check_20261027',
+        category: 'UTILITY',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'هذه رسالة اختبار ربط واتساب التي طلبتها من Message Pro.\nمرجع الاختبار: MP-20261027.\nلا يلزم اتخاذ أي إجراء.',
+        buttons: [],
+        labels: ['system', 'test'],
+      ),
+      MessageTemplate(
+        id: 84,
+        name: 'messagepro_requested_callback_utility_v1',
+        category: 'UTILITY',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'أهلًا يا فندم، حاولنا نكلم حضرتك بخصوص المكالمة اللي طلبتها عن مسج برو. لو الوقت مش مناسب، ابعتلنا الوقت اللي يناسبك وهنكلمك 📞',
+        buttons: [],
+        labels: ['callbacks', 'support'],
+      ),
+      MessageTemplate(
+        id: 69,
+        name: 'messagepro_first_channel_offer_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'عرض خاص ليك',
+        body: 'مبروك ربط أول قناة 🎉\n\nتقدر تحصل على خصم *٢٠٪* على أول اشتراك في مسج برو لو اشتركت خلال *٧٢ ساعة* من دلوقتي. العرض متاح لغاية *٣٠ سبتمبر ٢٠٢٦ الساعة ١:٣٠ ظهرًا بتوقيت القاهرة*.\n\nحابب تستفيد من العرض؟ اضغط على «اطلب العرض» وهنساعدك تكمل.',
+        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
+        buttons: ['شوف الباقات', 'اطلب العرض'],
+        labels: ['marketing', 'offers'],
+      ),
+      MessageTemplate(
+        id: 64,
+        name: 'messagepro_growth_advanced_25_48h',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: '🔥 *لمدة ٤٨ ساعة: خصم ٢٥٪ على Growth وAdvanced من Message Pro*\n\nاجمع محادثات عملائك في مكان واحد، وخلّي فريقك يعرف مين مسؤول عن كل محادثة وإيه الخطوة الجاية. ومع الأتمتة والـAI، تقدر تنظم الردود والمتابعة حسب طريقة شغلك.\n\nاستخدم كود *SAMPLE25* قبل *29 سبتمبر 2026 الساعة 6 مساءً بتوقيت القاهرة*.\n\n*رد «ابدأ»* وهنساعدك تختار الباقة وتجهّز حسابك. ولو عندك سؤال قبل الاشتراك، ابعته هنا.',
+        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
+        buttons: [],
+        labels: ['marketing'],
+      ),
+      MessageTemplate(
+        id: 65,
+        name: 'messagepro_growth_advanced_25_48h_v2',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'خصم ٢٥٪ لمدة ٤٨ ساعة',
+        body: 'العرض على باقتي *Growth* و*Advanced* من Message Pro.\n\nاجمع محادثات عملائك في مكان واحد، وخلّي فريقك يعرف مين مسؤول عن كل محادثة وإيه الخطوة الجاية. ومع الأتمتة والـAI، تقدر تنظم الردود والمتابعة حسب طريقة شغلك.\n\nاستخدم كود *SAMPLE25* قبل *29 سبتمبر 2026 الساعة 6 مساءً بتوقيت القاهرة*.\n\n*رد «ابدأ»* وهنساعدك تختار الباقة وتجهّز حسابك. ولو عندك سؤال قبل الاشتراك، ابعته هنا.',
+        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
+        buttons: [],
+        labels: ['marketing'],
+      ),
+      MessageTemplate(
+        id: 66,
+        name: 'messagepro_growth_advanced_25_48h_v3',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'خصم ٢٥٪ لمدة ٤٨ ساعة',
+        body: 'عرض على باقتي *Growth* و*Advanced* من مسج برو.\n\nاجمع محادثات عملائك في مكان واحد، وخلّي فريقك عارف مين بيتابع كل عميل. سرّع الردود بالـAI والأتمتة، وابعت عروضك وتحديثاتك لعملائك بالرسائل الجماعية، وانقل البيزنس بتاعك لنقطة احترافية.\n\nاستخدم كود *MP25*\nقبل *٢٩ سبتمبر ٢٠٢٦ الساعة ٩ صباحًا بتوقيت القاهرة*.\n\nمستني إيه؟ ابدأ دلوقتي 👇',
+        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
+        buttons: ['سجّل الآن', 'طلب مكالمة', 'تفاصيل'],
+        labels: ['marketing'],
+      ),
+      MessageTemplate(
+        id: 82,
+        name: 'messagepro_inquiry_received_utility_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'أهلًا يا فندم 👋 بنأكد استلام استفسارك عن مسج برو. هنرد عليك هنا، ولو في تفاصيل تحب تضيفها ابعتها في الشات.',
+        buttons: [],
+        labels: ['inquiry'],
+      ),
+      MessageTemplate(
+        id: 74,
+        name: 'messagepro_lead_followup_callback_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'أهلًا يا فندم، كنت بحاول أتواصل مع حضرتك بخصوص مسج برو. تحب أكلمك في وقت يناسبك تكون متاح فيه؟ 📞',
+        buttons: [],
+        labels: ['followup'],
+      ),
+      MessageTemplate(
+        id: 73,
+        name: 'messagepro_lead_followup_details_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'أهلًا يا فندم، هل التفاصيل واضحة لحضرتك؟ لو في أي سؤال أو حابب ندخل ميتنج نشرح فيه النظام، ابعتلنا هنا 📅',
+        buttons: [],
+        labels: ['followup'],
+      ),
+      MessageTemplate(
+        id: 72,
+        name: 'messagepro_lead_followup_interest_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'أهلًا يا فندم 👋 حبيت أتابع مع حضرتك بخصوص مسج برو. هل لسه مناسب ليك نكمل الكلام عن الخدمة؟ لو عندك أي سؤال، ابعته هنا وهنرد عليك.',
+        buttons: [],
+        labels: ['followup'],
+      ),
+      MessageTemplate(
+        id: 67,
+        name: 'messagepro_pharmacies_followup_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'نظّم رسائل صيدليتك وفروعها',
+        body: '💊 مع مسج برو، اجمع محادثات عملائك في مكان واحد، ووجّه كل محادثة للفرع أو الموظف المناسب. سواء فريقك بيرد من داخل الصيدلية أو من كول سنتر منفصل، تاريخ الكلام واضح والكل عارف مين بيتابع العميل، حتى لو الشفت اتغيّر.\n\nسرّع الردود بالـAI والأتمتة والردود الجاهزة، وابعت عروضك وتحديثاتك لعملائك بالرسائل الجماعية.\n\nحابب تشوف ده على شغل صيدليتك؟ اختار اللي يناسبك 👇',
+        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
+        buttons: ['تجربة مجانية', 'احجز ديمو', 'اطلب مكالمة', 'تفاصيل أكتر'],
+        labels: ['pharmacies'],
+      ),
+      MessageTemplate(
+        id: 83,
+        name: 'messagepro_requested_details_utility_v1',
+        category: 'UTILITY',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        body: 'أهلًا يا فندم، التفاصيل اللي طلبتها عن مسج برو بعتناها لحضرتك. لو في أي نقطة محتاجة توضيح، ابعتلنا هنا وهنوضحها.',
+        buttons: [],
+        labels: ['details'],
+      ),
+      MessageTemplate(
+        id: 68,
+        name: 'messagepro_signup_welcome_7d_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'أهلًا بيك في مسج برو',
+        body: 'حسابك اتسجّل بنجاح 🎉 ومعاك تجربة مجانية لمدة ٧ أيام.\n\nتقدر دلوقتي تربط أول قناة لاستقبال رسائل عملائك، تضيف فريقك، وتعمل أول AI Agent يساعدك في الرد.\n\nلو محتاج مساعدة في أي خطوة، ابعتلنا هنا وهنساعدك.',
+        footer: 'فريق مسج برو',
+        buttons: ['ابدأ إعداد حسابك', 'محتاج مساعدة'],
+        labels: ['welcome'],
+      ),
+      MessageTemplate(
+        id: 70,
+        name: 'messagepro_trial_ending_hours_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'تجربتك المجانية قربت تخلص',
+        body: 'فاضل *٤٨ ساعة* على انتهاء تجربتك المجانية في مسج برو.\n\nلو محتاج مساعدة في ربط القنوات أو تجهيز الفريق والـAI Agent، ابعتلنا هنا. ولو جاهز تكمل استخدام مسج برو، تقدر تختار الباقة المناسبة ليك.',
+        footer: 'فريق مسج برو',
+        buttons: ['شوف الباقات', 'محتاج مساعدة'],
+        labels: ['trial'],
+      ),
+      MessageTemplate(
+        id: 71,
+        name: 'messagepro_trial_expired_feedback_v1',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        status: 'APPROVED',
+        header: 'تجربتك المجانية انتهت',
+        body: 'تجربتك المجانية في مسج برو انتهت. شكرًا إنك جرّبتنا 🙏\n\nحابين نسمع رأيك: إيه أكتر حاجة فادتك خلال التجربة، وإيه اللي تحب يكون أفضل؟ رد علينا هنا، ورأيك هيساعدنا نقدملك تجربة أنسب.\n\nولو حابب تكمل، تقدر تختار الباقة المناسبة ليك.',
+        footer: 'فريق مسج برو',
+        buttons: ['شوف الباقات', 'شارك رأيك'],
+        labels: ['feedback'],
+      ),
+    ];
+  }
+
+  @override
+  Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil}) async {
+    try {
+      final payload = <String, dynamic>{'status': status};
+      if (snoozedUntil != null && snoozedUntil.isNotEmpty) {
+        payload['snoozed_until'] = snoozedUntil;
+      }
       await _api.post(
         'conversations/$conversationId/toggle_status',
-        data: {'status': status},
+        data: payload,
       );
       return const Right(null);
     } catch (e) {
@@ -160,12 +580,46 @@ class ConversationRepository implements IConversationRepository {
   }
 
   @override
-  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId) async {
+  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType}) async {
     try {
+      final Map<String, dynamic> data;
+      if (agentId == null) {
+        data = {'assignee_id': null};
+      } else {
+        final type = assigneeType ?? (agentId < 0 ? 'AgentBot' : 'User');
+        data = {
+          'assignee_id': agentId.abs(),
+          'assignee_type': type,
+        };
+      }
+
       await _api.post(
         'conversations/$conversationId/assignments',
-        data: {'assignee_id': agentId},
+        data: data,
       );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> pinConversation(int conversationId) async {
+    try {
+      await _api.post(
+        'conversation_pins',
+        data: {'conversation_id': conversationId},
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unpinConversation(int conversationId) async {
+    try {
+      await _api.delete('conversation_pins/$conversationId');
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -212,6 +666,26 @@ class ConversationRepository implements IConversationRepository {
   }
 
   @override
+  Future<Either<Failure, void>> muteConversation(int conversationId) async {
+    try {
+      await _api.post('conversations/$conversationId/mute');
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unmuteConversation(int conversationId) async {
+    try {
+      await _api.post('conversations/$conversationId/unmute');
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> markAsRead(int conversationId) async {
     try {
       await _api.post('conversations/$conversationId/update_last_seen');
@@ -226,8 +700,17 @@ class ConversationRepository implements IConversationRepository {
     try {
       final response = await _api.get('inboxes');
       final data = response.data;
-      List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map((i) => Inbox.fromJson(i as Map<String, dynamic>)).toList());
+      List list = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null && data['data']['payload'] != null
+              ? data['data']['payload']
+              : (data is Map && data['data'] is List
+                  ? data['data']
+                  : (data is List ? data : [])));
+      return Right(list
+          .whereType<Map>()
+          .map((i) => Inbox.fromJson(Map<String, dynamic>.from(i)))
+          .toList());
     } catch (_) {
       return const Right([]);
     }
@@ -238,8 +721,17 @@ class ConversationRepository implements IConversationRepository {
     try {
       final response = await _api.get('labels');
       final data = response.data;
-      List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map((l) => Label.fromJson(l as Map<String, dynamic>)).toList());
+      List list = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null && data['data']['payload'] != null
+              ? data['data']['payload']
+              : (data is Map && data['data'] is List
+                  ? data['data']
+                  : (data is List ? data : [])));
+      return Right(list
+          .whereType<Map>()
+          .map((l) => Label.fromJson(Map<String, dynamic>.from(l)))
+          .toList());
     } catch (_) {
       return const Right([]);
     }
@@ -250,8 +742,17 @@ class ConversationRepository implements IConversationRepository {
     try {
       final response = await _api.get('lifecycle_stages');
       final data = response.data;
-      List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map((s) => LifecycleStage.fromJson(s as Map<String, dynamic>)).toList());
+      List list = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null && data['data']['payload'] != null
+              ? data['data']['payload']
+              : (data is Map && data['data'] is List
+                  ? data['data']
+                  : (data is List ? data : [])));
+      return Right(list
+          .whereType<Map>()
+          .map((s) => LifecycleStage.fromJson(Map<String, dynamic>.from(s)))
+          .toList());
     } catch (_) {
       return Right([
         LifecycleStage(id: 1, name: 'New Lead', color: '#3B82F6', icon: '🌱'),
@@ -267,8 +768,17 @@ class ConversationRepository implements IConversationRepository {
     try {
       final response = await _api.get('teams');
       final data = response.data;
-      List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map((t) => Team.fromJson(t as Map<String, dynamic>)).toList());
+      List list = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null && data['data']['payload'] != null
+              ? data['data']['payload']
+              : (data is Map && data['data'] is List
+                  ? data['data']
+                  : (data is List ? data : [])));
+      return Right(list
+          .whereType<Map>()
+          .map((t) => Team.fromJson(Map<String, dynamic>.from(t)))
+          .toList());
     } catch (_) {
       return const Right([]);
     }
@@ -279,8 +789,17 @@ class ConversationRepository implements IConversationRepository {
     try {
       final response = await _api.get('agents');
       final data = response.data;
-      List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map((a) => User.fromJson(a as Map<String, dynamic>)).toList());
+      List list = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null && data['data']['payload'] != null
+              ? data['data']['payload']
+              : (data is Map && data['data'] is List
+                  ? data['data']
+                  : (data is List ? data : [])));
+      return Right(list
+          .whereType<Map>()
+          .map((a) => User.fromJson(Map<String, dynamic>.from(a)))
+          .toList());
     } catch (_) {
       return const Right([]);
     }
