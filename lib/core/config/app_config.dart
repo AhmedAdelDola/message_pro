@@ -4,7 +4,7 @@ class AppConfig {
   static const String appVersion = '1.0.7';
   static const int buildNumber = 10;
 
-  static const String defaultBaseUrl = 'http://api.message-pro.com';
+  static const String defaultBaseUrl = 'https://omni.message-pro.com';
   static const String defaultWebSocketUrl = 'wss://omni.message-pro.com/cable';
   static const String clientName = 'Message Pro Mobile';
 
