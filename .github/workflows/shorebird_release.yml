@@ -48,6 +48,7 @@ jobs:
       - name: Prepare iOS Build Directories
         run: |
           mkdir -p build/ios/SourcePackages
+          shorebird flutter config --no-enable-swift-package-manager
 
       - name: Shorebird Release iOS
         env:
