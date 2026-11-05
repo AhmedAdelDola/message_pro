@@ -15,6 +15,8 @@ import '../chat/chat_screen.dart';
 import '../contacts/add_contact_screen.dart';
 import 'widgets/conversation_tile.dart';
 import '../../widgets/app_bar_progress_bar.dart';
+import '../../widgets/break_countdown_banner.dart';
+import '../chat/widgets/start_direct_chat_sheet.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
@@ -485,6 +487,14 @@ class _InboxScreenState extends State<InboxScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: bgColor,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => StartDirectChatSheet.show(context),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        tooltip: isArabic ? 'بدء محادثة برقم' : 'New Chat',
+        elevation: 3,
+        child: const Icon(Icons.add_comment_rounded, size: 22),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -495,6 +505,7 @@ class _InboxScreenState extends State<InboxScreen> {
               _buildMainHeader(isDark, textPrimary),
 
             // Global sleek blue linear progress indicator
+            const BreakCountdownBanner(),
             LinearHeaderLoader(
               isLoading: context.watch<ConversationCubit>().state.isLoading,
             ),
@@ -825,6 +836,11 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
           Row(
             children: [
+              IconButton(
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedBubbleChatAdd, color: AppColors.primary, size: 21),
+                tooltip: 'Start Direct Chat',
+                onPressed: () => StartDirectChatSheet.show(context),
+              ),
               IconButton(
                 icon: HugeIcon(icon: HugeIcons.strokeRoundedUserAdd01, color: textPrimary, size: 21),
                 tooltip: 'New Contact',

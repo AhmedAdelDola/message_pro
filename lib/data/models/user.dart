@@ -8,6 +8,8 @@ class Account {
   final String? organizationName;
   final int? organizationId;
   final String? organizationLogo;
+  final DateTime? breakEndsAt;
+  final String? availabilityStatus;
 
   Account({
     required this.id,
@@ -17,6 +19,8 @@ class Account {
     this.organizationName,
     this.organizationId,
     this.organizationLogo,
+    this.breakEndsAt,
+    this.availabilityStatus,
   });
 
   Account copyWith({
@@ -27,6 +31,8 @@ class Account {
     String? organizationName,
     int? organizationId,
     String? organizationLogo,
+    DateTime? breakEndsAt,
+    String? availabilityStatus,
   }) {
     return Account(
       id: id ?? this.id,
@@ -36,6 +42,8 @@ class Account {
       organizationName: organizationName ?? this.organizationName,
       organizationId: organizationId ?? this.organizationId,
       organizationLogo: organizationLogo ?? this.organizationLogo,
+      breakEndsAt: breakEndsAt ?? this.breakEndsAt,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
     );
   }
 
@@ -69,6 +77,17 @@ class Account {
       }
     }
 
+    DateTime? bEndsAt;
+    final rawBreak = json['break_ends_at'];
+    if (rawBreak != null) {
+      if (rawBreak is String) {
+        bEndsAt = DateTime.tryParse(rawBreak);
+      } else if (rawBreak is num) {
+        final val = rawBreak.toInt();
+        bEndsAt = DateTime.fromMillisecondsSinceEpoch(val > 1e11 ? val : val * 1000);
+      }
+    }
+
     return Account(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: json['name']?.toString() ?? '',
@@ -77,8 +96,22 @@ class Account {
       organizationName: orgName,
       organizationId: orgId,
       organizationLogo: orgLogo,
+      breakEndsAt: bEndsAt,
+      availabilityStatus: json['availability_status']?.toString() ?? json['availability']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'role': role,
+    if (status != null) 'status': status,
+    if (organizationName != null) 'organization_name': organizationName,
+    if (organizationId != null) 'organization_id': organizationId,
+    if (organizationLogo != null) 'organization_logo': organizationLogo,
+    if (breakEndsAt != null) 'break_ends_at': breakEndsAt!.toIso8601String(),
+    if (availabilityStatus != null) 'availability_status': availabilityStatus,
+  };
 
   String getEffectiveOrgName(String defaultFallback) {
     if (organizationName != null && organizationName!.trim().isNotEmpty) {
@@ -107,16 +140,6 @@ class Account {
     }
     return name;
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'role': role,
-    'status': status,
-    if (organizationName != null) 'organization_name': organizationName,
-    if (organizationId != null) 'organization_id': organizationId,
-    if (organizationLogo != null) 'organization_logo': organizationLogo,
-  };
 }
 
 class User {
@@ -132,6 +155,14 @@ class User {
   final List<Account> accounts;
 
   String? get thumbnail => avatarUrl;
+  Account? get activeAccount => accounts.where((a) => a.id == accountId).firstOrNull ?? (accounts.isNotEmpty ? accounts.first : null);
+  DateTime? get activeBreakEndsAt => activeAccount?.breakEndsAt;
+  bool get isOnBreak {
+    final status = availabilityStatus.toLowerCase();
+    if (status != 'break' && status != 'on_break') return false;
+    if (activeBreakEndsAt == null) return true;
+    return activeBreakEndsAt!.isAfter(DateTime.now());
+  }
 
   User({
     required this.id,
@@ -238,6 +269,18 @@ class User {
       }
     }
 
+    final parsedAccountId = rawAccountId is int ? rawAccountId : int.tryParse(rawAccountId?.toString() ?? '') ?? 0;
+    final activeAcc = accountsList.where((a) => a.id == parsedAccountId).firstOrNull;
+    var userAvail = json['availability_status']?.toString() ?? json['availability']?.toString();
+    if (userAvail == null || userAvail == 'online') {
+      if (activeAcc?.availabilityStatus != null && activeAcc!.availabilityStatus!.isNotEmpty) {
+        userAvail = activeAcc.availabilityStatus;
+      }
+    }
+    if (activeAcc?.breakEndsAt != null && activeAcc!.breakEndsAt!.isAfter(DateTime.now())) {
+      userAvail = 'break';
+    }
+
     return User(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: json['name']?.toString() ?? '',
@@ -246,8 +289,8 @@ class User {
       avatarUrl: avatar,
       pubsubToken: json['pubsub_token']?.toString(),
       role: json['role']?.toString() ?? 'agent',
-      accountId: rawAccountId is int ? rawAccountId : int.tryParse(rawAccountId?.toString() ?? '') ?? 0,
-      availabilityStatus: json['availability_status']?.toString() ?? 'online',
+      accountId: parsedAccountId,
+      availabilityStatus: userAvail ?? 'online',
       accounts: accountsList,
     );
   }

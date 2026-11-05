@@ -10,6 +10,7 @@ import 'appearance_screen.dart';
 import 'language_screen.dart';
 import 'change_password_screen.dart';
 import 'notification_settings_screen.dart';
+import '../../widgets/break_countdown_banner.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -41,10 +42,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final availability = user?.availabilityStatus ?? 'online';
             Color statusColor;
             String statusLabel;
-            switch (availability) {
+            switch (availability.toLowerCase()) {
               case 'busy':
                 statusColor = const Color(0xFFFA8900);
                 statusLabel = isArabic ? 'مشغول (Busy)' : 'Busy';
+                break;
+              case 'on_break':
+              case 'on break':
+              case 'break':
+                statusColor = const Color(0xFF6B5DE8);
+                statusLabel = isArabic ? 'استراحة (On break)' : 'On break';
                 break;
               case 'offline':
                 statusColor = const Color(0xFF80838D);
@@ -80,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
+                const BreakCountdownBanner(),
 
                 // User Profile Row
                 if (user != null)
@@ -452,6 +460,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'color': const Color(0xFFFA8900),
       },
       {
+        'key': 'on_break',
+        'label': isArabic ? 'استراحة (On break)' : 'On break',
+        'desc': isArabic ? 'في استراحة مؤقتة عن استقبال المحادثات' : 'Taking a temporary break',
+        'color': const Color(0xFF6B5DE8),
+      },
+      {
         'key': 'offline',
         'label': isArabic ? 'غير متصل (Offline)' : 'Offline',
         'desc': isArabic ? 'تسجيل الخروج من التواجد' : 'Not available to handle chats',
@@ -496,21 +510,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 16),
                 for (final item in statuses) ...[
                   InkWell(
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(sheetCtx);
-                      context.read<AuthCubit>().updateAvailability(item['key'] as String);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isArabic
-                                ? 'تم تغيير الحالة إلى: ${item['label']}'
-                                : 'Status updated to: ${item['label']}',
-                            style: const TextStyle(fontFamily: 'Gontserrat'),
+                      final key = item['key'] as String;
+                      if (key == 'on_break' || key == 'break') {
+                        final duration = await BreakDurationSheet.show(context);
+                        if (duration != null && context.mounted) {
+                          context.read<AuthCubit>().updateAvailability('break', breakDurationMinutes: duration);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                isArabic ? 'بدأت الاستراحة لمدة $duration دقيقة' : 'Break started for $duration minutes',
+                                style: const TextStyle(fontFamily: 'Gontserrat'),
+                              ),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor: const Color(0xFF6B5DE8),
+                            ),
+                          );
+                        }
+                      } else {
+                        context.read<AuthCubit>().updateAvailability(key);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isArabic
+                                  ? 'تم تغيير الحالة إلى: ${item['label']}'
+                                  : 'Status updated to: ${item['label']}',
+                              style: const TextStyle(fontFamily: 'Gontserrat'),
+                            ),
+                            duration: const Duration(seconds: 2),
+                            backgroundColor: const Color(0xFF1E2024),
                           ),
-                          duration: const Duration(seconds: 2),
-                          backgroundColor: const Color(0xFF1E2024),
-                        ),
-                      );
+                        );
+                      }
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(

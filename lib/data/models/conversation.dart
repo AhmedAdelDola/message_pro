@@ -27,7 +27,15 @@ class Conversation {
   final String? replyBlockReason;
   final bool muted;
 
-  String get channelType => inbox?.channelType ?? channel;
+  String get channelType {
+    if (inbox != null && inbox!.channelType.isNotEmpty && inbox!.channelType != 'Channel::WebWidget') {
+      return inbox!.channelType;
+    }
+    if (channel.isNotEmpty && channel != 'web') {
+      return channel;
+    }
+    return inbox?.channelType ?? channel;
+  }
 
   Conversation({
     required this.id,
@@ -167,11 +175,12 @@ class Conversation {
 
     // Channel detection
     String ch = 'web';
-    final rawChannel = parsedInbox?.channelType ??
-        json['meta']?['channel'] ??
+    final rawChannel = json['meta']?['channel'] ??
         json['channel'] ??
         json['channel_type'] ??
-        json['inbox']?['channel_type'];
+        (parsedInbox != null && parsedInbox.channelType.isNotEmpty && parsedInbox.channelType != 'Channel::WebWidget' ? parsedInbox.channelType : null) ??
+        json['inbox']?['channel_type'] ??
+        parsedInbox?.channelType;
     if (rawChannel is String) {
       final lower = rawChannel.toLowerCase();
       if (lower.contains('whatsapp')) {
@@ -192,6 +201,23 @@ class Conversation {
         ch = 'line';
       } else if (lower.contains('web') || lower.contains('widget')) {
         ch = 'web';
+      }
+    }
+
+    if (ch == 'web') {
+      final cPhone = parsedContact.phoneNumber ?? '';
+      final cName = parsedContact.name.toLowerCase();
+      final inbName = (parsedInbox?.name ?? json['inbox']?['name']?.toString() ?? json['meta']?['inbox']?['name']?.toString() ?? '').toLowerCase();
+      if (cPhone.isNotEmpty || cName.contains('@c.us') || inbName.contains('whatsapp')) {
+        ch = 'whatsapp';
+      } else if (inbName.contains('instagram')) {
+        ch = 'instagram';
+      } else if (inbName.contains('facebook') || inbName.contains('messenger')) {
+        ch = 'facebook';
+      } else if (inbName.contains('email')) {
+        ch = 'email';
+      } else if (inbName.contains('telegram')) {
+        ch = 'telegram';
       }
     }
 

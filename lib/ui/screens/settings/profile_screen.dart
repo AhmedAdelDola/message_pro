@@ -7,6 +7,7 @@ import '../../../logic/auth/auth_cubit.dart';
 import '../../../logic/auth/auth_state.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/break_countdown_banner.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _emailController;
 
   String _selectedAvailability = 'online';
+  int? _breakDuration;
   bool _isSaving = false;
   bool _initialized = false;
 
@@ -96,7 +98,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // 2. If availability changed, update it too
     if (errorMessage == null && _selectedAvailability != currentUser.availabilityStatus) {
-      final availResult = await cubit.updateAvailability(_selectedAvailability);
+      final availResult = await cubit.updateAvailability(
+        _selectedAvailability,
+        breakDurationMinutes: _breakDuration,
+      );
       availResult.fold(
         (failure) => errorMessage = failure.message,
         (_) {},
@@ -495,6 +500,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'color': const Color(0xFFFA8900),
       },
       {
+        'key': 'on_break',
+        'label': isArabic ? 'استراحة' : 'On break',
+        'color': const Color(0xFF6B5DE8),
+      },
+      {
         'key': 'offline',
         'label': isArabic ? 'غير متصل' : 'Offline',
         'color': const Color(0xFF80838D),
@@ -515,10 +525,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           return Expanded(
             child: InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedAvailability = opt['key'] as String;
-                });
+              onTap: () async {
+                final key = opt['key'] as String;
+                if (key == 'on_break' || key == 'break') {
+                  final duration = await BreakDurationSheet.show(context);
+                  if (duration != null) {
+                    setState(() {
+                      _selectedAvailability = 'break';
+                      _breakDuration = duration;
+                    });
+                  }
+                } else {
+                  setState(() {
+                    _selectedAvailability = key;
+                    _breakDuration = null;
+                  });
+                }
               },
               borderRadius: BorderRadius.circular(10.r),
               child: AnimatedContainer(
@@ -536,18 +558,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 8.r,
-                      height: 8.r,
+                      width: 7.r,
+                      height: 7.r,
                       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                     ),
-                    SizedBox(width: 6.w),
-                    Text(
-                      opt['label'] as String,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? color : textSecondary,
-                        fontFamily: 'Gontserrat',
+                    SizedBox(width: 4.w),
+                    Flexible(
+                      child: Text(
+                        opt['label'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5.sp,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? color : textSecondary,
+                          fontFamily: 'Gontserrat',
+                        ),
                       ),
                     ),
                   ],

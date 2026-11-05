@@ -144,6 +144,10 @@ class AvatarWidget extends StatelessWidget {
           return const Color(0xFFFA8900);
         case 'offline':
           return const Color(0xFF80838D);
+        case 'on_break':
+        case 'on break':
+        case 'break':
+          return const Color(0xFF6B5DE8);
         case 'online':
         default:
           return const Color(0xFF2CA54A);

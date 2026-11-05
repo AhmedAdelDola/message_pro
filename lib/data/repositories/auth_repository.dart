@@ -19,7 +19,11 @@ abstract class IAuthRepository {
     String? displayName,
     String? email,
   });
-  Future<Either<Failure, void>> updateAvailability(String status);
+  Future<Either<Failure, void>> updateAvailability({
+    required String status,
+    int? breakDurationMinutes,
+    int? accountId,
+  });
   Future<Either<Failure, void>> setActiveAccount(int accountId);
   Future<Either<Failure, void>> resetPassword(String email);
   Future<Either<Failure, void>> signOut();
@@ -272,29 +276,41 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateAvailability(String status) async {
+  Future<Either<Failure, void>> updateAvailability({
+    required String status,
+    int? breakDurationMinutes,
+    int? accountId,
+  }) async {
     try {
-      // Backend endpoint in Chatwoot/Message-Pro:
-      // POST /api/v1/profile/availability with {"availability": status}
-      // or PUT /api/v1/profile with {"profile": {"availability_status": status}}
+      final activeAccId = accountId ?? await _storage.getActiveAccountId() ?? 0;
+      final isBreak = status == 'break' || status == 'on_break';
+      final apiAvailability = isBreak ? 'break' : status;
+
+      final profilePayload = <String, dynamic>{
+        if (activeAccId > 0) 'account_id': activeAccId,
+        'availability': apiAvailability,
+        if (isBreak && breakDurationMinutes != null)
+          'break_duration_minutes': breakDurationMinutes.clamp(1, 120),
+      };
+
+      final body = {
+        'profile': profilePayload,
+        'availability': apiAvailability,
+        'availability_status': apiAvailability,
+        if (activeAccId > 0) 'account_id': activeAccId,
+        if (isBreak && breakDurationMinutes != null)
+          'break_duration_minutes': breakDurationMinutes.clamp(1, 120),
+      };
+
       try {
-        await _api.post(
-          'profile/availability',
-          data: {
-            'availability': status,
-            'availability_status': status,
-          },
-        );
+        await _api.post('profile/availability', data: body);
       } on DioException catch (dioErr) {
         if (dioErr.response?.statusCode == 404 || dioErr.response?.statusCode == 405) {
           await _api.put(
             'profile',
             data: {
-              'profile': {
-                'availability_status': status,
-                'availability': status,
-              },
-              'availability_status': status,
+              'profile': profilePayload,
+              'availability_status': apiAvailability,
             },
           );
         } else {
@@ -305,8 +321,14 @@ class AuthRepository implements IAuthRepository {
       // Persist in local storage
       final savedUserMap = await _storage.getUserData();
       if (savedUserMap != null) {
-        savedUserMap['availability_status'] = status;
-        savedUserMap['availability'] = status;
+        savedUserMap['availability_status'] = apiAvailability;
+        savedUserMap['availability'] = apiAvailability;
+        if (isBreak && breakDurationMinutes != null) {
+          final endsAt = DateTime.now().add(Duration(minutes: breakDurationMinutes.clamp(1, 120)));
+          savedUserMap['break_ends_at'] = endsAt.toIso8601String();
+        } else {
+          savedUserMap.remove('break_ends_at');
+        }
         await _storage.saveUserData(savedUserMap);
       }
 

@@ -48,11 +48,18 @@ abstract class IConversationRepository {
   Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId);
   Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId);
   Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId);
+  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber});
   Future<Either<Failure, Conversation>> startNewConversation({
     required int contactId,
     required int inboxId,
     required String sourceId,
     String? message,
+  });
+  Future<Either<Failure, Conversation>> startDirectChat({
+    required String phoneNumber,
+    required int inboxId,
+    required String sourceId,
+    String? contactName,
   });
   Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil});
   Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType});
@@ -523,6 +530,137 @@ class ConversationRepository implements IConversationRepository {
       return const Right([]);
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل جلب القنوات المتاحة للعميل'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber}) async {
+    try {
+      final query = <String, dynamic>{};
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+        var cleanPhone = phoneNumber.trim();
+        if (!cleanPhone.startsWith('+')) {
+          if (cleanPhone.startsWith('01') && cleanPhone.length == 11) {
+            cleanPhone = '+2$cleanPhone';
+          } else if (cleanPhone.startsWith('201') && cleanPhone.length == 12) {
+            cleanPhone = '+$cleanPhone';
+          } else {
+            cleanPhone = '+$cleanPhone';
+          }
+        }
+        query['phone_number'] = cleanPhone;
+      }
+
+      final response = await _api.get(
+        'inboxes/phone_destinations',
+        queryParameters: query.isNotEmpty ? query : null,
+      );
+
+      final data = response.data;
+      List rawList = [];
+      if (data is List) {
+        rawList = data;
+      } else if (data is Map && data['payload'] is List) {
+        rawList = data['payload'];
+      } else if (data is Map && data['data'] is List) {
+        rawList = data['data'];
+      }
+
+      final results = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      return Right(results);
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل في تحميل وجهات القنوات المتاحة'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Conversation>> startDirectChat({
+    required String phoneNumber,
+    required int inboxId,
+    required String sourceId,
+    String? contactName,
+  }) async {
+    try {
+      var cleanPhone = phoneNumber.trim();
+      if (!cleanPhone.startsWith('+')) {
+        if (cleanPhone.startsWith('01') && cleanPhone.length == 11) {
+          cleanPhone = '+2$cleanPhone';
+        } else if (cleanPhone.startsWith('201') && cleanPhone.length == 12) {
+          cleanPhone = '+$cleanPhone';
+        } else {
+          cleanPhone = '+$cleanPhone';
+        }
+      }
+
+      // 1. Check if contact exists
+      int? contactId;
+      try {
+        final searchRes = await _api.get('contacts/search', queryParameters: {'q': cleanPhone});
+        final sData = searchRes.data;
+        List cList = [];
+        if (sData is Map && sData['payload'] is List) {
+          cList = sData['payload'];
+        } else if (sData is List) {
+          cList = sData;
+        }
+
+        if (cList.isNotEmpty) {
+          final first = cList.first;
+          contactId = first['id'] is int ? first['id'] : int.tryParse(first['id']?.toString() ?? '');
+        }
+      } catch (_) {}
+
+      // 2. If contact does not exist, create contact
+      if (contactId == null || contactId <= 0) {
+        final createRes = await _api.post('contacts', data: {
+          'name': (contactName != null && contactName.trim().isNotEmpty) ? contactName.trim() : cleanPhone,
+          'phone_number': cleanPhone,
+        });
+        final cData = createRes.data;
+        final cObj = (cData is Map && cData['payload']?['contact'] != null)
+            ? cData['payload']['contact']
+            : (cData is Map && cData['contact'] != null ? cData['contact'] : cData);
+        contactId = cObj is Map ? (cObj['id'] is int ? cObj['id'] : int.tryParse(cObj['id']?.toString() ?? '')) : null;
+      }
+
+      if (contactId == null || contactId <= 0) {
+        return Left(ServerFailure('تعذر تحديد أو إنشاء جهة الاتصال للرقم $cleanPhone'));
+      }
+
+      // 3. Ensure contact_inbox is registered
+      try {
+        await _api.post('contacts/$contactId/contact_inboxes', data: {
+          'inbox_id': inboxId,
+          'source_id': sourceId,
+        });
+      } catch (_) {}
+
+      // 4. POST /api/v1/accounts/:account_id/conversations without message parameter
+      final convRes = await _api.post('conversations', data: {
+        'contact_id': contactId,
+        'inbox_id': inboxId,
+        'source_id': sourceId,
+      });
+
+      final convData = convRes.data;
+      final rawConv = convData is Map ? (convData['payload'] ?? convData['data'] ?? convData) : null;
+      if (rawConv is Map) {
+        return Right(Conversation.fromJson(Map<String, dynamic>.from(rawConv)));
+      }
+      return Left(ServerFailure('استجابة غير صالحة من السيرفر'));
+    } on DioException catch (e) {
+      String errMsg = 'فشل في بدء المحادثة';
+      if (e.response?.data is Map) {
+        final d = e.response!.data as Map;
+        errMsg = d['message']?.toString() ?? d['error']?.toString() ?? errMsg;
+      } else if (e.message != null) {
+        errMsg = e.message!;
+      }
+      return Left(ServerFailure(errMsg));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

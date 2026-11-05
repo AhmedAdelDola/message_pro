@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/models/conversation.dart';
+import '../../../../logic/conversation/conversation_cubit.dart';
 import '../../../widgets/avatar_widget.dart';
 
 class ConversationTile extends StatelessWidget {
@@ -111,6 +113,39 @@ class ConversationTile extends StatelessWidget {
     final aName = assignee?.name.trim() ?? '';
     final assigneeInitial = aName.isNotEmpty ? aName[0].toUpperCase() : 'A';
 
+    // Robust channel resolution matching workspace inboxes, phone number and names
+    final inboxes = context.read<ConversationCubit>().state.inboxes;
+    final matchingInbox = inboxes.where((i) => i.id == conversation.inboxId).firstOrNull;
+
+    String resolvedChannel = (matchingInbox != null && matchingInbox.channelType.isNotEmpty)
+        ? matchingInbox.channelType
+        : conversation.channelType;
+
+    final lower = resolvedChannel.toLowerCase();
+    if (resolvedChannel.isEmpty || lower == 'web' || lower == 'channel::webwidget') {
+      final inbName = (matchingInbox?.name ?? conversation.inboxName ?? '').toLowerCase();
+      final cPhone = contact.phoneNumber ?? '';
+      final cNameLower = cname.toLowerCase();
+
+      if (inbName.contains('whatsapp') || cPhone.isNotEmpty || cNameLower.contains('@c.us')) {
+        resolvedChannel = 'whatsapp';
+      } else if (inbName.contains('instagram')) {
+        resolvedChannel = 'instagram';
+      } else if (inbName.contains('facebook') || inbName.contains('messenger')) {
+        resolvedChannel = 'facebook';
+      } else if (inbName.contains('telegram')) {
+        resolvedChannel = 'telegram';
+      } else if (inbName.contains('email') || (contact.email != null && contact.email!.isNotEmpty)) {
+        resolvedChannel = 'email';
+      } else if (inbName.contains('sms')) {
+        resolvedChannel = 'sms';
+      } else if (inbName.contains('api')) {
+        resolvedChannel = 'api';
+      } else {
+        resolvedChannel = conversation.channel.isNotEmpty ? conversation.channel : 'web';
+      }
+    }
+
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -130,7 +165,7 @@ class ConversationTile extends StatelessWidget {
               avatarUrl: contact.avatarUrl,
               name: cname,
               size: 38,
-              channel: conversation.channelType,
+              channel: resolvedChannel,
             ),
             const SizedBox(width: 12),
 

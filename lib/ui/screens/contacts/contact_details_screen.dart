@@ -119,6 +119,29 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
         }
       });
 
+      if (inboxes.isEmpty && widget.contact.phoneNumber != null && widget.contact.phoneNumber!.isNotEmpty) {
+        final phoneDestRes = await repo.getPhoneDestinations(phoneNumber: widget.contact.phoneNumber);
+        phoneDestRes.fold((_) {}, (destList) {
+          for (final d in destList) {
+            final rawInbox = d['inbox'];
+            final pId = (rawInbox is Map) ? rawInbox['id'] : d['inbox_id'];
+            final parsedId = pId is int ? pId : int.tryParse(pId?.toString() ?? '');
+            final pName = (rawInbox is Map ? rawInbox['name'] : d['inbox_name'])?.toString() ?? 'WhatsApp';
+            final chType = (rawInbox is Map ? rawInbox['channel_type'] : d['channel_type'])?.toString() ?? 'Channel::Whatsapp';
+            final srcId = d['source_id']?.toString() ?? widget.contact.phoneNumber!;
+
+            if (parsedId != null && !inboxes.any((existing) => existing['id'] == parsedId)) {
+              inboxes.add({
+                'id': parsedId,
+                'name': pName,
+                'channel_type': chType,
+                'source_id': srcId,
+              });
+            }
+          }
+        });
+      }
+
       if (inboxes.isEmpty) {
         if (workspaceInboxes.isNotEmpty) {
           inboxes = workspaceInboxes.map((inb) => {

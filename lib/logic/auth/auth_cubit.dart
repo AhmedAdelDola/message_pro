@@ -185,32 +185,88 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-  Future<Either<Failure, void>> updateAvailability(String availability) async {
+  Future<Either<Failure, void>> updateAvailability(
+    String availability, {
+    int? breakDurationMinutes,
+  }) async {
     if (state is! Authenticated) {
       return const Left(ServerFailure('المستخدم غير مسجل'));
     }
     final current = (state as Authenticated).user;
+    final isBreak = availability == 'break' || availability == 'on_break';
+    final apiStatus = isBreak ? 'break' : availability;
+
+    final breakEndsAt = (isBreak && breakDurationMinutes != null)
+        ? DateTime.now().add(Duration(minutes: breakDurationMinutes.clamp(1, 120)))
+        : null;
+
+    final updatedAccounts = current.accounts.map((a) {
+      if (a.id == current.accountId) {
+        return a.copyWith(
+          breakEndsAt: breakEndsAt,
+          availabilityStatus: apiStatus,
+        );
+      }
+      return a;
+    }).toList();
+
+    final updatedUser = current.copyWith(
+      availabilityStatus: apiStatus,
+      accounts: updatedAccounts,
+    );
 
     // Immediately update state so UI responds without delay
-    emit(Authenticated(current.copyWith(availabilityStatus: availability)));
+    emit(Authenticated(updatedUser));
 
     // Persist to local storage
     final savedUserMap = await storage.getUserData();
     if (savedUserMap != null) {
-      savedUserMap['availability_status'] = availability;
-      savedUserMap['availability'] = availability;
+      savedUserMap['availability_status'] = apiStatus;
+      savedUserMap['availability'] = apiStatus;
+      if (breakEndsAt != null) {
+        savedUserMap['break_ends_at'] = breakEndsAt.toIso8601String();
+      } else {
+        savedUserMap.remove('break_ends_at');
+      }
       await storage.saveUserData(savedUserMap);
     }
 
-    final result = await authRepo.updateAvailability(availability);
+    final result = await authRepo.updateAvailability(
+      status: apiStatus,
+      breakDurationMinutes: breakDurationMinutes,
+      accountId: current.accountId,
+    );
+
     return result.fold(
       (failure) {
         // Rollback on failure
         emit(Authenticated(current));
         return Left(failure);
       },
-      (_) => const Right(null),
+      (_) async {
+        // Silently sync latest from GET /api/v1/profile
+        try {
+          final pRes = await authRepo.getProfile();
+          pRes.fold((_) {}, (freshUser) {
+            emit(Authenticated(freshUser));
+          });
+        } catch (_) {}
+        return const Right(null);
+      },
     );
+  }
+
+  Future<void> endBreakEarly() async {
+    await updateAvailability('online');
+  }
+
+  Future<void> refreshProfile() async {
+    try {
+      final pRes = await authRepo.getProfile();
+      pRes.fold((_) {}, (freshUser) {
+        emit(Authenticated(freshUser));
+      });
+    } catch (_) {}
   }
 
   Future<void> logout() async {
