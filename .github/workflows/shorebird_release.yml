@@ -46,7 +46,7 @@ jobs:
           cache: true
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: shorebird flutter pub get
 
       - name: Shorebird Release iOS
         env:
@@ -84,7 +84,7 @@ jobs:
           cache: true
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: shorebird flutter pub get
 
       - name: Shorebird Release Android
         env:
