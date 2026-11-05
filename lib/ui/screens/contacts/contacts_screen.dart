@@ -151,25 +151,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           fontFamily: 'Gontserrat',
                         ),
                       ),
-                      if (_contacts.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4162E3).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${_contacts.length}',
-                            style: const TextStyle(
-                              color: Color(0xFF4162E3),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Gontserrat',
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                   IconButton(
