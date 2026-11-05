@@ -40,18 +40,26 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-);
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('[Firebase] Init error: $e');
+  }
   // Set Bloc Observer for pretty state logs
   Bloc.observer = AppBlocObserver();
   // Initialize Dependency Injection with GetIt
   await initDI();
   await SoundService().init();
 
-  // Initialize Firebase and Push Notifications
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await PushNotificationService.initialize();
+  // Initialize Firebase and Push Notifications safely
+  try {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await PushNotificationService.initialize();
+  } catch (e) {
+    debugPrint('[PushNotification] Init error: $e');
+  }
 
   // Set preferred orientations
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);

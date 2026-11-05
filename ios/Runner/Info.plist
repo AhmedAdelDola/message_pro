@@ -66,5 +66,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires camera access to take and send photos and videos in customer conversations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires photo library access to attach and share images and documents in chats.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app requires permission to save downloaded images and media to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires microphone access to record and send voice messages to customers.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
