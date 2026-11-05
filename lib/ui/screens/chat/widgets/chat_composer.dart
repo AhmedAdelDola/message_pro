@@ -219,17 +219,26 @@ class ChatComposerState extends State<ChatComposer> {
   Widget _buildChannelLogo({double size = 16}) {
     final lower = widget.channelType.toLowerCase();
 
-    // 1. WhatsApp (Green circle with white speech bubble matching CRM web exactly)
-    if (lower.contains('whatsapp')) {
-      return Container(
+    // 1. WhatsApp
+    if (lower.contains('whatsapp') ||
+        lower.contains('twilio') ||
+        lower.contains('message-pro') ||
+        widget.channelName.toLowerCase().contains('message-pro') ||
+        widget.channelName.toLowerCase().contains('whatsapp')) {
+      return Image.asset(
+        'assets/images/channels/whatsapp.png',
         width: size,
         height: size,
-        decoration: const BoxDecoration(
-          color: Color(0xFF22C55E),
-          shape: BoxShape.circle,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            color: Color(0xFF25D366),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.chat_bubble, size: size * 0.55, color: Colors.white),
         ),
-        alignment: Alignment.center,
-        child: Icon(Icons.chat_bubble, size: size * 0.58, color: Colors.white),
       );
     }
 

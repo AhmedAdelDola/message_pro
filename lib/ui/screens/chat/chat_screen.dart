@@ -634,6 +634,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                               chatState.messages[index - 1].createdAt.month != msg.createdAt.month;
                           return MessageBubble(
                             message: msg,
+                            contactName: msg.senderName ?? widget.conversation.contact.name,
+                            contactThumbnail: msg.senderAvatar ?? widget.conversation.contact.avatarUrl,
                             showDateHeader: showDateHeader,
                             onRetry: () => context.read<ChatCubit>().retryMessage(msg),
                           );
