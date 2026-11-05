@@ -17,7 +17,9 @@ import 'widgets/chat_composer.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/canned_responses_sheet.dart';
 import 'widgets/assignee_sheet.dart';
+import 'widgets/collaborators_sheet.dart';
 import 'widgets/send_template_modal.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 
 class ChatScreen extends StatelessWidget {
   final Conversation conversation;
@@ -268,6 +270,28 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     );
   }
 
+  void _showCollaboratorsSheet() {
+    final agents = context.read<ConversationCubit>().state.agents;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (ctx) {
+        return CollaboratorsSheet(
+          conversationId: widget.conversation.id,
+          workspaceAgents: agents,
+          assignee: widget.conversation.assignee,
+          onCollaboratorsChanged: () {
+            context.read<ConversationCubit>().loadConversations();
+          },
+        );
+      },
+    );
+  }
+
   void _showCannedResponses() {
     final canned = context.read<ChatCubit>().state.cannedResponses;
     showModalBottomSheet(
@@ -318,6 +342,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       builder: (context, chatState) {
         return Scaffold(
           appBar: AppBar(
+            bottom: AppBarProgressBar(
+              isLoading: chatState.isLoading,
+            ),
             titleSpacing: 0,
             title: InkWell(
               onTap: () {
@@ -453,6 +480,18 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   tooltip: 'تعيين مسؤول',
                   onPressed: _showAssigneeSheet,
                 ),
+              // Collaborators button matching website/webview
+              IconButton(
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedUserGroup,
+                  size: 20.r,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : Colors.black87,
+                ),
+                tooltip: 'المتعاونين (Collaborators)',
+                onPressed: _showCollaboratorsSheet,
+              ),
               // 3-dots popup menu matching web interface
               PopupMenuButton<String>(
                 icon: HugeIcon(
@@ -484,6 +523,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                       break;
                     case 'assign_agent':
                       _showAssigneeSheet();
+                      break;
+                    case 'collaborators':
+                      _showCollaboratorsSheet();
                       break;
                     case 'copy_link':
                       _copyConversationLink();
@@ -573,6 +615,23 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           SizedBox(width: 10.w),
                           Text(
                             isArabic ? 'تعيين مسؤول (Assign)' : 'Assign agent',
+                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'collaborators',
+                      child: Row(
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedUserGroup,
+                            size: 19.r,
+                            color: const Color(0xFF4162E3),
+                          ),
+                          SizedBox(width: 10.w),
+                          Text(
+                            isArabic ? 'المتعاونين (Collaborators)' : 'Collaborators',
                             style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
                           ),
                         ],

@@ -8,6 +8,7 @@ import '../../../data/repositories/contact_repository.dart';
 import '../../widgets/avatar_widget.dart';
 import 'add_contact_screen.dart';
 import 'contact_details_screen.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -189,6 +190,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ],
               ),
             ),
+
+            // Global sleek blue linear progress indicator
+            LinearHeaderLoader(isLoading: _isLoading),
 
             // Search Bar
             Container(

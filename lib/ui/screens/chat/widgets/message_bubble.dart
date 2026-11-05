@@ -185,25 +185,6 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-          // Mini WhatsApp badge at bottom-right (matching Image 1 & 2)
-          Positioned(
-            right: -2,
-            bottom: -2,
-            child: Container(
-              width: size * 0.48,
-              height: size * 0.48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF25D366),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.2),
-              ),
-              child: Icon(
-                Icons.chat_bubble,
-                size: size * 0.26,
-                color: Colors.white,
-              ),
-            ),
-          ),
         ],
       ),
     );

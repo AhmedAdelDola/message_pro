@@ -1075,6 +1075,12 @@ class ChatComposerState extends State<ChatComposer> {
                       fontFamily: 'Gontserrat',
                     ),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    filled: false,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -1087,44 +1093,29 @@ class ChatComposerState extends State<ChatComposer> {
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
               child: Row(
                 children: [
-                  // Suggest reply chip (matching Crop 2 & Crop 3)
+                  // Suggest reply button (icon-only with purple accent)
                   InkWell(
                     onTap: _handleSmartReplyPrediction,
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      padding: const EdgeInsets.all(5.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const HugeIcon(
-                            icon: HugeIcons.strokeRoundedSparkles,
-                            size: 14,
-                            color: Color(0xFF8B5CF6),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isArabic ? 'اقتراح رد' : 'Suggest reply',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF8B5CF6),
-                              fontFamily: 'Gontserrat',
-                            ),
-                          ),
-                        ],
+                      child: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedSparkles,
+                        size: 17,
+                        color: Color(0xFF8B5CF6),
                       ),
                     ),
                   ),
                   const SizedBox(width: 4),
 
-                  // Canned Responses with Bubble & 3 dots (matching Crop 4)
+                  // Canned Responses / Snippets (with official bubble chat delay icon)
                   IconButton(
-                    icon: Icon(
-                      Icons.sms_outlined,
+                    icon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedBubbleChatDelay,
                       size: 20,
                       color: textSecondary,
                     ),
@@ -1134,35 +1125,6 @@ class ChatComposerState extends State<ChatComposer> {
                     onPressed: widget.onOpenCannedResponses,
                   ),
                   const SizedBox(width: 2),
-
-                  // B Templates chip when WhatsApp channel is active (matching Crop 1)
-                  if (widget.channelType.toLowerCase().contains('whatsapp')) ...[
-                    InkWell(
-                      onTap: widget.onOpenTemplates ?? _showTemplatesSheet,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF132A1C) : const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF166534) : const Color(0xFF86EFAC),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          'B Templates',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF22C55E) : const Color(0xFF15803D),
-                            fontFamily: 'Gontserrat',
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                  ],
 
                   // Emoji picker
                   IconButton(

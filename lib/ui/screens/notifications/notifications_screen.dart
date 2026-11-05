@@ -7,6 +7,7 @@ import '../../../data/repositories/conversation_repository.dart';
 import '../../../logic/notification/notification_cubit.dart';
 import '../../../logic/notification/notification_state.dart';
 import '../chat/chat_screen.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -85,6 +86,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ],
                   ),
                 ),
+
+                // Global sleek blue linear progress indicator
+                LinearHeaderLoader(isLoading: state.isLoading),
 
                 // Horizontal Underline Filter Tabs (New | Archived | All)
                 Container(

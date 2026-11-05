@@ -5,6 +5,7 @@ import '../../../core/di/injection_container.dart';
 import '../../../data/models/notification_settings.dart';
 import '../../../data/repositories/notification_repository.dart';
 import '../../../core/services/sound_service.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -216,9 +217,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               ),
             ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: borderColor, height: 1),
+        bottom: AppBarProgressBar(
+          isLoading: _isLoading || _isSaving,
+          idleBorderColor: borderColor,
+          height: 2.5,
         ),
       ),
       body: _isLoading

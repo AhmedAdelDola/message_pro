@@ -106,7 +106,7 @@ class AvatarWidget extends StatelessWidget {
                   ),
           ),
         ),
-        if (channel != null && channel!.isNotEmpty && (avatarUrl == null || avatarUrl!.isEmpty))
+        if (channel != null && channel!.isNotEmpty)
           PositionedDirectional(
             end: -2.w,
             bottom: -2.h,

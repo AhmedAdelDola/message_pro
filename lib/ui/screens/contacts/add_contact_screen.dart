@@ -51,14 +51,25 @@ class _AddContactScreenState extends State<AddContactScreen> {
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     setState(() => _isLoading = true);
     final fullName = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim();
 
+    String? phone = _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null;
+    if (phone != null) {
+      // Normalize Egyptian/local numbers for WhatsApp international format
+      if (phone.startsWith('01') && phone.length == 11) {
+        phone = '+2$phone';
+      } else if (phone.startsWith('201') && phone.length == 12) {
+        phone = '+$phone';
+      }
+    }
+
     final result = await sl<IContactRepository>().createContact(
       name: fullName,
       email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-      phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+      phoneNumber: phone,
     );
 
     if (!mounted) return;
@@ -67,13 +78,16 @@ class _AddContactScreenState extends State<AddContactScreen> {
       (failure) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
+          SnackBar(content: Text(failure.message), backgroundColor: Colors.redAccent),
         );
       },
       (contact) {
-        Navigator.pop(context);
+        Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Contact created successfully')),
+          SnackBar(
+            content: Text(isArabic ? 'تم إنشاء جهة الاتصال بنجاح' : 'Contact created successfully'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
         );
       },
     );

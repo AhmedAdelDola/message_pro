@@ -536,10 +536,28 @@ class ConversationRepository implements IConversationRepository {
     String? message,
   }) async {
     try {
+      // 1. Normalize sourceId (clean phone number)
+      String cleanSource = sourceId.trim();
+      if (cleanSource.startsWith('01') && cleanSource.length == 11) {
+        cleanSource = '+2$cleanSource';
+      } else if (cleanSource.startsWith('201') && cleanSource.length == 12) {
+        cleanSource = '+$cleanSource';
+      }
+
+      // 2. Ensure contact has a contact_inbox linked to this inbox
+      try {
+        await _api.post('contacts/$contactId/contact_inboxes', data: {
+          'inbox_id': inboxId,
+          'source_id': cleanSource,
+        });
+      } catch (_) {
+        // If it already exists or returns 422, proceed to conversation creation
+      }
+
       final payload = <String, dynamic>{
         'contact_id': contactId,
         'inbox_id': inboxId,
-        'source_id': sourceId,
+        'source_id': cleanSource,
         'status': 'open',
       };
       if (message != null && message.trim().isNotEmpty) {
@@ -557,7 +575,18 @@ class ConversationRepository implements IConversationRepository {
       }
       return Left(ServerFailure('فشل بدء المحادثة'));
     } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل إنشاء المحادثة'));
+      String errMsg = 'فشل إنشاء المحادثة';
+      if (e.response?.data is Map) {
+        final d = e.response!.data as Map;
+        errMsg = d['message']?.toString() ??
+                 d['error']?.toString() ??
+                 (d['errors'] is List ? (d['errors'] as List).join(', ') : null) ??
+                 e.message ??
+                 'فشل إنشاء المحادثة';
+      } else if (e.message != null && e.message!.isNotEmpty) {
+        errMsg = e.message!;
+      }
+      return Left(ServerFailure(errMsg));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

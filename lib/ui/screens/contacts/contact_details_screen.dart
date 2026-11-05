@@ -96,7 +96,20 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
       final inboxesResult = await repo.getContactableInboxes(widget.contact.id);
 
       List<Map<String, dynamic>> inboxes = [];
-      inboxesResult.fold((_) {}, (list) => inboxes = list);
+      inboxesResult.fold((_) {}, (list) {
+        for (final item in list) {
+          final inbMap = item['inbox'] is Map ? Map<String, dynamic>.from(item['inbox'] as Map) : item;
+          final id = inbMap['id'] ?? item['id'] ?? item['inbox_id'];
+          if (id != null) {
+            inboxes.add({
+              'id': id is int ? id : int.tryParse(id.toString()) ?? 1,
+              'name': inbMap['name']?.toString() ?? 'Inbox #$id',
+              'channel_type': inbMap['channel_type']?.toString() ?? '',
+              'source_id': item['source_id']?.toString() ?? widget.contact.phoneNumber ?? widget.contact.email,
+            });
+          }
+        }
+      });
 
       if (inboxes.isEmpty) {
         final allInboxesResult = await repo.fetchInboxes();
@@ -227,29 +240,60 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   itemBuilder: (_, index) {
                     final inb = inboxes[index];
                     final name = inb['name']?.toString() ?? 'Inbox #${inb['id']}';
-                    final channel = inb['channel_type']?.toString() ?? '';
-                    final isWhatsApp = channel.toLowerCase().contains('whatsapp');
+                    final channel = inb['channel_type']?.toString().toLowerCase() ?? '';
+                    final isWhatsApp = channel.contains('whatsapp');
+                    final isMessenger = channel.contains('facebook') || channel.contains('messenger');
+                    final isInstagram = channel.contains('instagram');
+                    final isEmail = channel.contains('email');
+
+                    Widget channelIcon;
+                    Color iconBg;
+
+                    if (isWhatsApp) {
+                      iconBg = const Color(0xFF22C55E).withValues(alpha: 0.15);
+                      channelIcon = Image.asset(
+                        'assets/images/channels/whatsapp.png',
+                        width: 22,
+                        height: 22,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.chat_bubble, size: 18, color: Color(0xFF22C55E)),
+                      );
+                    } else if (isMessenger) {
+                      iconBg = const Color(0xFF0084FF).withValues(alpha: 0.15);
+                      channelIcon = Image.asset(
+                        'assets/images/channels/messenger.png',
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.facebook, size: 20, color: Color(0xFF0084FF)),
+                      );
+                    } else if (isInstagram) {
+                      iconBg = const Color(0xFFDD2A7B).withValues(alpha: 0.15);
+                      channelIcon = const Icon(Icons.camera_alt_rounded, size: 20, color: Color(0xFFDD2A7B));
+                    } else if (isEmail) {
+                      iconBg = const Color(0xFFEA4335).withValues(alpha: 0.15);
+                      channelIcon = const Icon(Icons.email_rounded, size: 19, color: Color(0xFFEA4335));
+                    } else {
+                      iconBg = const Color(0xFF4162E3).withValues(alpha: 0.15);
+                      channelIcon = const Icon(Icons.language_rounded, size: 20, color: Color(0xFF4162E3));
+                    }
 
                     return ListTile(
                       leading: Container(
-                        width: 36,
-                        height: 36,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: isWhatsApp ? const Color(0xFF22C55E).withValues(alpha: 0.15) : const Color(0xFF4162E3).withValues(alpha: 0.15),
+                          color: iconBg,
                           shape: BoxShape.circle,
                         ),
-                        child: Center(
-                          child: isWhatsApp
-                              ? Image.asset('assets/images/channels/whatsapp.png', width: 20, height: 20, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.chat_bubble, size: 18, color: Color(0xFF22C55E)))
-                              : const Icon(Icons.forum_rounded, size: 18, color: Color(0xFF4162E3)),
-                        ),
+                        child: Center(child: channelIcon),
                       ),
                       title: Text(
                         name,
                         style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 14, fontFamily: 'Gontserrat'),
                       ),
                       subtitle: Text(
-                        channel,
+                        inb['channel_type']?.toString() ?? '',
                         style: TextStyle(color: textSecondary, fontSize: 12, fontFamily: 'Gontserrat'),
                       ),
                       onTap: () {

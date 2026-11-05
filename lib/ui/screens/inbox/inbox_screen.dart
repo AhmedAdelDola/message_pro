@@ -14,6 +14,7 @@ import '../../../logic/conversation/conversation_state.dart';
 import '../chat/chat_screen.dart';
 import '../contacts/add_contact_screen.dart';
 import 'widgets/conversation_tile.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
@@ -492,6 +493,11 @@ class _InboxScreenState extends State<InboxScreen> {
               _buildSearchHeader(isDark, isArabic, textPrimary, textSecondary, borderColor)
             else
               _buildMainHeader(isDark, textPrimary),
+
+            // Global sleek blue linear progress indicator
+            LinearHeaderLoader(
+              isLoading: context.watch<ConversationCubit>().state.isLoading,
+            ),
 
             // Segmented Primary Filter Tabs: All | Mine | Collaborating | Unassigned
             if (!_isSearching)
