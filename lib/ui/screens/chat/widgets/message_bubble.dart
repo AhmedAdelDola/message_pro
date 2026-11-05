@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../data/models/message.dart';
@@ -694,7 +694,7 @@ class MessageBubble extends StatelessWidget {
                         if (headerText != null && headerText.isNotEmpty) ...[
                           Builder(
                             builder: (context) {
-                              final isAr = _isArabicText(headerText);
+                              final isAr = _isArabicText(headerText!);
                               return Align(
                                 alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
                                 child: Text(
