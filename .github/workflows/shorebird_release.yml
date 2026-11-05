@@ -45,6 +45,10 @@ jobs:
         with:
           cache: true
 
+      - name: Prepare iOS Build Directories
+        run: |
+          mkdir -p build/ios/SourcePackages
+
       - name: Shorebird Release iOS
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
