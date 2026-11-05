@@ -1094,13 +1094,17 @@ class _InboxScreenState extends State<InboxScreen> {
                         fontFamily: 'Gontserrat',
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Search conversations...',
+                        hintText: isArabic ? 'بحث في المحادثات...' : 'Search conversations...',
                         hintStyle: TextStyle(
                           color: textSecondary.withValues(alpha: 0.8),
                           fontSize: 14,
                           fontFamily: 'Gontserrat',
                         ),
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        filled: false,
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                       ),

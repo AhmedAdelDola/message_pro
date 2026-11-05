@@ -408,7 +408,7 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10.r),
-                borderSide: const BorderSide(color: Color(0xFF4162E3)),
+                borderSide: BorderSide(color: borderColor),
               ),
             ),
           ),
