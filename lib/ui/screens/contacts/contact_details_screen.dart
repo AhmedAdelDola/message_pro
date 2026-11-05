@@ -92,6 +92,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     setState(() => _isStartingConversation = true);
 
     try {
+      final workspaceInboxes = context.read<ConversationCubit>().state.inboxes;
       final repo = sl<IConversationRepository>();
       final inboxesResult = await repo.getContactableInboxes(widget.contact.id);
 
@@ -99,28 +100,44 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
       inboxesResult.fold((_) {}, (list) {
         for (final item in list) {
           final inbMap = item['inbox'] is Map ? Map<String, dynamic>.from(item['inbox'] as Map) : item;
-          final id = inbMap['id'] ?? item['id'] ?? item['inbox_id'];
-          if (id != null) {
+          final rawId = inbMap['id'] ?? item['id'] ?? item['inbox_id'] ?? inbMap['inbox_id'];
+          final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+
+          final matchingInbox = id != null ? workspaceInboxes.where((wi) => wi.id == id).firstOrNull : null;
+          final name = inbMap['name']?.toString() ?? matchingInbox?.name ?? (id != null ? 'Inbox #$id' : 'قناة مراسلة');
+          final channelType = inbMap['channel_type']?.toString() ?? matchingInbox?.channelType ?? '';
+          final sourceId = item['source_id']?.toString() ?? widget.contact.phoneNumber ?? widget.contact.email ?? 'contact_${widget.contact.id}';
+
+          if (id != null || matchingInbox != null) {
             inboxes.add({
-              'id': id is int ? id : int.tryParse(id.toString()) ?? 1,
-              'name': inbMap['name']?.toString() ?? 'Inbox #$id',
-              'channel_type': inbMap['channel_type']?.toString() ?? '',
-              'source_id': item['source_id']?.toString() ?? widget.contact.phoneNumber ?? widget.contact.email,
+              'id': id ?? matchingInbox!.id,
+              'name': name,
+              'channel_type': channelType,
+              'source_id': sourceId,
             });
           }
         }
       });
 
       if (inboxes.isEmpty) {
-        final allInboxesResult = await repo.fetchInboxes();
-        allInboxesResult.fold((_) {}, (list) {
-          inboxes = list.map((inb) => {
+        if (workspaceInboxes.isNotEmpty) {
+          inboxes = workspaceInboxes.map((inb) => {
             'id': inb.id,
             'name': inb.name,
             'channel_type': inb.channelType,
             'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
           }).toList();
-        });
+        } else {
+          final allInboxesResult = await repo.fetchInboxes();
+          allInboxesResult.fold((_) {}, (list) {
+            inboxes = list.map((inb) => {
+              'id': inb.id,
+              'name': inb.name,
+              'channel_type': inb.channelType,
+              'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
+            }).toList();
+          });
+        }
       }
 
       if (!mounted) return;
@@ -159,10 +176,15 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     setState(() => _isStartingConversation = true);
     final repo = sl<IConversationRepository>();
     final inboxId = inbox['id'] as int? ?? int.tryParse(inbox['id'].toString()) ?? 1;
-    final sourceId = inbox['source_id']?.toString() ??
-        widget.contact.phoneNumber ??
-        widget.contact.email ??
-        'contact_${widget.contact.id}';
+    final channel = inbox['channel_type']?.toString().toLowerCase() ?? '';
+    final isWhatsApp = channel.contains('whatsapp');
+
+    final sourceId = (isWhatsApp && widget.contact.phoneNumber != null && widget.contact.phoneNumber!.isNotEmpty)
+        ? widget.contact.phoneNumber!
+        : (inbox['source_id']?.toString() ??
+            widget.contact.phoneNumber ??
+            widget.contact.email ??
+            'contact_${widget.contact.id}');
 
     final result = await repo.startNewConversation(
       contactId: widget.contact.id,
@@ -239,12 +261,23 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   itemCount: inboxes.length,
                   itemBuilder: (_, index) {
                     final inb = inboxes[index];
-                    final name = inb['name']?.toString() ?? 'Inbox #${inb['id']}';
                     final channel = inb['channel_type']?.toString().toLowerCase() ?? '';
                     final isWhatsApp = channel.contains('whatsapp');
                     final isMessenger = channel.contains('facebook') || channel.contains('messenger');
                     final isInstagram = channel.contains('instagram');
                     final isEmail = channel.contains('email');
+
+                    String rawName = inb['name']?.toString() ?? '';
+                    if (rawName.isEmpty || rawName == 'Inbox #null') {
+                      rawName = isWhatsApp
+                          ? 'WhatsApp'
+                          : (isMessenger
+                              ? 'Messenger'
+                              : (isInstagram
+                                  ? 'Instagram'
+                                  : (isEmail ? 'Email' : 'Website Widget')));
+                    }
+                    final name = rawName;
 
                     Widget channelIcon;
                     Color iconBg;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hugeicons/hugeicons.dart';
+import '../../logic/auth/auth_cubit.dart';
+import '../../logic/auth/auth_state.dart';
 import '../../logic/conversation/conversation_cubit.dart';
 import '../../logic/conversation/conversation_state.dart';
 import '../../logic/notification/notification_cubit.dart';
@@ -50,13 +52,26 @@ class _MainLayoutState extends State<MainLayout> {
           builder: (context, notifState) {
             final unreadNotifs = notifState.unreadCount;
 
-            return Scaffold(
-              backgroundColor: bgColor,
-              body: IndexedStack(
-                index: _currentIndex,
-                children: _screens,
-              ),
-              bottomNavigationBar: Container(
+            return BlocListener<AuthCubit, AuthState>(
+              listenWhen: (prev, curr) {
+                if (prev is Authenticated && curr is Authenticated) {
+                  return prev.user.accountId != curr.user.accountId;
+                }
+                return false;
+              },
+              listener: (context, authState) {
+                if (authState is Authenticated) {
+                  context.read<ConversationCubit>().onWorkspaceSwitched(authState.user.accountId);
+                  context.read<NotificationCubit>().loadNotifications();
+                }
+              },
+              child: Scaffold(
+                backgroundColor: bgColor,
+                body: IndexedStack(
+                  index: _currentIndex,
+                  children: _screens,
+                ),
+                bottomNavigationBar: Container(
                 decoration: BoxDecoration(
                   color: bgColor,
                   border: Border(
@@ -115,7 +130,7 @@ class _MainLayoutState extends State<MainLayout> {
                   ),
                 ),
               ),
-            );
+            ));
           },
         );
       },
