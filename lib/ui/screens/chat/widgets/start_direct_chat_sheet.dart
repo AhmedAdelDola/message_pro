@@ -62,7 +62,9 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
 
   String _cleanPhone(String raw) {
     var p = raw.trim().replaceAll(' ', '').replaceAll('-', '');
-    if (p.startsWith('01') && p.length == 11) {
+    if (p.startsWith('00')) {
+      p = '+${p.substring(2)}';
+    } else if (p.startsWith('01') && p.length == 11) {
       p = '+2$p';
     } else if (p.startsWith('201') && p.length == 12) {
       p = '+$p';

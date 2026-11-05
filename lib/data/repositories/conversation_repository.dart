@@ -696,7 +696,6 @@ class ConversationRepository implements IConversationRepository {
         'contact_id': contactId,
         'inbox_id': inboxId,
         'source_id': cleanSource,
-        'status': 'open',
       };
       if (message != null && message.trim().isNotEmpty) {
         payload['message'] = {

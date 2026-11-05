@@ -94,46 +94,35 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     try {
       final workspaceInboxes = context.read<ConversationCubit>().state.inboxes;
       final repo = sl<IConversationRepository>();
-      final inboxesResult = await repo.getContactableInboxes(widget.contact.id);
-
       List<Map<String, dynamic>> inboxes = [];
-      inboxesResult.fold((_) {}, (list) {
-        for (final item in list) {
-          final inbMap = item['inbox'] is Map ? Map<String, dynamic>.from(item['inbox'] as Map) : item;
-          final rawId = inbMap['id'] ?? item['id'] ?? item['inbox_id'] ?? inbMap['inbox_id'];
-          final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
 
-          final matchingInbox = id != null ? workspaceInboxes.where((wi) => wi.id == id).firstOrNull : null;
-          final name = inbMap['name']?.toString() ?? matchingInbox?.name ?? (id != null ? 'Inbox #$id' : 'قناة مراسلة');
-          final channelType = inbMap['channel_type']?.toString() ?? matchingInbox?.channelType ?? '';
-          final sourceId = item['source_id']?.toString() ?? widget.contact.phoneNumber ?? widget.contact.email ?? 'contact_${widget.contact.id}';
-
-          if (id != null || matchingInbox != null) {
-            inboxes.add({
-              'id': id ?? matchingInbox!.id,
-              'name': name,
-              'channel_type': channelType,
-              'source_id': sourceId,
-            });
-          }
-        }
-      });
-
-      if (inboxes.isEmpty && widget.contact.phoneNumber != null && widget.contact.phoneNumber!.isNotEmpty) {
-        final phoneDestRes = await repo.getPhoneDestinations(phoneNumber: widget.contact.phoneNumber);
+      final phone = widget.contact.phoneNumber?.trim();
+      if (phone != null && phone.isNotEmpty) {
+        final phoneDestRes = await repo.getPhoneDestinations(phoneNumber: phone);
         phoneDestRes.fold((_) {}, (destList) {
           for (final d in destList) {
             final rawInbox = d['inbox'];
-            final pId = (rawInbox is Map) ? rawInbox['id'] : d['inbox_id'];
-            final parsedId = pId is int ? pId : int.tryParse(pId?.toString() ?? '');
-            final pName = (rawInbox is Map ? rawInbox['name'] : d['inbox_name'])?.toString() ?? 'WhatsApp';
-            final chType = (rawInbox is Map ? rawInbox['channel_type'] : d['channel_type'])?.toString() ?? 'Channel::Whatsapp';
-            final srcId = d['source_id']?.toString() ?? widget.contact.phoneNumber!;
+            int? parsedId;
+            String? pName;
+            String? chType;
+            if (rawInbox is Map) {
+              parsedId = rawInbox['id'] is int ? rawInbox['id'] : int.tryParse(rawInbox['id']?.toString() ?? '');
+              pName = rawInbox['name']?.toString();
+              chType = rawInbox['channel_type']?.toString();
+            } else {
+              parsedId = d['inbox_id'] is int ? d['inbox_id'] : int.tryParse(d['inbox_id']?.toString() ?? '');
+              pName = d['inbox_name']?.toString();
+              chType = d['channel_type']?.toString();
+            }
+            final srcId = d['source_id']?.toString() ?? phone;
 
-            if (parsedId != null && !inboxes.any((existing) => existing['id'] == parsedId)) {
+            if (parsedId != null && parsedId > 0 && !inboxes.any((existing) => existing['id'] == parsedId)) {
+              final matchingInbox = workspaceInboxes.where((wi) => wi.id == parsedId).firstOrNull;
+              pName ??= matchingInbox?.name;
+              chType ??= matchingInbox?.channelType ?? 'Channel::Whatsapp';
               inboxes.add({
                 'id': parsedId,
-                'name': pName,
+                'name': (pName != null && pName.isNotEmpty) ? pName : 'WhatsApp',
                 'channel_type': chType,
                 'source_id': srcId,
               });
@@ -142,23 +131,60 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
         });
       }
 
+      // Also check contactable inboxes for existing non-phone channels (Facebook, Instagram, Email, WebWidget)
+      if (inboxes.isEmpty) {
+        final inboxesResult = await repo.getContactableInboxes(widget.contact.id);
+        inboxesResult.fold((_) {}, (list) {
+          for (final item in list) {
+            final inbMap = item['inbox'] is Map ? Map<String, dynamic>.from(item['inbox'] as Map) : null;
+            final rawInboxId = inbMap?['id'] ?? item['inbox_id'];
+            final inboxId = rawInboxId is int ? rawInboxId : int.tryParse(rawInboxId?.toString() ?? '');
+
+            if (inboxId == null || inboxId <= 0) continue;
+
+            final matchingInbox = workspaceInboxes.where((wi) => wi.id == inboxId).firstOrNull;
+            final name = inbMap?['name']?.toString() ?? matchingInbox?.name ?? 'قناة مراسلة';
+            final channelType = inbMap?['channel_type']?.toString() ?? matchingInbox?.channelType ?? '';
+            final sourceId = item['source_id']?.toString() ?? widget.contact.phoneNumber ?? widget.contact.email ?? 'contact_${widget.contact.id}';
+
+            if (!inboxes.any((existing) => existing['id'] == inboxId)) {
+              inboxes.add({
+                'id': inboxId,
+                'name': name,
+                'channel_type': channelType,
+                'source_id': sourceId,
+              });
+            }
+          }
+        });
+      }
+
+      // Fallback to workspace inboxes
       if (inboxes.isEmpty) {
         if (workspaceInboxes.isNotEmpty) {
-          inboxes = workspaceInboxes.map((inb) => {
-            'id': inb.id,
-            'name': inb.name,
-            'channel_type': inb.channelType,
-            'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
-          }).toList();
+          for (final inb in workspaceInboxes) {
+            if (!inboxes.any((existing) => existing['id'] == inb.id)) {
+              inboxes.add({
+                'id': inb.id,
+                'name': inb.name,
+                'channel_type': inb.channelType,
+                'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
+              });
+            }
+          }
         } else {
           final allInboxesResult = await repo.fetchInboxes();
           allInboxesResult.fold((_) {}, (list) {
-            inboxes = list.map((inb) => {
-              'id': inb.id,
-              'name': inb.name,
-              'channel_type': inb.channelType,
-              'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
-            }).toList();
+            for (final inb in list) {
+              if (!inboxes.any((existing) => existing['id'] == inb.id)) {
+                inboxes.add({
+                  'id': inb.id,
+                  'name': inb.name,
+                  'channel_type': inb.channelType,
+                  'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
+                });
+              }
+            }
           });
         }
       }

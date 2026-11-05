@@ -652,8 +652,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               ),
                               subtitle: Text(
                                 isArabic
-                                    ? 'تشغيل نغمة واتساب المميزة عند استقبال أو إرسال أي رسالة داخل التطبيق.'
-                                    : 'Play WhatsApp sound effects for incoming and outgoing messages while using the app.',
+                                    ? 'تشغيل مؤثر صوتي عند استقبال أو إرسال أي رسالة داخل التطبيق.'
+                                    : 'Play sound effects for incoming and outgoing messages while using the app.',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   color: textSecondary,
@@ -669,6 +669,115 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                 }
                               },
                             ),
+                            if (SoundService().isSoundEnabled) ...[
+                              const SizedBox(height: 12),
+                              Divider(color: borderColor, height: 1),
+                              const SizedBox(height: 14),
+                              Text(
+                                isArabic ? 'نغمة الرسائل الواردة' : 'Incoming Message Tone',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: textPrimary,
+                                  fontFamily: 'Gontserrat',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isArabic
+                                    ? 'اضغط على أي نغمة لاختيارها وسماعها فوراً:'
+                                    : 'Tap any sound to select and preview it:',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: textSecondary,
+                                  fontFamily: 'Gontserrat',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...SoundService.availableSounds.map((sound) {
+                                final isSelected = SoundService().selectedSound == sound.id;
+                                return InkWell(
+                                  onTap: () async {
+                                    await SoundService().setSound(sound.id);
+                                    await SoundService().playPreview(sound.id);
+                                    setState(() {});
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? AppColors.primary.withValues(alpha: 0.1)
+                                          : (isDark ? const Color(0xFF1E2024) : const Color(0xFFF7F8FA)),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.primary : borderColor,
+                                        width: isSelected ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : (isDark ? const Color(0xFF282A2E) : const Color(0xFFE9EBEF)),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            sound.icon,
+                                            size: 16,
+                                            color: isSelected ? Colors.white : textSecondary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            isArabic ? sound.nameAr : sound.nameEn,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isSelected ? AppColors.primary : textPrimary,
+                                              fontFamily: 'Gontserrat',
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.play_circle_fill_rounded,
+                                            color: isSelected ? AppColors.primary : textSecondary,
+                                            size: 22,
+                                          ),
+                                          tooltip: isArabic ? 'استماع' : 'Listen',
+                                          onPressed: () {
+                                            SoundService().playPreview(sound.id);
+                                          },
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          width: 18,
+                                          height: 18,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: isSelected ? AppColors.primary : textSecondary.withValues(alpha: 0.5),
+                                              width: 2,
+                                            ),
+                                            color: isSelected ? AppColors.primary : Colors.transparent,
+                                          ),
+                                          child: isSelected
+                                              ? const Icon(Icons.check, size: 12, color: Colors.white)
+                                              : null,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
                           ],
                         ),
                       ),

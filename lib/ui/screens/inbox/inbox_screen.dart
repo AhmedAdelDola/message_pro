@@ -101,6 +101,24 @@ class _InboxScreenState extends State<InboxScreen> {
     });
   }
 
+  bool _looksLikePhoneNumber(String text) {
+    final clean = text.replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
+    if (clean.length < 7 || clean.length > 16) return false;
+    return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(clean);
+  }
+
+  String _cleanSearchPhoneNumber(String text) {
+    var p = text.trim().replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
+    if (p.startsWith('00')) {
+      p = '+${p.substring(2)}';
+    } else if (p.startsWith('01') && p.length == 11) {
+      p = '+2$p';
+    } else if (p.startsWith('201') && p.length == 12) {
+      p = '+$p';
+    }
+    return p;
+  }
+
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
@@ -487,14 +505,6 @@ class _InboxScreenState extends State<InboxScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: bgColor,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => StartDirectChatSheet.show(context),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        tooltip: isArabic ? 'بدء محادثة برقم' : 'New Chat',
-        elevation: 3,
-        child: const Icon(Icons.add_comment_rounded, size: 22),
-      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -670,6 +680,96 @@ class _InboxScreenState extends State<InboxScreen> {
                   }
 
                   if (conversations.isEmpty) {
+                    final searchQuery = _searchController.text.trim();
+                    final isPhoneQuery = _isSearching && _looksLikePhoneNumber(searchQuery);
+
+                    if (isPhoneQuery) {
+                      final cleanNumber = _cleanSearchPhoneNumber(searchQuery);
+                      return Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E2024) : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 58,
+                                  height: 58,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  isArabic ? 'لا توجد محادثة سابقة مع هذا الرقم' : 'No existing chat with this number',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: textSecondary,
+                                    fontSize: 13,
+                                    fontFamily: 'Gontserrat',
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Directionality(
+                                  textDirection: TextDirection.ltr,
+                                  child: Text(
+                                    searchQuery,
+                                    style: TextStyle(
+                                      color: textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Gontserrat',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      StartDirectChatSheet.show(context, initialPhone: cleanNumber);
+                                    },
+                                    icon: const Icon(Icons.add_comment_rounded, size: 18),
+                                    label: Text(
+                                      isArabic ? 'بدء محادثة جديدة مع الرقم' : 'Start chat with this number',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -698,15 +798,94 @@ class _InboxScreenState extends State<InboxScreen> {
                     );
                   }
 
+                  final searchQuery = _searchController.text.trim();
+                  final isPhoneQuery = _isSearching && _looksLikePhoneNumber(searchQuery);
+                  final cleanSearchNumber = isPhoneQuery ? _cleanSearchPhoneNumber(searchQuery) : '';
+                  final hasExactMatch = isPhoneQuery && conversations.any((c) {
+                    final cPhone = (c.contact.phoneNumber ?? '').replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
+                    final sPhone = cleanSearchNumber.replaceAll('+', '');
+                    return cPhone.isNotEmpty && (cPhone.endsWith(sPhone) || sPhone.endsWith(cPhone));
+                  });
+                  final showStartChatBanner = isPhoneQuery && !hasExactMatch;
+
+                  final extraBannerCount = showStartChatBanner ? 1 : 0;
+                  final totalItemCount = conversations.length + extraBannerCount + (state.isLoadingMore ? 1 : 0);
+
                   return RefreshIndicator(
                     color: AppColors.primary,
                     onRefresh: () => cubit.loadConversations(),
                     child: ListView.builder(
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: conversations.length + (state.isLoadingMore ? 1 : 0),
+                      itemCount: totalItemCount,
                       itemBuilder: (context, index) {
-                        if (index == conversations.length) {
+                        if (showStartChatBanner && index == 0) {
+                          return InkWell(
+                            onTap: () {
+                              StartDirectChatSheet.show(context, initialPhone: cleanSearchNumber);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.add_comment_rounded, color: Colors.white, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isArabic ? 'بدء محادثة جديدة' : 'Start new conversation',
+                                          style: TextStyle(
+                                            color: textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            fontFamily: 'Gontserrat',
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Directionality(
+                                          textDirection: TextDirection.ltr,
+                                          child: Text(
+                                            isArabic ? 'فتح محادثة مع $searchQuery' : 'Open chat with $searchQuery',
+                                            style: TextStyle(
+                                              color: textSecondary,
+                                              fontSize: 12,
+                                              fontFamily: 'Gontserrat',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    isArabic ? Icons.arrow_back_ios_new_rounded : Icons.arrow_forward_ios_rounded,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
+                        final effectiveIndex = showStartChatBanner ? index - 1 : index;
+
+                        if (effectiveIndex == conversations.length) {
                           return const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
                             child: Center(
@@ -721,7 +900,7 @@ class _InboxScreenState extends State<InboxScreen> {
                             ),
                           );
                         }
-                        final conv = conversations[index];
+                        final conv = conversations[effectiveIndex];
                         return ConversationTile(
                           key: ValueKey(conv.id),
                           conversation: conv,
@@ -836,11 +1015,6 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
           Row(
             children: [
-              IconButton(
-                icon: const HugeIcon(icon: HugeIcons.strokeRoundedBubbleChatAdd, color: AppColors.primary, size: 21),
-                tooltip: 'Start Direct Chat',
-                onPressed: () => StartDirectChatSheet.show(context),
-              ),
               IconButton(
                 icon: HugeIcon(icon: HugeIcons.strokeRoundedUserAdd01, color: textPrimary, size: 21),
                 tooltip: 'New Contact',
