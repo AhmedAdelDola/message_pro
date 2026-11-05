@@ -24,7 +24,9 @@ class ConversationTile extends StatelessWidget {
     final difference = now.difference(dt);
 
     if (difference.inDays == 0 && now.day == dt.day) {
-      return DateFormat('h:mm a').format(dt);
+      final hourMin = DateFormat('h:mm').format(dt);
+      final amPm = dt.hour >= 12 ? (isArabic ? 'م' : 'PM') : (isArabic ? 'ص' : 'AM');
+      return '$hourMin $amPm';
     }
 
     final yesterday = now.subtract(const Duration(days: 1));
@@ -33,10 +35,10 @@ class ConversationTile extends StatelessWidget {
     }
 
     if (difference.inDays < 7) {
-      return DateFormat('EEE').format(dt);
+      return DateFormat('EEE', isArabic ? 'ar' : 'en').format(dt);
     }
 
-    return DateFormat('MMM d').format(dt);
+    return DateFormat('MMM d', isArabic ? 'ar' : 'en').format(dt);
   }
 
   @override

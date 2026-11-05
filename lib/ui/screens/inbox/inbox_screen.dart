@@ -176,18 +176,21 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  String _formatFilterDropdownLabel() {
-    String statusStr = 'All';
-    if (_selectedStatus == 'open') statusStr = 'Open';
-    if (_selectedStatus == 'closed' || _selectedStatus == 'resolved') statusStr = 'Closed';
-    if (_selectedStatus == 'snoozed') statusStr = 'Snoozed';
+  String _formatFilterDropdownLabel(bool isArabic) {
+    String statusStr = isArabic ? 'الكل' : 'All';
+    if (_selectedStatus == 'open') statusStr = isArabic ? 'مفتوحة' : 'Open';
+    if (_selectedStatus == 'closed' || _selectedStatus == 'resolved') statusStr = isArabic ? 'مغلقة' : 'Closed';
+    if (_selectedStatus == 'snoozed') statusStr = isArabic ? 'مؤجلة' : 'Snoozed';
 
-    String sortStr = _sortBy == 'newest' ? 'Newest' : 'Oldest';
-    return '$statusStr, $sortStr';
+    String sortStr = _sortBy == 'newest'
+        ? (isArabic ? 'الأحدث' : 'Newest')
+        : (isArabic ? 'الأقدم' : 'Oldest');
+    return isArabic ? '$statusStr، $sortStr' : '$statusStr, $sortStr';
   }
 
   // Status & Sort Modal matching browser screenshot 85
   void _showFilterDropdownModal() {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? AppColors.darkCard : Colors.white;
     final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
@@ -216,7 +219,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   children: [
                     // Section 1: Show
                     Text(
-                      'Show',
+                      isArabic ? 'عرض' : 'Show',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -226,7 +229,7 @@ class _InboxScreenState extends State<InboxScreen> {
                     ),
                     const SizedBox(height: 6),
                     _buildRadioRow(
-                      label: 'All conversations',
+                      label: isArabic ? 'جميع المحادثات' : 'All conversations',
                       value: 'all',
                       groupValue: _selectedStatus,
                       onChanged: (val) {
@@ -239,7 +242,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       textPrimary: textPrimary,
                     ),
                     _buildRadioRow(
-                      label: 'Open conversations',
+                      label: isArabic ? 'المحادثات المفتوحة' : 'Open conversations',
                       value: 'open',
                       groupValue: _selectedStatus,
                       onChanged: (val) {
@@ -252,7 +255,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       textPrimary: textPrimary,
                     ),
                     _buildRadioRow(
-                      label: 'Closed conversations',
+                      label: isArabic ? 'المحادثات المغلقة' : 'Closed conversations',
                       value: 'closed',
                       groupValue: _selectedStatus,
                       onChanged: (val) {
@@ -265,7 +268,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       textPrimary: textPrimary,
                     ),
                     _buildRadioRow(
-                      label: 'Snoozed conversations',
+                      label: isArabic ? 'المحادثات المؤجلة' : 'Snoozed conversations',
                       value: 'snoozed',
                       groupValue: _selectedStatus,
                       onChanged: (val) {
@@ -282,7 +285,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
                     // Section 2: Sort by
                     Text(
-                      'Sort by',
+                      isArabic ? 'الترتيب حسب' : 'Sort by',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -292,7 +295,7 @@ class _InboxScreenState extends State<InboxScreen> {
                     ),
                     const SizedBox(height: 6),
                     _buildRadioRow(
-                      label: 'Newest',
+                      label: isArabic ? 'الأحدث' : 'Newest',
                       value: 'newest',
                       groupValue: _sortBy,
                       onChanged: (val) {
@@ -302,7 +305,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       textPrimary: textPrimary,
                     ),
                     _buildRadioRow(
-                      label: 'Oldest',
+                      label: isArabic ? 'الأقدم' : 'Oldest',
                       value: 'oldest',
                       groupValue: _sortBy,
                       onChanged: (val) {
@@ -320,11 +323,11 @@ class _InboxScreenState extends State<InboxScreen> {
                         Navigator.pop(ctx);
                         _showAdvancedFiltersBottomSheet();
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Text(
-                          'Advanced filters',
-                          style: TextStyle(
+                          isArabic ? 'تصفية متقدمة' : 'Advanced filters',
+                          style: const TextStyle(
                             color: AppColors.primary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -579,7 +582,7 @@ class _InboxScreenState extends State<InboxScreen> {
             if (_isSearching)
               _buildSearchHeader(isDark, isArabic, textPrimary, textSecondary, borderColor)
             else
-              _buildMainHeader(isDark, textPrimary),
+              _buildMainHeader(isDark, textPrimary, isArabic),
 
             // Global sleek blue linear progress indicator
             const BreakCountdownBanner(),
@@ -600,10 +603,10 @@ class _InboxScreenState extends State<InboxScreen> {
                 ),
                 child: Row(
                   children: [
-                    _buildSegmentTab('all', 'All', isDark),
-                    _buildSegmentTab('mine', 'Mine', isDark),
-                    _buildSegmentTab('collaborating', 'Collaborating', isDark),
-                    _buildSegmentTab('unassigned', 'Unassigned', isDark),
+                    _buildSegmentTab('all', isArabic ? 'الكل' : 'All', isDark),
+                    _buildSegmentTab('mine', isArabic ? 'خاصتي' : 'Mine', isDark),
+                    _buildSegmentTab('collaborating', isArabic ? 'المتعاونة' : 'Collaborating', isDark),
+                    _buildSegmentTab('unassigned', isArabic ? 'غير معينة' : 'Unassigned', isDark),
                   ],
                 ),
               ),
@@ -624,7 +627,7 @@ class _InboxScreenState extends State<InboxScreen> {
                         child: Row(
                           children: [
                             Text(
-                              _formatFilterDropdownLabel(),
+                              _formatFilterDropdownLabel(isArabic),
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -651,7 +654,7 @@ class _InboxScreenState extends State<InboxScreen> {
                           ),
                         ),
                         Text(
-                          'Unreplied',
+                          isArabic ? 'بدون رد' : 'Unreplied',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -979,7 +982,7 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   // Chats Tab Header matching browser Tab 1
-  Widget _buildMainHeader(bool isDark, Color textPrimary) {
+  Widget _buildMainHeader(bool isDark, Color textPrimary, bool isArabic) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -1002,7 +1005,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       : 'E';
 
                   return Tooltip(
-                    message: activeAccount?.name ?? 'Workspace',
+                    message: activeAccount?.name ?? (isArabic ? 'مساحة العمل' : 'Workspace'),
                     child: InkWell(
                       onTap: () => _showWorkspacesBottomSheet(context),
                       borderRadius: BorderRadius.circular(10),
@@ -1045,7 +1048,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Chats',
+                    isArabic ? 'المحادثات' : 'Chats',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1055,7 +1058,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   ),
                   const SizedBox(height: 3),
                   Container(
-                    width: 44,
+                    width: isArabic ? 55 : 44,
                     height: 2.5,
                     decoration: BoxDecoration(
                       color: AppColors.primary,
@@ -1070,7 +1073,7 @@ class _InboxScreenState extends State<InboxScreen> {
             children: [
               IconButton(
                 icon: HugeIcon(icon: HugeIcons.strokeRoundedUserAdd01, color: textPrimary, size: 21),
-                tooltip: 'New Contact',
+                tooltip: isArabic ? 'جهة اتصال جديدة' : 'New Contact',
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const AddContactScreen()),
@@ -1079,7 +1082,7 @@ class _InboxScreenState extends State<InboxScreen> {
               ),
               IconButton(
                 icon: HugeIcon(icon: HugeIcons.strokeRoundedSearch01, color: textPrimary, size: 21),
-                tooltip: 'Search',
+                tooltip: isArabic ? 'بحث' : 'Search',
                 onPressed: () => setState(() => _isSearching = true),
               ),
             ],
