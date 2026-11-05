@@ -20,7 +20,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController _nameController;
-  late TextEditingController _displayNameController;
   late TextEditingController _emailController;
 
   String _selectedAvailability = 'online';
@@ -32,7 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _displayNameController = TextEditingController();
     _emailController = TextEditingController();
   }
 
@@ -43,7 +41,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final user = context.read<AuthCubit>().currentUser;
       if (user != null) {
         _nameController.text = user.name;
-        _displayNameController.text = user.displayName ?? '';
         _emailController.text = user.email;
         _selectedAvailability = user.availabilityStatus;
       }
@@ -54,7 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _displayNameController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -77,14 +73,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isSaving = true);
 
     final name = _nameController.text.trim();
-    final displayName = _displayNameController.text.trim();
     final email = _emailController.text.trim();
     final cubit = context.read<AuthCubit>();
 
-    // 1. Update Profile (name, display_name, email)
+    // 1. Update Profile (name, email)
     final profileResult = await cubit.updateProfile(
       name: name,
-      displayName: displayName.isNotEmpty ? displayName : null,
       email: email,
     );
 
@@ -184,9 +178,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Keep controllers up to date if user state changes externally
             if (_nameController.text != authState.user.name) {
               _nameController.text = authState.user.name;
-            }
-            if (_displayNameController.text != (authState.user.displayName ?? '')) {
-              _displayNameController.text = authState.user.displayName ?? '';
             }
             if (_emailController.text != authState.user.email) {
               _emailController.text = authState.user.email;
@@ -302,29 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                         SizedBox(height: 16.h),
 
-                        // Display Name
-                        _buildLabel(isArabic ? 'اسم العرض (اختياري)' : 'Display Name (Optional)', textPrimary),
-                        SizedBox(height: 4.h),
-                        Text(
-                          isArabic
-                              ? 'الاسم الذي يظهر للعملاء والمستخدمين في المحادثات'
-                              : 'The name shown to customers and teammates in chat',
-                          style: TextStyle(fontSize: 11.5.sp, color: textSecondary, fontFamily: 'Gontserrat'),
-                        ),
-                        SizedBox(height: 6.h),
-                        TextFormField(
-                          controller: _displayNameController,
-                          style: TextStyle(fontSize: 14.sp, color: textPrimary, fontFamily: 'Gontserrat'),
-                          decoration: _inputDecoration(
-                            hint: isArabic ? 'أدخل اسم العرض' : 'e.g. John D.',
-                            icon: Icons.badge_outlined,
-                            inputBg: inputBg,
-                            borderColor: borderColor,
-                            textSecondary: textSecondary,
-                          ),
-                        ),
 
-                        SizedBox(height: 16.h),
 
                         // Email
                         _buildLabel(isArabic ? 'البريد الإلكتروني *' : 'Email Address *', textPrimary),

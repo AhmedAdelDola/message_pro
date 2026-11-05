@@ -196,49 +196,57 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
             // Search Bar
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+                border: Border(bottom: BorderSide(color: borderColor, width: 0.8)),
               ),
               child: Container(
                 height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF1F5F9),
+                  color: isDark ? AppColors.darkSurface : const Color(0xFFF1F2F4),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: borderColor),
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  style: TextStyle(
-                    color: textPrimary,
-                    fontSize: 13.5,
-                    fontFamily: 'Gontserrat',
-                  ),
-                  decoration: InputDecoration(
-                    hintText: isArabic ? 'بحث بالاسم، البريد أو الهاتف...' : 'Search by name, email, or phone...',
-                    hintStyle: TextStyle(
-                      color: textSecondary,
-                      fontSize: 13,
-                      fontFamily: 'Gontserrat',
-                    ),
-                    prefixIcon: HugeIcon(
+                child: Row(
+                  children: [
+                    HugeIcon(
                       icon: HugeIcons.strokeRoundedSearch01,
                       color: textSecondary,
                       size: 18,
                     ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.close_rounded, size: 18, color: textSecondary),
-                            onPressed: () {
-                              _searchController.clear();
-                              _onSearchChanged('');
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 13.5,
+                          fontFamily: 'Gontserrat',
+                        ),
+                        decoration: InputDecoration(
+                          hintText: isArabic ? 'بحث بالاسم، البريد أو الهاتف...' : 'Search by name, email, or phone...',
+                          hintStyle: TextStyle(
+                            color: textSecondary,
+                            fontSize: 13,
+                            fontFamily: 'Gontserrat',
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                    if (_searchController.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                        child: Icon(Icons.close_rounded, size: 18, color: textSecondary),
+                      ),
+                  ],
                 ),
               ),
             ),

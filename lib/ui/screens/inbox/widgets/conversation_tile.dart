@@ -103,6 +103,7 @@ class ConversationTile extends StatelessWidget {
     }
     final ctime = _formatTime(conversation.updatedAt, isArabic);
     final isSnoozed = conversation.status == 'snoozed' || conversation.snoozedUntil != null;
+    final isClosed = conversation.status == 'resolved' || conversation.status == 'closed';
 
     // Lifecycle stage info
     final stageName = conversation.lifecycleStage?.name ?? 'New Lead';
@@ -194,6 +195,14 @@ class ConversationTile extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            if (isClosed) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                            ],
                             if (isSnoozed) ...[
                               const SizedBox(width: 6),
                               Container(
@@ -226,6 +235,14 @@ class ConversationTile extends StatelessWidget {
                                     ),
                                   ],
                                 ),
+                              ),
+                            ],
+                            if (conversation.muted) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.notifications_off_rounded,
+                                size: 13,
+                                color: Color(0xFF9CA3AF),
                               ),
                             ],
                           ],

@@ -198,6 +198,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       await chatCubit.unmuteConversation();
       setState(() => _isMuted = false);
       if (mounted) {
+        context.read<ConversationCubit>().loadConversations();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isArabic ? 'تم إلغاء كتم المحادثة' : 'Conversation unmuted'),
@@ -210,6 +211,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       await chatCubit.muteConversation();
       setState(() => _isMuted = true);
       if (mounted) {
+        context.read<ConversationCubit>().loadConversations();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isArabic ? 'تم كتم إشعارات المحادثة' : 'Conversation muted'),
@@ -334,6 +336,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   @override
   Widget build(BuildContext context) {
     final contact = widget.conversation.contact;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return BlocConsumer<ChatCubit, ChatState>(
       listener: (context, state) {
@@ -657,6 +660,58 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
           ),
           body: Column(
             children: [
+              // Muted Conversation Banner
+              if (_isMuted)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF232529)
+                        : const Color(0xFFF3F4F6),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.darkBorder
+                            : AppColors.lightBorder,
+                        width: 0.8,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.notifications_off_rounded, size: 16.r, color: const Color(0xFF80838D)),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          isArabic ? 'إشعارات هذه المحادثة مكتومة' : 'This conversation is muted',
+                          style: TextStyle(
+                            fontSize: 12.5.sp,
+                            color: const Color(0xFF80838D),
+                            fontFamily: 'Gontserrat',
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _toggleMute,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: AppColors.primary,
+                        ),
+                        child: Text(
+                          isArabic ? 'إلغاء الكتم' : 'Unmute',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.sp,
+                            fontFamily: 'Gontserrat',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // Typing Indicator Banner
               if (chatState.typingUsers.isNotEmpty)
                 Container(

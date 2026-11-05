@@ -451,6 +451,27 @@ class _InboxScreenState extends State<InboxScreen> {
                   if (mounted) context.read<ConversationCubit>().loadConversations();
                 },
               ),
+              // Mute / Unmute
+              _buildActionRow(
+                icon: Icon(
+                  conv.muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+                  color: conv.muted ? AppColors.success : textPrimary,
+                ),
+                label: conv.muted
+                    ? (isArabic ? 'إلغاء كتم المحادثة' : 'Unmute Conversation')
+                    : (isArabic ? 'كتم المحادثة (Mute)' : 'Mute Conversation'),
+                textColor: conv.muted ? AppColors.success : textPrimary,
+                borderColor: borderColor,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (conv.muted) {
+                    await sl<IConversationRepository>().unmuteConversation(conv.id);
+                  } else {
+                    await sl<IConversationRepository>().muteConversation(conv.id);
+                  }
+                  if (mounted) context.read<ConversationCubit>().loadConversations();
+                },
+              ),
             ],
           ),
         );

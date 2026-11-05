@@ -130,9 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  user.displayName != null && user.displayName!.isNotEmpty && user.displayName != user.name
-                                      ? '${user.name} (${user.displayName})'
-                                      : user.name,
+                                  user.name,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
