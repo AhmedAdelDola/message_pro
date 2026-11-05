@@ -1,0 +1,86 @@
+name: Shorebird iOS & Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform to release'
+        required: true
+        default: 'ios'
+        type: choice
+        options:
+          - ios
+          - android
+          - both
+
+permissions:
+  contents: read
+
+jobs:
+  release-ios:
+    name: Build Shorebird iOS Release
+    if: inputs.platform == 'ios' || inputs.platform == 'both'
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Shorebird Release iOS
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: |
+          # If Apple signing certificates are not configured in CI, build without codesign or with manual signing
+          shorebird release ios --no-codesign
+
+      - name: Upload iOS Archive Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-release-archive
+          path: build/ios/archive/Runner.xcarchive
+          if-no-files-found: warn
+
+  release-android:
+    name: Build Shorebird Android Release
+    if: inputs.platform == 'android' || inputs.platform == 'both'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Shorebird Release Android
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: |
+          shorebird release android --no-confirm
+
+      - name: Upload Android AAB Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
