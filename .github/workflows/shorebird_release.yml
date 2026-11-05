@@ -12,14 +12,28 @@ on:
           - ios
           - android
           - both
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.github/workflows/**'
 
 permissions:
   contents: read
 
 jobs:
+  workflow-ready:
+    name: Check Workflow
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Confirm Ready
+        run: echo "Shorebird Release workflow is active and ready. Trigger via 'Run workflow'."
+
   release-ios:
     name: Build Shorebird iOS Release
-    if: inputs.platform == 'ios' || inputs.platform == 'both'
+    if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'both')
     runs-on: macos-14
 
     steps:
@@ -51,7 +65,7 @@ jobs:
 
   release-android:
     name: Build Shorebird Android Release
-    if: inputs.platform == 'android' || inputs.platform == 'both'
+    if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'both')
     runs-on: ubuntu-latest
 
     steps:
