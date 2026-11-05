@@ -26,8 +26,10 @@ class MessageBubble extends StatelessWidget {
     this.onRetry,
   });
 
-  String _formatTime(DateTime dt) {
-    return DateFormat('hh:mm a').format(dt);
+  String _formatTime(DateTime dt, [bool isArabic = false]) {
+    final hourMin = DateFormat('h:mm').format(dt);
+    final amPm = dt.hour >= 12 ? (isArabic ? 'م' : 'PM') : (isArabic ? 'ص' : 'AM');
+    return '$hourMin $amPm';
   }
 
   String _formatDate(DateTime dt, bool isArabic) {
@@ -97,9 +99,9 @@ class MessageBubble extends StatelessWidget {
         else if (message.isTemplate)
           _buildTemplateBubble(isDark, isArabic, context)
         else if (isOutgoing)
-          _buildOutgoingBubble(isDark, context)
+          _buildOutgoingBubble(isDark, isArabic, context)
         else
-          _buildIncomingBubble(isDark, context),
+          _buildIncomingBubble(isDark, isArabic, context),
       ],
     );
   }
@@ -209,7 +211,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildOutgoingBubble(bool isDark, BuildContext context) {
+  Widget _buildOutgoingBubble(bool isDark, bool isArabic, BuildContext context) {
     final isFailed = message.isFailed;
 
     return Padding(
@@ -304,7 +306,8 @@ class MessageBubble extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _formatTime(message.createdAt),
+                        _formatTime(message.createdAt, isArabic),
+                        textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xBFFFFFFF), // rgba(255,255,255,0.75)
@@ -326,7 +329,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildIncomingBubble(bool isDark, BuildContext context) {
+  Widget _buildIncomingBubble(bool isDark, bool isArabic, BuildContext context) {
     final bubbleBg = isDark ? const Color(0xFF161616) : Colors.white;
     final textColor = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
 
@@ -403,7 +406,8 @@ class MessageBubble extends StatelessWidget {
 
                   const SizedBox(height: 4),
                   Text(
-                    _formatTime(message.createdAt),
+                    _formatTime(message.createdAt, isArabic),
+                    textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF80838D),
@@ -481,7 +485,8 @@ class MessageBubble extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                _formatTime(message.createdAt),
+                _formatTime(message.createdAt, isArabic),
+                textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
                 style: TextStyle(
                   fontSize: 10,
                   color: accent.withValues(alpha: 0.8),
