@@ -20,8 +20,8 @@ android {
         applicationId = "com.message.pro.com"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 10
-        versionName = "1.0.7"
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     signingConfigs {
@@ -45,12 +45,9 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("release")
-        }
-    }
-
-    packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*.so")
+            ndk {
+                debugSymbolLevel = "none"
+            }
         }
     }
 }
