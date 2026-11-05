@@ -45,9 +45,6 @@ jobs:
         with:
           cache: true
 
-      - name: Install Dependencies
-        run: shorebird flutter pub get
-
       - name: Shorebird Release iOS
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
@@ -82,9 +79,6 @@ jobs:
         uses: shorebirdtech/setup-shorebird@v1
         with:
           cache: true
-
-      - name: Install Dependencies
-        run: shorebird flutter pub get
 
       - name: Shorebird Release Android
         env:
