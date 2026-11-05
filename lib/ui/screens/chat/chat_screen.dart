@@ -78,23 +78,34 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     });
   }
 
-  void _toggleResolveReopen() {
+  void _toggleResolveReopen() async {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final newStatus = _status == 'resolved' ? 'open' : 'resolved';
-    context.read<ChatCubit>().toggleStatus(newStatus);
-    context.read<ConversationCubit>().loadConversations();
-    setState(() => _status = newStatus);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          newStatus == 'resolved'
-              ? (isArabic ? 'تم حل وإغلاق المحادثة' : 'Conversation marked as resolved')
-              : (isArabic ? 'تمت إعادة فتح المحادثة' : 'Conversation reopened'),
+    final targetStatus = _status == 'resolved' ? 'open' : 'resolved';
+    final success = await context.read<ChatCubit>().toggleStatus(targetStatus);
+    if (!mounted) return;
+    if (success) {
+      context.read<ConversationCubit>().loadConversations();
+      setState(() => _status = targetStatus);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            targetStatus == 'resolved'
+                ? (isArabic ? 'تم حل وإغلاق المحادثة' : 'Conversation marked as resolved')
+                : (isArabic ? 'تمت إعادة فتح المحادثة' : 'Conversation reopened'),
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
         ),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isArabic ? 'تعذر تحديث حالة المحادثة' : 'Failed to update conversation status'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showSnoozeOptions() {
@@ -130,22 +141,26 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   leading: const Icon(Icons.alarm_off_rounded, color: Color(0xFFFA8900)),
                   title: Text(isArabic ? 'إلغاء التأجيل (Unsnooze)' : 'Unsnooze'),
                   subtitle: Text(isArabic ? 'إعادة المحادثة للوضع المفتوح' : 'Revert conversation to open'),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    context.read<ChatCubit>().toggleStatus('open');
-                    context.read<ConversationCubit>().loadConversations();
-                    setState(() => _status = 'open');
+                    final success = await context.read<ChatCubit>().toggleStatus('open');
+                    if (mounted && success) {
+                      context.read<ConversationCubit>().loadConversations();
+                      setState(() => _status = 'open');
+                    }
                   },
                 ),
               ListTile(
                 leading: const Icon(Icons.reply_rounded, color: AppColors.primary),
                 title: Text(isArabic ? 'حتى الرد القادم' : 'Until next reply'),
                 subtitle: Text(isArabic ? 'تظل مؤجلة حتى يرد العميل' : 'Snooze until customer replies'),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
-                  context.read<ChatCubit>().toggleStatus('snoozed');
-                  context.read<ConversationCubit>().loadConversations();
-                  setState(() => _status = 'snoozed');
+                  final success = await context.read<ChatCubit>().toggleStatus('snoozed');
+                  if (mounted && success) {
+                    context.read<ConversationCubit>().loadConversations();
+                    setState(() => _status = 'snoozed');
+                  }
                 },
               ),
               ListTile(
@@ -156,13 +171,15 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     DateTime.now().add(const Duration(days: 1)).copyWith(hour: 9, minute: 0, second: 0),
                   ),
                 ),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
                   final now = DateTime.now();
                   final tomorrow9am = DateTime(now.year, now.month, now.day + 1, 9, 0, 0);
-                  context.read<ChatCubit>().toggleStatus('snoozed', snoozedUntil: tomorrow9am.toUtc().toIso8601String());
-                  context.read<ConversationCubit>().loadConversations();
-                  setState(() => _status = 'snoozed');
+                  final success = await context.read<ChatCubit>().toggleStatus('snoozed', snoozedUntil: tomorrow9am.toUtc().toIso8601String());
+                  if (mounted && success) {
+                    context.read<ConversationCubit>().loadConversations();
+                    setState(() => _status = 'snoozed');
+                  }
                 },
               ),
               ListTile(
@@ -173,15 +190,17 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     DateTime.now().add(Duration(days: ((8 - DateTime.now().weekday) <= 0 ? 7 : (8 - DateTime.now().weekday)))).copyWith(hour: 9, minute: 0, second: 0),
                   ),
                 ),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
                   final now = DateTime.now();
                   final daysUntilNextMonday = (DateTime.monday - now.weekday + 7) % 7;
                   final addDays = daysUntilNextMonday == 0 ? 7 : daysUntilNextMonday;
                   final nextWeekMonday9am = DateTime(now.year, now.month, now.day + addDays, 9, 0, 0);
-                  context.read<ChatCubit>().toggleStatus('snoozed', snoozedUntil: nextWeekMonday9am.toUtc().toIso8601String());
-                  context.read<ConversationCubit>().loadConversations();
-                  setState(() => _status = 'snoozed');
+                  final success = await context.read<ChatCubit>().toggleStatus('snoozed', snoozedUntil: nextWeekMonday9am.toUtc().toIso8601String());
+                  if (mounted && success) {
+                    context.read<ConversationCubit>().loadConversations();
+                    setState(() => _status = 'snoozed');
+                  }
                 },
               ),
             ],
@@ -337,6 +356,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   Widget build(BuildContext context) {
     final contact = widget.conversation.contact;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return BlocConsumer<ChatCubit, ChatState>(
       listener: (context, state) {
@@ -344,6 +364,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       },
       builder: (context, chatState) {
         return Scaffold(
+          backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF3F4F6),
           appBar: AppBar(
             bottom: AppBarProgressBar(
               isLoading: chatState.isLoading,
@@ -418,10 +439,13 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 2.w),
                   child: InkWell(
-                    onTap: () {
-                      context.read<ChatCubit>().toggleStatus('open');
-                      context.read<ConversationCubit>().loadConversations();
-                      setState(() => _status = 'open');
+                    onTap: () async {
+                      final convCubit = context.read<ConversationCubit>();
+                      final success = await context.read<ChatCubit>().toggleStatus('open');
+                      if (mounted && success) {
+                        convCubit.loadConversations();
+                        setState(() => _status = 'open');
+                      }
                     },
                     borderRadius: BorderRadius.circular(6.r),
                     child: Container(
@@ -736,7 +760,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
               // Messages List
               Expanded(
                 child: chatState.isLoading && chatState.messages.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const SizedBox.shrink()
                     : ListView.builder(
                         controller: _scrollController,
                         padding: EdgeInsets.symmetric(vertical: 12.h),

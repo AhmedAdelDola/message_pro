@@ -435,8 +435,33 @@ class _InboxScreenState extends State<InboxScreen> {
                 onTap: () async {
                   Navigator.pop(ctx);
                   final nextStatus = conv.status == 'resolved' ? 'open' : 'resolved';
-                  await sl<IConversationRepository>().toggleStatus(conv.id, nextStatus);
-                  if (mounted) context.read<ConversationCubit>().loadConversations();
+                  final res = await sl<IConversationRepository>().toggleStatus(conv.id, nextStatus);
+                  if (mounted) {
+                    res.fold(
+                      (failure) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(isArabic ? 'تعذر تحديث حالة المحادثة' : 'Failed to update conversation status'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      },
+                      (_) {
+                        context.read<ConversationCubit>().loadConversations();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              nextStatus == 'resolved'
+                                  ? (isArabic ? 'تم حل وإغلاق المحادثة' : 'Conversation marked as resolved')
+                                  : (isArabic ? 'تمت إعادة فتح المحادثة' : 'Conversation reopened'),
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    );
+                  }
                 },
               ),
               // Snooze
@@ -447,8 +472,29 @@ class _InboxScreenState extends State<InboxScreen> {
                 borderColor: borderColor,
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await sl<IConversationRepository>().toggleStatus(conv.id, 'snoozed');
-                  if (mounted) context.read<ConversationCubit>().loadConversations();
+                  final res = await sl<IConversationRepository>().toggleStatus(conv.id, 'snoozed');
+                  if (mounted) {
+                    res.fold(
+                      (failure) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(isArabic ? 'تعذر تأجيل المحادثة' : 'Failed to snooze conversation'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      },
+                      (_) {
+                        context.read<ConversationCubit>().loadConversations();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(isArabic ? 'تم تأجيل المحادثة' : 'Conversation snoozed'),
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    );
+                  }
                 },
               ),
               // Mute / Unmute
@@ -538,7 +584,9 @@ class _InboxScreenState extends State<InboxScreen> {
             // Global sleek blue linear progress indicator
             const BreakCountdownBanner(),
             LinearHeaderLoader(
-              isLoading: context.watch<ConversationCubit>().state.isLoading,
+              isLoading: context.watch<ConversationCubit>().state.isLoading ||
+                  context.watch<ConversationCubit>().state.isLoadingMore ||
+                  _isSearchingServer,
             ),
 
             // Segmented Primary Filter Tabs: All | Mine | Collaborating | Unassigned
@@ -655,11 +703,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   }
 
                   if (state.isLoading && conversations.isEmpty) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
-                    );
+                    return const SizedBox.shrink();
                   }
 
                   if (state.errorMessage != null && conversations.isEmpty) {
@@ -907,19 +951,7 @@ class _InboxScreenState extends State<InboxScreen> {
                         final effectiveIndex = showStartChatBanner ? index - 1 : index;
 
                         if (effectiveIndex == conversations.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                                ),
-                              ),
-                            ),
-                          );
+                          return const SizedBox(height: 16);
                         }
                         final conv = conversations[effectiveIndex];
                         return ConversationTile(
@@ -1111,17 +1143,6 @@ class _InboxScreenState extends State<InboxScreen> {
                       onChanged: _onSearchChanged,
                     ),
                   ),
-                  if (_isSearchingServer) ...[
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
                   if (_searchController.text.isNotEmpty)
                     InkWell(
                       onTap: () {

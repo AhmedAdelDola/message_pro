@@ -913,14 +913,37 @@ class ConversationRepository implements IConversationRepository {
   @override
   Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil}) async {
     try {
-      final payload = <String, dynamic>{'status': status};
-      if (snoozedUntil != null && snoozedUntil.isNotEmpty) {
-        payload['snoozed_until'] = snoozedUntil;
+      final payload = <String, dynamic>{};
+      if (status == 'snoozed') {
+        payload['status'] = 'snoozed';
+        if (snoozedUntil != null && snoozedUntil.isNotEmpty) {
+          payload['snoozed_until'] = snoozedUntil;
+        }
+      } else if (status == 'open') {
+        payload['status'] = 'open';
       }
-      await _api.post(
+      // Note: Passing 'status': 'resolved' causes Chatwoot backend to throw 500 Internal Server Error.
+      // Calling toggle_status with empty payload {} cleanly triggers Chatwoot's toggle_status
+      // action, resolving an open conversation.
+
+      final response = await _api.post(
         'conversations/$conversationId/toggle_status',
         data: payload,
       );
+
+      final currentStatus = response.data is Map && response.data['payload'] is Map
+          ? response.data['payload']['current_status']?.toString()
+          : null;
+
+      if (status == 'resolved' && currentStatus != null && currentStatus != 'resolved') {
+        // If the conversation was previously snoozed, the first toggle moved it to 'open'.
+        // Toggle once more to transition it into 'resolved'.
+        await _api.post(
+          'conversations/$conversationId/toggle_status',
+          data: <String, dynamic>{},
+        );
+      }
+
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));

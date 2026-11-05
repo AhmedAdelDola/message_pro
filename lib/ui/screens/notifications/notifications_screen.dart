@@ -113,11 +113,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     color: AppColors.primary,
                     onRefresh: () => cubit.loadNotifications(),
                     child: state.isLoading && items.isEmpty
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                            ),
-                          )
+                        ? const SizedBox.shrink()
                         : items.isEmpty
                             ? Center(
                                 child: Column(

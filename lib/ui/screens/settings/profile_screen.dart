@@ -8,6 +8,7 @@ import '../../../logic/auth/auth_state.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/break_countdown_banner.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -151,6 +152,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
+        bottom: AppBarProgressBar(
+          isLoading: _isSaving,
+        ),
         title: Text(
           isArabic ? 'الملف الشخصي' : 'Edit Profile',
           style: TextStyle(
@@ -192,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (context, authState) {
           final user = authState is Authenticated ? authState.user : context.read<AuthCubit>().currentUser;
           if (user == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
 
           final statusColor = _getStatusColor(_selectedAvailability);

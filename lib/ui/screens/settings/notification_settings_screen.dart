@@ -201,22 +201,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
         ),
         centerTitle: false,
-        actions: [
-          if (_isSaving)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
-                ),
-              ),
-            ),
-        ],
         bottom: AppBarProgressBar(
           isLoading: _isLoading || _isSaving,
           idleBorderColor: borderColor,
@@ -224,11 +208,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              ),
-            )
+          ? const SizedBox.shrink()
           : _errorMessage != null
               ? Center(
                   child: Padding(

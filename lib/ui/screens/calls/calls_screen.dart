@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../logic/calls/calls_cubit.dart';
 import '../../../logic/calls/calls_state.dart';
 import '../../widgets/avatar_widget.dart';
+import '../../widgets/app_bar_progress_bar.dart';
 import '../contacts/add_contact_screen.dart';
 
 class CallsScreen extends StatefulWidget {
@@ -83,6 +84,7 @@ class _CallsScreenState extends State<CallsScreen> {
                     ],
                   ),
                 ),
+                LinearHeaderLoader(isLoading: callsState.isLoading),
 
                 // Calls Content
                 Expanded(
@@ -90,11 +92,7 @@ class _CallsScreenState extends State<CallsScreen> {
                     color: AppColors.primary,
                     onRefresh: () => cubit.loadCalls(),
                     child: callsState.isLoading && calls.isEmpty
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                            ),
-                          )
+                        ? const SizedBox.shrink()
                         : calls.isEmpty
                             // Exact Coming Soon view from browser Tab 2
                             ? Center(

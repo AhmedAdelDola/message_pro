@@ -42,6 +42,22 @@ class MessageBubble extends StatelessWidget {
     return DateFormat('MMM d, yyyy').format(dt);
   }
 
+  static bool _isArabicText(String text) {
+    final cleanText = text.trim();
+    if (cleanText.isEmpty) return false;
+    final arabicRegex = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]');
+    for (int i = 0; i < cleanText.length; i++) {
+      final char = cleanText[i];
+      if (RegExp(r'[a-zA-Z]').hasMatch(char)) {
+        return false;
+      }
+      if (arabicRegex.hasMatch(char)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -134,7 +150,10 @@ class MessageBubble extends StatelessWidget {
       ));
     }
 
+    final isAr = _isArabicText(text);
     return RichText(
+      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+      textAlign: isAr ? TextAlign.right : TextAlign.left,
       text: TextSpan(children: spans),
     );
   }
@@ -231,16 +250,27 @@ class MessageBubble extends StatelessWidget {
                   ],
 
                   // Content
-                  if (message.content != null && message.content!.isNotEmpty)
-                    Text(
-                      message.content!,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        height: 1.35,
-                        color: Colors.white,
-                        fontFamily: 'Gontserrat',
-                      ),
+                  if (message.content != null && message.content!.isNotEmpty) ...[
+                    Builder(
+                      builder: (context) {
+                        final isAr = _isArabicText(message.content!);
+                        return Align(
+                          alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Text(
+                            message.content!,
+                            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+                            textAlign: isAr ? TextAlign.right : TextAlign.left,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              height: 1.35,
+                              color: Colors.white,
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                        );
+                      },
                     ),
+                  ],
 
                   if (isFailed) ...[
                     const SizedBox(height: 4),
@@ -321,6 +351,17 @@ class MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: bubbleBg,
+                border: Border.all(
+                  color: isDark ? const Color(0xFF2C2D32) : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ],
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
@@ -338,16 +379,27 @@ class MessageBubble extends StatelessWidget {
                   ],
 
                   // Content
-                  if (message.content != null && message.content!.isNotEmpty)
-                    Text(
-                      message.content!,
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        height: 1.35,
-                        color: textColor,
-                        fontFamily: 'Gontserrat',
-                      ),
+                  if (message.content != null && message.content!.isNotEmpty) ...[
+                    Builder(
+                      builder: (context) {
+                        final isAr = _isArabicText(message.content!);
+                        return Align(
+                          alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Text(
+                            message.content!,
+                            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+                            textAlign: isAr ? TextAlign.right : TextAlign.left,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              height: 1.35,
+                              color: textColor,
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                        );
+                      },
                     ),
+                  ],
 
                   const SizedBox(height: 4),
                   Text(
@@ -404,16 +456,27 @@ class MessageBubble extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            if (message.content != null && message.content!.isNotEmpty)
-              Text(
-                message.content!,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.35,
-                  color: text,
-                  fontFamily: 'Gontserrat',
-                ),
+            if (message.content != null && message.content!.isNotEmpty) ...[
+              Builder(
+                builder: (context) {
+                  final isAr = _isArabicText(message.content!);
+                  return Align(
+                    alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Text(
+                      message.content!,
+                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+                      textAlign: isAr ? TextAlign.right : TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.35,
+                        color: text,
+                        fontFamily: 'Gontserrat',
+                      ),
+                    ),
+                  );
+                },
               ),
+            ],
             const SizedBox(height: 4),
             Align(
               alignment: Alignment.centerRight,
@@ -629,14 +692,24 @@ class MessageBubble extends StatelessWidget {
                       children: [
                         // Header title (bold dark red in pink card, bold slate in blue card)
                         if (headerText != null && headerText.isNotEmpty) ...[
-                          Text(
-                            headerText,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              color: titleColor,
-                              fontFamily: 'Gontserrat',
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final isAr = _isArabicText(headerText);
+                              return Align(
+                                alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Text(
+                                  headerText,
+                                  textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+                                  textAlign: isAr ? TextAlign.right : TextAlign.left,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: titleColor,
+                                    fontFamily: 'Gontserrat',
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 6),
                         ],

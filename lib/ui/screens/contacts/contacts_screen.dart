@@ -238,10 +238,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
             // Contacts List
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF4162E3)),
-                    )
+              child: (_isLoading && _contacts.isEmpty)
+                  ? const SizedBox.shrink()
                   : _contacts.isEmpty
                       ? Center(
                           child: Column(
@@ -279,19 +277,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                             ),
                             itemBuilder: (context, index) {
                               if (index >= _contacts.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Color(0xFF4162E3),
-                                      ),
-                                    ),
-                                  ),
-                                );
+                                return const SizedBox(height: 16);
                               }
 
                               final contact = _contacts[index];

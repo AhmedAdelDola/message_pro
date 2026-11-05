@@ -376,11 +376,18 @@ class ChatCubit extends Cubit<ChatState> {
     }
   }
 
-  Future<void> toggleStatus(String newStatus, {String? snoozedUntil}) async {
+  Future<bool> toggleStatus(String newStatus, {String? snoozedUntil}) async {
     final result = await repo.toggleStatus(conversationId, newStatus, snoozedUntil: snoozedUntil);
-    result.fold((_) {}, (_) {
-      emit(state.copyWith(status: newStatus));
-    });
+    return result.fold(
+      (failure) {
+        emit(state.copyWith(errorMessage: failure.message));
+        return false;
+      },
+      (_) {
+        emit(state.copyWith(status: newStatus));
+        return true;
+      },
+    );
   }
 
   Future<bool> muteConversation() async {
