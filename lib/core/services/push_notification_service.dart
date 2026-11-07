@@ -320,8 +320,22 @@ class PushNotificationService {
         return;
       }
 
+      // On iOS, wait for APNs token to be set by the system before requesting FCM token
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        if (apnsToken == null) {
+          debugPrint('[PushNotification] Waiting for iOS APNs token to initialize...');
+          await Future.delayed(const Duration(seconds: 2));
+        }
+      }
+
       // ignore: deprecated_member_use
-      final token = await FirebaseMessaging.instance.getToken();
+      String? token = await FirebaseMessaging.instance.getToken();
+      if ((token == null || token.isEmpty) && defaultTargetPlatform == TargetPlatform.iOS) {
+        // Retry once after brief delay for APNs handshake on cold boot
+        await Future.delayed(const Duration(seconds: 3));
+        token = await FirebaseMessaging.instance.getToken();
+      }
       if (token == null || token.isEmpty) {
         debugPrint('[PushNotification] FCM token is null or empty');
         return;
