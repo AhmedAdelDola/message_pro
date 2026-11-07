@@ -34,7 +34,7 @@ jobs:
   release-ios:
     name: Build Shorebird iOS Release
     if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'both')
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Code
