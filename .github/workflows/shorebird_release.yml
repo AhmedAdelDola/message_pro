@@ -65,6 +65,55 @@ jobs:
           path: build/ios/archive/Runner.xcarchive
           if-no-files-found: warn
 
+      - name: Setup App Store Connect API Key
+        if: env.HAVE_ASC_KEY == 'true'
+        env:
+          HAVE_ASC_KEY: ${{ secrets.APP_STORE_CONNECT_KEY_ID != '' }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          mkdir -p ~/.private_keys
+          mkdir -p private_keys
+          echo "$KEY_CONTENT" > private_keys/AuthKey_$KEY_ID.p8
+          cp private_keys/AuthKey_$KEY_ID.p8 ~/.appstoreconnect/private_keys/AuthKey_$KEY_ID.p8
+          cp private_keys/AuthKey_$KEY_ID.p8 ~/.private_keys/AuthKey_$KEY_ID.p8
+
+      - name: Export and Upload to App Store Connect
+        if: env.HAVE_ASC_KEY == 'true'
+        env:
+          HAVE_ASC_KEY: ${{ secrets.APP_STORE_CONNECT_KEY_ID != '' }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat << 'EOF' > ios/ExportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>destination</key>
+              <string>upload</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+          /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM_ID" ios/ExportOptions.plist || /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" ios/ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            -authenticationKeyPath "$PWD/private_keys/AuthKey_$KEY_ID.p8"
+
   release-android:
     name: Build Shorebird Android Release
     if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'both')
