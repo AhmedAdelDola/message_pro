@@ -76,7 +76,47 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           mkdir -p ~/.private_keys
           mkdir -p private_keys
-          echo "$KEY_CONTENT" > private_keys/AuthKey_$KEY_ID.p8
+          python3 -c '
+import os, sys, base64
+
+content = os.environ.get("KEY_CONTENT", "").strip()
+if (content.startswith("\"") and content.endswith("\"")) or (content.startswith("\x27") and content.endswith("\x27")):
+    content = content[1:-1].strip()
+
+# Handle potential full base64 encoding of the entire p8 file
+if "-----BEGIN" not in content:
+    try:
+        decoded = base64.b64decode(content).decode("utf-8")
+        if "-----BEGIN" in decoded:
+            content = decoded
+    except Exception:
+        pass
+
+# Clean out carriage returns and trailing/leading whitespace
+lines = [l.strip() for l in content.splitlines() if l.strip()]
+full_text = " ".join(lines)
+if "-----BEGIN PRIVATE KEY-----" in full_text and "-----END PRIVATE KEY-----" in full_text:
+    parts = full_text.split("-----BEGIN PRIVATE KEY-----")
+    rest = parts[1].split("-----END PRIVATE KEY-----")
+    body = rest[0].replace(" ", "").replace("\r", "").replace("\n", "")
+elif "-----BEGIN" in full_text and "-----END" in full_text:
+    parts = full_text.split("-----")
+    # parts: ["", "BEGIN...", key_type, body, "END...", ""]
+    body = "".join([p for p in parts if not p.startswith("BEGIN") and not p.startswith("END")]).replace(" ", "").replace("\r", "").replace("\n", "")
+else:
+    body = full_text.replace(" ", "").replace("\r", "").replace("\n", "")
+
+# Wrap in standard 64-character lines
+chunks = [body[i:i+64] for i in range(0, len(body), 64)]
+pem = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
+
+key_id = os.environ.get("KEY_ID", "").strip()
+out_path = f"private_keys/AuthKey_{key_id}.p8"
+with open(out_path, "w", newline="\n") as f:
+    f.write(pem)
+
+print(f"Generated normalized PEM key: {out_path} ({len(pem)} bytes)")
+'
           cp private_keys/AuthKey_$KEY_ID.p8 ~/.appstoreconnect/private_keys/AuthKey_$KEY_ID.p8
           cp private_keys/AuthKey_$KEY_ID.p8 ~/.private_keys/AuthKey_$KEY_ID.p8
 
@@ -113,7 +153,12 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
-            -authenticationKeyPath "$PWD/private_keys/AuthKey_$KEY_ID.p8"
+            -authenticationKeyPath "$PWD/private_keys/AuthKey_$KEY_ID.p8" \
+            || {
+              echo "=== Detailed Export / Distribution Diagnostics ===";
+              find ~/Library/Developer/Xcode/DerivedData -name "IDEDistribution*.log" -exec cat {} + 2>/dev/null || true;
+              exit 1;
+            }
 
   release-android:
     name: Build Shorebird Android Release
