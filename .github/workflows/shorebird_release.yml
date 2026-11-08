@@ -159,33 +159,44 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CUSTOM_EXPORT_OPTIONS: ${{ secrets.EXPORT_OPTIONS_PLIST }}
         run: |
-          if [ -n "$CUSTOM_EXPORT_OPTIONS" ]; then
-            echo "Using custom EXPORT_OPTIONS_PLIST from repository secrets..."
-            if [[ "$CUSTOM_EXPORT_OPTIONS" == *"plist"* ]] || [[ "$CUSTOM_EXPORT_OPTIONS" == *"dict"* ]]; then
-              echo "$CUSTOM_EXPORT_OPTIONS" > ios/ExportOptions.plist
-            else
-              echo "$CUSTOM_EXPORT_OPTIONS" | base64 --decode > ios/ExportOptions.plist 2>/dev/null || echo "$CUSTOM_EXPORT_OPTIONS" > ios/ExportOptions.plist
-            fi
-          else
-            echo "Generating default ExportOptions.plist..."
-            cat << 'EOF' > ios/ExportOptions.plist
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-                <key>method</key>
-                <string>app-store-connect</string>
-                <key>destination</key>
-                <string>export</string>
-                <key>signingStyle</key>
-                <string>automatic</string>
-                <key>manageAppVersionAndBuildNumber</key>
-                <false/>
-            </dict>
-            </plist>
-            EOF
-          fi
-          /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM_ID" ios/ExportOptions.plist 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" ios/ExportOptions.plist 2>/dev/null || true
+          python3 -c '
+          import os, sys
+
+          custom = os.environ.get("CUSTOM_EXPORT_OPTIONS", "").strip()
+          team_id = os.environ.get("TEAM_ID", "").strip()
+
+          if custom:
+              if "plist" in custom or "dict" in custom:
+                  content = custom
+              else:
+                  import base64
+                  try:
+                      content = base64.b64decode(custom).decode("utf-8")
+                  except Exception:
+                      content = custom
+          else:
+              content = f"""<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>destination</key>
+              <string>export</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+              <key>teamID</key>
+              <string>{team_id}</string>
+          </dict>
+          </plist>
+          """
+          os.makedirs("ios", exist_ok=True)
+          with open("ios/ExportOptions.plist", "w", encoding="utf-8") as f:
+              f.write(content)
+          print("ios/ExportOptions.plist prepared successfully.")
+          '
 
           xcodebuild -exportArchive \
             -archivePath build/ios/archive/Runner.xcarchive \
