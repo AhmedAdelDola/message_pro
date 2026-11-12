@@ -396,36 +396,22 @@ class Conversation {
         ? Map<String, dynamic>.from(json['additional_attributes'])
         : {};
 
-    dynamic findReferralMap(dynamic obj) {
-      if (obj == null) return null;
-      if (obj is String && obj.trim().startsWith('{')) {
-        try {
-          final decoded = jsonDecode(obj);
-          final res = findReferralMap(decoded);
-          if (res != null) return res;
-        } catch (_) {}
-      }
-      if (obj is Map) {
-        if (obj['ad_referral'] != null) return findReferralMap(obj['ad_referral']);
-        if (obj['referral'] != null) return findReferralMap(obj['referral']);
-        if (obj['referral_params'] != null) return findReferralMap(obj['referral_params']);
-        if (obj['source_id'] != null || obj['headline'] != null || obj['ctwa_clid'] != null || obj['source_url'] != null) {
-          return obj;
-        }
-        for (final entry in obj.entries) {
-          final res = findReferralMap(entry.value);
-          if (res != null) return res;
-        }
-      }
-      return null;
-    }
-
     MessageReferral? convReferral;
-    final rawConvRef = findReferralMap(aAttrs) ??
-        findReferralMap(cAttrs) ??
-        findReferralMap(json['meta']) ??
-        findReferralMap(json);
+    final wa = cAttrs['whatsapp'] ?? aAttrs['whatsapp'];
+    dynamic rawConvRef;
+    if (wa is Map) {
+      rawConvRef = wa['ad_referral'] ?? wa['referral'];
+    }
+    rawConvRef ??= aAttrs['ad_referral'] ??
+        aAttrs['referral'] ??
+        cAttrs['ad_referral'] ??
+        cAttrs['referral'];
 
+    if (rawConvRef is String && rawConvRef.trim().startsWith('{')) {
+      try {
+        rawConvRef = jsonDecode(rawConvRef);
+      } catch (_) {}
+    }
     if (rawConvRef is Map) {
       try {
         final parsed = MessageReferral.fromJson(Map<String, dynamic>.from(rawConvRef));

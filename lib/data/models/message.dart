@@ -58,11 +58,10 @@ class MessageReferral {
 
   bool get hasContent =>
       (headline != null && headline!.trim().isNotEmpty) ||
-      (body != null && body!.trim().isNotEmpty) ||
       (sourceUrl != null && sourceUrl!.trim().isNotEmpty) ||
       (imageUrl != null && imageUrl!.trim().isNotEmpty) ||
       (videoUrl != null && videoUrl!.trim().isNotEmpty) ||
-      (sourceId != null && sourceId!.trim().isNotEmpty);
+      (ctwaClid != null && ctwaClid!.trim().isNotEmpty);
 
   factory MessageReferral.fromJson(Map<String, dynamic> json) {
     return MessageReferral(
@@ -322,36 +321,23 @@ class Message {
       parsedStatus = 'read';
     }
 
-    dynamic findReferralMap(dynamic obj) {
-      if (obj == null) return null;
-      if (obj is String && obj.trim().startsWith('{')) {
-        try {
-          final decoded = jsonDecode(obj);
-          final res = findReferralMap(decoded);
-          if (res != null) return res;
-        } catch (_) {}
-      }
-      if (obj is Map) {
-        if (obj['ad_referral'] != null) return findReferralMap(obj['ad_referral']);
-        if (obj['referral'] != null) return findReferralMap(obj['referral']);
-        if (obj['referral_params'] != null) return findReferralMap(obj['referral_params']);
-        if (obj['source_id'] != null || obj['headline'] != null || obj['ctwa_clid'] != null || obj['source_url'] != null) {
-          return obj;
-        }
-        for (final entry in obj.entries) {
-          final res = findReferralMap(entry.value);
-          if (res != null) return res;
-        }
-      }
-      return null;
-    }
-
     MessageReferral? ref;
-    final rawRef = findReferralMap(cAttr) ??
-        findReferralMap(aAttr) ??
-        findReferralMap(json['meta']) ??
-        findReferralMap(json);
+    final wa = cAttr['whatsapp'];
+    dynamic rawRef;
+    if (wa is Map) {
+      rawRef = wa['ad_referral'] ?? wa['referral'];
+    }
+    rawRef ??= cAttr['ad_referral'] ??
+        cAttr['referral'] ??
+        cAttr['referral_params'] ??
+        aAttr['ad_referral'] ??
+        aAttr['referral'];
 
+    if (rawRef is String && rawRef.trim().startsWith('{')) {
+      try {
+        rawRef = jsonDecode(rawRef);
+      } catch (_) {}
+    }
     if (rawRef is Map) {
       try {
         final parsedRef = MessageReferral.fromJson(Map<String, dynamic>.from(rawRef));

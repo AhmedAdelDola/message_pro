@@ -19,22 +19,27 @@ class AiAgentTakeoverBanner extends StatelessWidget {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     final bgColor = isDark ? const Color(0xFF231D33) : const Color(0xFFFBF8FF);
-    final borderColor = isDark ? const Color(0xFF3F325E) : const Color(0xFFEDE9FE);
+    final borderColor = isDark ? const Color(0xFF3F325E) : const Color(0xFFE9E5FA);
     final titleColor = isDark ? Colors.white : const Color(0xFF1E1B4B);
     final subtitleColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280);
     const purplePrimary = Color(0xFF5850EC);
 
     final displayName = agentName.isNotEmpty ? agentName : (isArabic ? 'مساعد الذكاء الاصطناعي' : 'AI Agent');
 
+    // Extract leading emoji if present (e.g. 🤠 Sales agent)
+    String iconEmoji = '🤖';
+    final emojiMatch = RegExp(r'^(\p{Emoji_Presentation}|\p{Extended_Pictographic})', unicode: true).firstMatch(displayName.trim());
+    if (emojiMatch != null) {
+      iconEmoji = emojiMatch.group(1) ?? '🤖';
+    }
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
       decoration: BoxDecoration(
         color: bgColor,
-        border: Border(
-          top: BorderSide(color: borderColor, width: 1),
-          bottom: BorderSide(color: borderColor, width: 1),
-        ),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: borderColor, width: 1.2),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -47,7 +52,7 @@ class AiAgentTakeoverBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(8.r),
             ),
             child: Text(
-              '🤖',
+              iconEmoji,
               style: TextStyle(fontSize: 18.sp),
             ),
           ),

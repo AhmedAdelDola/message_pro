@@ -80,6 +80,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   User? _currentAssignee;
   bool _isTakenOver = false;
   bool _isTakingOver = false;
+  int? _lastMessageId;
+  bool _initialScrolled = false;
+  double? _maxScrollBeforeLoad;
 
   @override
   void initState() {
@@ -87,6 +90,38 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     _status = widget.conversation.status;
     _isMuted = widget.conversation.muted;
     _currentAssignee = widget.conversation.assignee;
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels <= 120) {
+      _maxScrollBeforeLoad ??= _scrollController.position.maxScrollExtent;
+      context.read<ChatCubit>().loadPreviousMessages();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom({bool immediate = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        if (immediate) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        } else {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      }
+    });
   }
 
   bool _isAiAgentHandling(Conversation conv, List<Message> messages) {
@@ -197,24 +232,6 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         });
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   void _toggleResolveReopen() async {
@@ -513,7 +530,35 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
     return BlocConsumer<ChatCubit, ChatState>(
       listener: (context, state) {
-        _scrollToBottom();
+        if (state.messages.isEmpty) return;
+
+        final newLastId = state.messages.last.id;
+        final hasNewMessage = _lastMessageId != null && newLastId != _lastMessageId;
+
+        if (!_initialScrolled && !state.isLoading && state.messages.isNotEmpty) {
+          _initialScrolled = true;
+          _lastMessageId = newLastId;
+          _scrollToBottom(immediate: true);
+        } else if (hasNewMessage) {
+          _lastMessageId = newLastId;
+          _scrollToBottom();
+        }
+
+        if (state.isLoadingOlder && _maxScrollBeforeLoad == null && _scrollController.hasClients) {
+          _maxScrollBeforeLoad = _scrollController.position.maxScrollExtent;
+        }
+
+        if (_maxScrollBeforeLoad != null && !state.isLoadingOlder) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients && _maxScrollBeforeLoad != null) {
+              final diff = _scrollController.position.maxScrollExtent - _maxScrollBeforeLoad!;
+              if (diff > 0) {
+                _scrollController.jumpTo(_scrollController.position.pixels + diff);
+              }
+              _maxScrollBeforeLoad = null;
+            }
+          });
+        }
       },
       builder: (context, chatState) {
         return Scaffold(
@@ -987,12 +1032,75 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   final isAiHandling = _isAiAgentHandling(widget.conversation, chatState.messages);
                   if (isAiHandling) {
                     final aiAgentName = _getAiAgentName(widget.conversation, chatState.messages);
+                    final channelName = widget.conversation.inboxName ??
+                        (widget.conversation.channelType.toLowerCase().contains('whatsapp')
+                            ? 'Message-pro'
+                            : widget.conversation.channelType);
+
                     return SafeArea(
                       top: false,
-                      child: AiAgentTakeoverBanner(
-                        agentName: aiAgentName,
-                        isLoading: _isTakingOver,
-                        onTakeover: _handleTakeover,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          border: Border(
+                            top: BorderSide(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightBorder,
+                              width: 0.8,
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(14.w, 8.h, 14.w, 6.h),
+                              child: Row(
+                                children: [
+                                  Image.asset(
+                                    'assets/images/channels/whatsapp.png',
+                                    width: 15.r,
+                                    height: 15.r,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 15.r,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  SizedBox(width: 6.w),
+                                  Text(
+                                    channelName,
+                                    style: TextStyle(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white
+                                          : const Color(0xFF1F2937),
+                                      fontFamily: 'Gontserrat',
+                                    ),
+                                  ),
+                                  SizedBox(width: 4.w),
+                                  Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 16.r,
+                                    color: const Color(0xFF9CA3AF),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(10.w, 0, 10.w, 10.h),
+                              child: AiAgentTakeoverBanner(
+                                agentName: aiAgentName,
+                                isLoading: _isTakingOver,
+                                onTakeover: _handleTakeover,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }

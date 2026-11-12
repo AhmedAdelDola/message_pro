@@ -230,7 +230,7 @@ class MessageBubble extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.74,
             ),
             child: Container(
-              padding: message.referral != null
+              padding: (message.referral != null && message.referral!.hasContent)
                   ? const EdgeInsets.fromLTRB(6, 6, 6, 8)
                   : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -249,7 +249,7 @@ class MessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   // Ad Referral Card (if message is from a Meta / WhatsApp Click-to-Chat ad)
-                  if (message.referral != null) ...[
+                  if (message.referral != null && message.referral!.hasContent) ...[
                     _buildAdReferralCard(context, message.referral!, isDark, isArabic),
                     const SizedBox(height: 6),
                   ],
@@ -360,7 +360,7 @@ class MessageBubble extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
             child: Container(
-              padding: message.referral != null
+              padding: (message.referral != null && message.referral!.hasContent)
                   ? const EdgeInsets.fromLTRB(6, 6, 6, 8)
                   : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -387,7 +387,7 @@ class MessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Ad Referral Card (if message is from a Meta / WhatsApp Click-to-Chat ad)
-                  if (message.referral != null) ...[
+                  if (message.referral != null && message.referral!.hasContent) ...[
                     _buildAdReferralCard(context, message.referral!, isDark, isArabic),
                     const SizedBox(height: 6),
                   ],
