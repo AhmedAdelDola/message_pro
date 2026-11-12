@@ -6,7 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 class CannedResponsesSheet extends StatelessWidget {
   final List<Map<String, String>> responses;
   final Function(String content) onSelect;
-  final void Function(String content, String? imageUrl)? onSelectResponse;
+  final void Function(String content, List<String> fileUrls)? onSelectResponse;
 
   const CannedResponsesSheet({
     super.key,
@@ -58,6 +58,11 @@ class CannedResponsesSheet extends StatelessWidget {
                   final code = item['short_code'] ?? '';
                   final content = item['content'] ?? '';
                   final imageUrl = item['image_url'];
+                  final rawFiles = item['files'] ?? '';
+                  final fileUrls = rawFiles.isNotEmpty
+                      ? rawFiles.split('|||').where((u) => u.trim().isNotEmpty).toList()
+                      : (imageUrl != null && imageUrl.isNotEmpty ? [imageUrl] : <String>[]);
+                  final hasAttachments = fileUrls.isNotEmpty;
                   final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
                   return ListTile(
@@ -83,27 +88,69 @@ class CannedResponsesSheet extends StatelessWidget {
                       style: TextStyle(fontSize: 14.sp),
                     ),
                     trailing: hasImage
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(6.r),
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              width: 44.r,
-                              height: 44.r,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
+                        ? Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6.r),
+                                child: CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  width: 44.r,
+                                  height: 44.r,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    width: 44.r,
+                                    height: 44.r,
+                                    color: Colors.grey.withValues(alpha: 0.2),
+                                    child: const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5))),
+                                  ),
+                                  errorWidget: (_, __, ___) => const Icon(Icons.broken_image_rounded, size: 20),
+                                ),
+                              ),
+                              if (fileUrls.length > 1)
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '+${fileUrls.length - 1}',
+                                      style: TextStyle(color: Colors.white, fontSize: 9.sp, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
+                        : (hasAttachments
+                            ? Container(
                                 width: 44.r,
                                 height: 44.r,
-                                color: Colors.grey.withValues(alpha: 0.2),
-                                child: const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5))),
-                              ),
-                              errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, size: 20),
-                            ),
-                          )
-                        : null,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.attach_file_rounded, size: 20.r, color: AppColors.primary),
+                                    if (fileUrls.length > 1)
+                                      Text(
+                                        '${fileUrls.length}',
+                                        style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                      ),
+                                  ],
+                                ),
+                              )
+                            : null),
                     onTap: () {
                       Navigator.pop(context);
                       if (onSelectResponse != null) {
-                        onSelectResponse!(content, imageUrl);
+                        onSelectResponse!(content, fileUrls);
                       } else {
                         onSelect(content);
                       }

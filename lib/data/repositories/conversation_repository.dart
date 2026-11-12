@@ -1223,40 +1223,89 @@ class ConversationRepository implements IConversationRepository {
       final response = await _api.get('canned_responses');
       final data = response.data;
       List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map<Map<String, String>>((c) {
-        String mediaUrl = '';
-        if (c['attachments'] is List && (c['attachments'] as List).isNotEmpty) {
-          final first = c['attachments'][0];
-          if (first is Map) {
-            mediaUrl = (first['data_url'] ?? first['thumb_url'] ?? first['file_url'] ?? first['url'])?.toString() ?? '';
-          } else if (first is String) {
-            mediaUrl = first;
+
+      // Get server base URL to resolve relative URLs like /rails/active_storage/...
+      final base = await _storage.getBaseUrl();
+      final uri = Uri.tryParse(base.isNotEmpty ? base : AppConfig.defaultBaseUrl);
+      final domainRoot = uri != null ? '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}' : AppConfig.defaultBaseUrl;
+
+      return Right(list.whereType<Map>().map<Map<String, String>>((c) {
+        final List<String> extractedUrls = [];
+
+        void addUrl(dynamic u) {
+          if (u == null) return;
+          var str = u.toString().trim();
+          if (str.isEmpty) return;
+          if (str.startsWith('/')) {
+            str = '$domainRoot$str';
           }
-        } else if (c['files'] is List && (c['files'] as List).isNotEmpty) {
-          final first = c['files'][0];
-          mediaUrl = first is Map ? (first['file_url'] ?? first['url'])?.toString() ?? '' : first.toString();
-        } else if (c['image_url'] != null && c['image_url'].toString().isNotEmpty) {
-          mediaUrl = c['image_url'].toString();
-        } else if (c['media_url'] != null && c['media_url'].toString().isNotEmpty) {
-          mediaUrl = c['media_url'].toString();
+          if (!extractedUrls.contains(str)) {
+            extractedUrls.add(str);
+          }
         }
 
-        if (mediaUrl.isNotEmpty && mediaUrl.startsWith('/')) {
-          mediaUrl = '${AppConfig.defaultBaseUrl}$mediaUrl';
+        // 1. Check attachments list or map
+        final rawAttachments = c['attachments'] ?? c['files'] ?? c['attached_files'] ?? c['media'];
+        if (rawAttachments is List) {
+          for (final a in rawAttachments) {
+            if (a is Map) {
+              addUrl(a['data_url'] ?? a['file_url'] ?? a['thumb_url'] ?? a['url'] ?? a['blob_url'] ?? a['download_url']);
+            } else if (a is String) {
+              addUrl(a);
+            }
+          }
+        } else if (rawAttachments is Map) {
+          addUrl(rawAttachments['data_url'] ?? rawAttachments['file_url'] ?? rawAttachments['thumb_url'] ?? rawAttachments['url']);
         }
+
+        // 2. Check direct URL fields
+        addUrl(c['image_url']);
+        addUrl(c['file_url']);
+        addUrl(c['media_url']);
+        addUrl(c['attachment_url']);
+        addUrl(c['document_url']);
+
+        // 3. Extract embedded image and file links from content
+        final rawContent = c['content']?.toString() ?? '';
+        final mdImgRegex = RegExp(r'!\[.*?\]\((https?://[^\s\)]+|/[^\s\)]+)\)');
+        for (final m in mdImgRegex.allMatches(rawContent)) {
+          addUrl(m.group(1));
+        }
+
+        final htmlImgRegex = RegExp(r'''<img[^>]+src=["'](https?://[^"']+|/[^"']+)["']''');
+        for (final m in htmlImgRegex.allMatches(rawContent)) {
+          addUrl(m.group(1));
+        }
+
+        final fileLinkRegex = RegExp(r'\[.*?\]\((https?://[^\s\)]+|/[^\s\)]+)\)');
+        for (final m in fileLinkRegex.allMatches(rawContent)) {
+          final u = m.group(1);
+          if (u != null && (u.contains('.') || u.contains('rails/active_storage') || u.contains('download'))) {
+            addUrl(u);
+          }
+        }
+
+        // Clean content by removing markdown images from text so it doesn't look messy
+        String cleanContent = rawContent.replaceAll(mdImgRegex, '').replaceAll(htmlImgRegex, '').trim();
+        if (cleanContent.isEmpty) cleanContent = rawContent;
+
+        final firstImageUrl = extractedUrls.where((u) {
+          final lower = u.toLowerCase();
+          return lower.contains('.png') || lower.contains('.jpg') || lower.contains('.jpeg') ||
+              lower.contains('.webp') || lower.contains('.gif') || lower.contains('image');
+        }).firstOrNull ?? (extractedUrls.isNotEmpty ? extractedUrls.first : '');
 
         return {
           'short_code': c['short_code']?.toString() ?? '',
-          'content': c['content']?.toString() ?? '',
-          'image_url': mediaUrl,
+          'content': cleanContent,
+          'raw_content': rawContent,
+          'image_url': firstImageUrl,
+          'files': extractedUrls.join('|||'),
+          'file_count': extractedUrls.length.toString(),
         };
       }).toList());
     } catch (_) {
-      return const Right([
-        {'short_code': 'hello', 'content': 'أهلاً بك! كيف يمكنني مساعدتك اليوم؟', 'image_url': ''},
-        {'short_code': 'thanks', 'content': 'شكراً لتواصلك مع Message Pro!', 'image_url': ''},
-        {'short_code': 'wait', 'content': 'يرجى الانتظار لحظات للتحقق من طلبك.', 'image_url': ''},
-      ]);
+      return const Right([]);
     }
   }
 }

@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../data/models/message_template_registry.dart';
 import 'send_template_modal.dart';
 
@@ -70,28 +71,65 @@ class ChatComposerState extends State<ChatComposer> {
     setState(() {});
   }
 
-  Future<void> insertSnippet({required String text, String? imageUrl}) async {
+  Future<void> insertSnippet({required String text, List<String> fileUrls = const []}) async {
     insertText(text);
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      try {
-        final tempDir = await getTemporaryDirectory();
-        final ext = imageUrl.split('?').first.split('.').last;
-        final validExt = (ext.length <= 4 && ext.isNotEmpty) ? ext : 'png';
-        final fileName = 'snippet_${DateTime.now().millisecondsSinceEpoch}.$validExt';
-        final file = File('${tempDir.path}/$fileName');
-        final response = await Dio().get<List<int>>(
-          imageUrl,
-          options: Options(responseType: ResponseType.bytes),
-        );
-        if (response.data != null) {
-          await file.writeAsBytes(response.data!);
-          if (mounted) {
-            setState(() => _attachedPaths.add(file.path));
-          }
-        }
-      } catch (e) {
-        debugPrint('Error downloading snippet image: $e');
+
+    if (fileUrls.isEmpty) return;
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final authHeaders = await SecureStorageService().getAuthHeaders();
+      final headers = <String, String>{};
+      if (authHeaders != null) {
+        if (authHeaders['access-token'] != null) headers['access-token'] = authHeaders['access-token']!;
+        if (authHeaders['client'] != null) headers['client'] = authHeaders['client']!;
+        if (authHeaders['uid'] != null) headers['uid'] = authHeaders['uid']!;
       }
+
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 25),
+        receiveTimeout: const Duration(seconds: 35),
+        headers: headers,
+        followRedirects: true,
+        validateStatus: (status) => status != null && status < 400,
+      ));
+
+      for (int i = 0; i < fileUrls.length; i++) {
+        final url = fileUrls[i].trim();
+        if (url.isEmpty) continue;
+
+        try {
+          final cleanUrl = url.split('?').first;
+          final lastSegment = cleanUrl.split('/').last;
+          String ext = lastSegment.contains('.') ? lastSegment.split('.').last.toLowerCase() : '';
+          if (ext.length > 5 || ext.isEmpty) {
+            ext = 'png';
+          }
+
+          final fileName = 'snippet_${DateTime.now().millisecondsSinceEpoch}_$i.$ext';
+          final file = File('${tempDir.path}/$fileName');
+
+          final response = await dio.get<List<int>>(
+            url,
+            options: Options(responseType: ResponseType.bytes),
+          );
+
+          if (response.data != null && response.data!.isNotEmpty) {
+            await file.writeAsBytes(response.data!);
+            if (mounted) {
+              setState(() {
+                if (!_attachedPaths.contains(file.path)) {
+                  _attachedPaths.add(file.path);
+                }
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error downloading snippet file ($url): $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in insertSnippet: $e');
     }
   }
 
