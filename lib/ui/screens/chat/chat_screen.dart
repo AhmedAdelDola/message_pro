@@ -141,12 +141,12 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
     if (_currentAssignee != null) {
       if (_currentAssignee!.isBot) return true;
-      final nameLower = _currentAssignee!.name.toLowerCase();
-      if (nameLower.contains('agent') ||
-          nameLower.contains('bot') ||
-          nameLower.contains('sales agent') ||
-          nameLower.contains('ai') ||
-          _currentAssignee!.name.contains('🤖')) {
+      final nameLower = _currentAssignee!.name.trim().toLowerCase();
+      if (nameLower == 'sales agent' ||
+          nameLower == 'ai agent' ||
+          nameLower == 'bot' ||
+          nameLower.startsWith('🤖') ||
+          nameLower.startsWith('🤠 sales agent')) {
         return true;
       }
     }
@@ -449,44 +449,26 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
             final chatCubit = context.read<ChatCubit>();
             final convCubit = context.read<ConversationCubit>();
 
-            final isAiSelected = isAi || (agentId != null && agentId < 0);
+            if (isAi) {
+              // 1. Unassign human agent from server
+              await chatCubit.assignAgent(null);
 
-            if (isAiSelected) {
-              // 1. Resolve real agent if present
-              int? realAgentId;
-              User? aiUser;
-
-              if (agentId != null && agentId > 0) {
-                realAgentId = agentId;
-                aiUser = agents.where((a) => a.id == agentId).firstOrNull;
-              } else {
-                aiUser = agents.where((a) {
-                  final n = a.name.toLowerCase();
-                  return n.contains('sales agent') || n.contains('bot') || n.contains('ai');
-                }).firstOrNull;
-                realAgentId = aiUser?.id;
-              }
-
-              // 2. Assign agent on server (real id or null)
-              await chatCubit.assignAgent(realAgentId);
-
-              // 3. Set conversation status to 'bot' on server so the AI responds!
+              // 2. Set conversation status to 'bot' on server so the AI responds!
               await chatCubit.toggleStatus('bot');
 
-              // 4. Reload conversations to update inboxes and listings
+              // 3. Reload conversations to update inboxes and listings
               convCubit.loadConversations();
 
               if (mounted) {
                 setState(() {
                   _isTakenOver = false;
                   _status = 'bot';
-                  _currentAssignee = aiUser ??
-                      User(
-                        id: realAgentId ?? -101,
-                        name: 'Sales agent',
-                        email: 'ai@messagepro.com',
-                        accountId: widget.conversation.accountId,
-                      );
+                  _currentAssignee = User(
+                    id: -1,
+                    name: 'Sales agent',
+                    email: 'ai@messagepro.com',
+                    accountId: widget.conversation.accountId,
+                  );
                 });
               }
             } else {

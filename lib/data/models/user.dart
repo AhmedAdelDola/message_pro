@@ -168,21 +168,23 @@ class User {
   bool get isBot {
     final t = (type ?? '').toLowerCase();
     final r = role.toLowerCase();
-    final n = name.toLowerCase();
-    final dn = (displayName ?? '').toLowerCase();
-    final em = email.toLowerCase();
-    return t == 'agent_bot' ||
-        t == 'bot' ||
-        r == 'bot' ||
-        r == 'agent_bot' ||
-        n.contains('agent') ||
-        n.contains('bot') ||
-        n.contains('🤖') ||
-        dn.contains('agent') ||
-        dn.contains('bot') ||
-        dn.contains('🤖') ||
-        em.contains('bot') ||
-        em.contains('agent');
+    if (t == 'agent_bot' || t == 'bot' || r == 'bot' || r == 'agent_bot') {
+      return true;
+    }
+    final n = name.trim().toLowerCase();
+    final dn = (displayName ?? '').trim().toLowerCase();
+    return n == 'sales agent' ||
+        n == 'ai agent' ||
+        n == 'bot' ||
+        n == 'chatbot' ||
+        n.startsWith('🤖') ||
+        n.startsWith('🤠 sales agent') ||
+        dn == 'sales agent' ||
+        dn == 'ai agent' ||
+        dn == 'bot' ||
+        dn == 'chatbot' ||
+        dn.startsWith('🤖') ||
+        dn.startsWith('🤠 sales agent');
   }
 
   User({

@@ -41,79 +41,25 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
     final textPrimary = isDark ? const Color(0xFFEDEEF0) : const Color(0xFF282E34);
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F);
 
-    // Build dynamic list of AI agents
-    final List<Map<String, dynamic>> resolvedAiAgents = [];
-
-    final baseAiList = [
+    // AI Agents list - Virtual AI Bot
+    final List<Map<String, dynamic>> aiAgents = [
       {
-        'id': -101,
+        'id': -1,
         'name': 'Sales agent',
         'emoji': '🤠',
-        'role': 'AI Sales Assistant',
-      },
-      {
-        'id': -102,
-        'name': 'Message Pro | مساعد حنين',
-        'emoji': '🤖',
-        'role': 'AI Support Assistant',
-      },
-      {
-        'id': -103,
-        'name': 'Message Pro | مساعد حسنى',
-        'emoji': '💡',
-        'role': 'AI Knowledge Assistant',
+        'role': isArabic ? 'مساعد المبيعات الذكي' : 'AI Sales Assistant',
       },
     ];
 
-    for (final base in baseAiList) {
-      final baseName = (base['name'] as String).toLowerCase();
-      final cleanBase = baseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '').trim();
-
-      // Look for a matching real agent in workspace
-      final matching = widget.agents.where((a) {
-        final aName = a.name.toLowerCase().replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '').trim();
-        return aName.contains(cleanBase) || cleanBase.contains(aName);
-      }).firstOrNull;
-
-      if (matching != null) {
-        resolvedAiAgents.add({
-          'id': matching.id,
-          'name': matching.name,
-          'emoji': base['emoji'],
-          'role': base['role'],
-          'isReal': true,
-        });
-      } else {
-        resolvedAiAgents.add({
-          ...base,
-          'isReal': false,
-        });
-      }
-    }
-
-    // Include any other bot user in workspace
-    for (final a in widget.agents) {
-      if (a.isBot && !resolvedAiAgents.any((ai) => ai['id'] == a.id)) {
-        resolvedAiAgents.add({
-          'id': a.id,
-          'name': a.name,
-          'emoji': '🤖',
-          'role': 'AI Agent',
-          'isReal': true,
-        });
-      }
-    }
-
-    final filteredAiAgents = resolvedAiAgents.where((ai) {
+    final filteredAiAgents = aiAgents.where((ai) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       final name = (ai['name'] as String).toLowerCase();
       return name.contains(q);
     }).toList();
 
+    // ALL workspace agents are team members
     final filteredAgents = widget.agents.where((a) {
-      // Exclude agents that are shown in AI Agents section
-      if (resolvedAiAgents.any((ai) => ai['id'] == a.id)) return false;
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return a.name.toLowerCase().contains(q) || a.email.toLowerCase().contains(q);
@@ -260,10 +206,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       ),
                     ),
                     ...filteredAiAgents.map((ai) {
-                      final isSelected = widget.currentAssignee?.id == ai['id'] ||
-                          (widget.isStatusBot &&
-                              widget.currentAssignee == null &&
-                              ai['name'].toString().toLowerCase().contains('sales'));
+                      final isSelected = widget.isStatusBot;
 
                       return ListTile(
                         dense: true,
@@ -301,7 +244,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             : null,
                         onTap: () {
                           Navigator.pop(context);
-                          widget.onSelect(ai['id'] as int?, isAi: true);
+                          widget.onSelect(null, isAi: true);
                         },
                       );
                     }),
