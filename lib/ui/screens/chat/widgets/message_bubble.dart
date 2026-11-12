@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:message_pro/core/config/app_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../data/models/message.dart';
 import '../../../../data/models/message_template_registry.dart';
@@ -659,6 +660,12 @@ class MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Ad Referral Card (if attached to template message)
+                  if (message.referral != null) ...[
+                    _buildAdReferralCard(context, message.referral!, isDark, isArabic),
+                    const SizedBox(height: 6),
+                  ],
+
                   // Top Header Badge: (B) Template message | template_name
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
@@ -880,10 +887,15 @@ class MessageBubble extends StatelessWidget {
   Widget _buildAdReferralCard(BuildContext context, MessageReferral referral, bool isDark, bool isArabic) {
     final adCardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
     final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
-    final headline = referral.headline?.trim() ?? (isArabic ? 'إعلان ممول' : 'Sponsored Ad');
+    final headline = (referral.headline != null && referral.headline!.trim().isNotEmpty)
+        ? referral.headline!.trim()
+        : (isArabic ? 'إعلان فيسبوك / واتساب' : 'Sponsored Meta Ad');
     final body = referral.body?.trim();
     final sourceUrl = referral.sourceUrl;
-    final imageUrl = referral.imageUrl;
+    String? imageUrl = referral.imageUrl?.trim();
+    if (imageUrl != null && imageUrl.isNotEmpty && imageUrl.startsWith('/')) {
+      imageUrl = '${AppConfig.defaultBaseUrl}$imageUrl';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -913,7 +925,17 @@ class MessageBubble extends StatelessWidget {
                   color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                   child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                 ),
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                errorWidget: (_, __, ___) => Container(
+                  height: 90,
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  child: Center(
+                    child: Icon(
+                      Icons.campaign_rounded,
+                      size: 32,
+                      color: isDark ? Colors.white38 : Colors.black26,
+                    ),
+                  ),
+                ),
               ),
             ),
           Padding(
@@ -982,12 +1004,23 @@ class MessageBubble extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     body,
-                    maxLines: 3,
+                    maxLines: 4,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11.5,
                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                       fontFamily: 'Gontserrat',
+                    ),
+                  ),
+                ],
+                if (referral.sourceId != null && referral.sourceId!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ad ID: ${referral.sourceId}',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      fontFamily: 'monospace',
                     ),
                   ),
                 ],

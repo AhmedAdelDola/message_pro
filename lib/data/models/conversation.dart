@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'contact.dart';
 import 'message.dart';
 import 'user.dart';
@@ -26,6 +27,26 @@ class Conversation {
   final DateTime? contactLastSeenAt;
   final String? replyBlockReason;
   final bool muted;
+  final Map<String, dynamic> customAttributes;
+  final Map<String, dynamic> additionalAttributes;
+  final MessageReferral? referral;
+
+  bool get isAiAgentHandling {
+    if (status.toLowerCase() == 'bot') return true;
+    if (assignee != null && assignee!.isBot) return true;
+    final ca = customAttributes;
+    final aa = additionalAttributes;
+    if (ca['ai_agent'] == true ||
+        ca['bot'] == true ||
+        ca['ai_active'] == true ||
+        aa['ai_agent'] == true ||
+        aa['bot'] == true ||
+        ca['handling_agent_type'] == 'bot' ||
+        aa['handling_agent_type'] == 'bot') {
+      return true;
+    }
+    return false;
+  }
 
   String get channelType {
     if (inbox != null && inbox!.channelType.isNotEmpty && inbox!.channelType != 'Channel::WebWidget') {
@@ -61,6 +82,9 @@ class Conversation {
     this.contactLastSeenAt,
     this.replyBlockReason,
     this.muted = false,
+    this.customAttributes = const {},
+    this.additionalAttributes = const {},
+    this.referral,
   });
 
   Conversation copyWith({
@@ -87,6 +111,9 @@ class Conversation {
     DateTime? contactLastSeenAt,
     String? replyBlockReason,
     bool? muted,
+    Map<String, dynamic>? customAttributes,
+    Map<String, dynamic>? additionalAttributes,
+    MessageReferral? referral,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -112,6 +139,9 @@ class Conversation {
       contactLastSeenAt: contactLastSeenAt ?? this.contactLastSeenAt,
       replyBlockReason: replyBlockReason ?? this.replyBlockReason,
       muted: muted ?? this.muted,
+      customAttributes: customAttributes ?? this.customAttributes,
+      additionalAttributes: additionalAttributes ?? this.additionalAttributes,
+      referral: referral ?? this.referral,
     );
   }
 
@@ -359,6 +389,36 @@ class Conversation {
         json['meta']?['muted'] == true ||
         json['muted_at'] != null;
 
+    final Map<String, dynamic> cAttrs = json['custom_attributes'] is Map
+        ? Map<String, dynamic>.from(json['custom_attributes'])
+        : {};
+    final Map<String, dynamic> aAttrs = json['additional_attributes'] is Map
+        ? Map<String, dynamic>.from(json['additional_attributes'])
+        : {};
+
+    MessageReferral? convReferral;
+    dynamic rawConvRef = aAttrs['referral'] ??
+        cAttrs['referral'] ??
+        aAttrs['referral_params'] ??
+        cAttrs['referral_params'] ??
+        aAttrs['ad'] ??
+        cAttrs['ad'] ??
+        json['referral'] ??
+        json['meta']?['referral'] ??
+        json['meta']?['sender']?['referral'];
+
+    if (rawConvRef is String && rawConvRef.trim().startsWith('{')) {
+      try {
+        rawConvRef = jsonDecode(rawConvRef);
+      } catch (_) {}
+    }
+    if (rawConvRef is Map) {
+      try {
+        final parsed = MessageReferral.fromJson(Map<String, dynamic>.from(rawConvRef));
+        if (parsed.hasContent) convReferral = parsed;
+      } catch (_) {}
+    }
+
     return Conversation(
       id: convId > 0 ? convId : (json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0),
       recordId: json['record_id'] is int ? json['record_id'] : int.tryParse(json['record_id']?.toString() ?? ''),
@@ -383,6 +443,9 @@ class Conversation {
       contactLastSeenAt: dtContactLastSeen,
       replyBlockReason: rawReplyBlockReason,
       muted: isMuted,
+      customAttributes: cAttrs,
+      additionalAttributes: aAttrs,
+      referral: convReferral,
     );
   }
 }

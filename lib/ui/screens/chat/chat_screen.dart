@@ -8,6 +8,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection_container.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../data/models/conversation.dart';
+import '../../../data/models/message.dart';
+import '../../../data/models/user.dart';
+import '../../../logic/auth/auth_cubit.dart';
 import '../../../logic/chat/chat_cubit.dart';
 import '../../../logic/chat/chat_state.dart';
 import '../../../logic/conversation/conversation_cubit.dart';
@@ -19,7 +22,29 @@ import 'widgets/canned_responses_sheet.dart';
 import 'widgets/assignee_sheet.dart';
 import 'widgets/collaborators_sheet.dart';
 import 'widgets/send_template_modal.dart';
+import 'widgets/workflow_steps_group.dart';
+import 'widgets/ai_agent_takeover_banner.dart';
 import '../../widgets/app_bar_progress_bar.dart';
+
+abstract class _ChatListItem {
+  DateTime get createdAt;
+}
+
+class _ChatSingleMessageItem extends _ChatListItem {
+  final Message message;
+  _ChatSingleMessageItem(this.message);
+
+  @override
+  DateTime get createdAt => message.createdAt;
+}
+
+class _ChatActivityGroupItem extends _ChatListItem {
+  final List<Message> messages;
+  _ChatActivityGroupItem(this.messages);
+
+  @override
+  DateTime get createdAt => messages.first.createdAt;
+}
 
 class ChatScreen extends StatelessWidget {
   final Conversation conversation;
@@ -52,12 +77,126 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   final GlobalKey<ChatComposerState> _composerKey = GlobalKey<ChatComposerState>();
   late String _status;
   late bool _isMuted;
+  User? _currentAssignee;
+  bool _isTakenOver = false;
+  bool _isTakingOver = false;
 
   @override
   void initState() {
     super.initState();
     _status = widget.conversation.status;
     _isMuted = widget.conversation.muted;
+    _currentAssignee = widget.conversation.assignee;
+  }
+
+  bool _isAiAgentHandling(Conversation conv, List<Message> messages) {
+    if (_isTakenOver) return false;
+
+    final currentUser = context.read<AuthCubit>().currentUser;
+    final currentUserId = currentUser?.id;
+
+    if (_currentAssignee != null && currentUserId != null && _currentAssignee?.id == currentUserId) {
+      return false;
+    }
+
+    if (_status.toLowerCase() == 'bot') return true;
+
+    if (_currentAssignee != null) {
+      if (_currentAssignee!.isBot) return true;
+      final nameLower = _currentAssignee!.name.toLowerCase();
+      if (nameLower.contains('agent') ||
+          nameLower.contains('bot') ||
+          nameLower.contains('sales agent') ||
+          nameLower.contains('ai') ||
+          _currentAssignee!.name.contains('🤖')) {
+        return true;
+      }
+    }
+
+    if (conv.isAiAgentHandling) return true;
+
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final msg = messages[i];
+      final c = (msg.content ?? '').toLowerCase();
+      if (c.contains('assigning ai agent') ||
+          c.contains('assigned this contact to') ||
+          c.contains('assigned to')) {
+        if (c.contains('agent') || c.contains('bot') || c.contains('🤖')) {
+          return true;
+        }
+        break;
+      }
+    }
+
+    return false;
+  }
+
+  String _getAiAgentName(Conversation conv, List<Message> messages) {
+    if (_currentAssignee != null && _currentAssignee!.name.isNotEmpty) {
+      return _currentAssignee!.name;
+    }
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final msg = messages[i];
+      final c = msg.content ?? '';
+      final regex = RegExp(r'\(([^)]*(?:agent|bot|🤖)[^)]*)\)', caseSensitive: false);
+      final match = regex.firstMatch(c);
+      if (match != null) {
+        return match.group(1) ?? 'Sales agent';
+      }
+      final regex2 = RegExp(r'to (.*? agent)', caseSensitive: false);
+      final match2 = regex2.firstMatch(c);
+      if (match2 != null) {
+        return match2.group(1) ?? 'Sales agent';
+      }
+    }
+    return 'Sales agent';
+  }
+
+  Future<void> _handleTakeover() async {
+    final currentUser = context.read<AuthCubit>().currentUser;
+    final currentUserId = currentUser?.id;
+    if (currentUserId == null) return;
+
+    final chatCubit = context.read<ChatCubit>();
+    final convCubit = context.read<ConversationCubit>();
+
+    setState(() {
+      _isTakingOver = true;
+    });
+
+    try {
+      await chatCubit.assignAgent(currentUserId);
+      if (_status.toLowerCase() == 'bot') {
+        await chatCubit.toggleStatus('open');
+        _status = 'open';
+      }
+      if (mounted) {
+        setState(() {
+          _isTakingOver = false;
+          _isTakenOver = true;
+          _currentAssignee = currentUser;
+        });
+        convCubit.loadConversations();
+        final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic
+                  ? 'تم استلام المحادثة وتعيينها لك بنجاح، وتوقف الذكاء الاصطناعي عن الرد.'
+                  : 'Conversation assigned to you. AI Agent stopped.',
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF5850EC),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isTakingOver = false;
+        });
+      }
+    }
   }
 
   @override
@@ -272,6 +411,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
   void _showAssigneeSheet() {
     final agents = context.read<ConversationCubit>().state.agents;
+    final activeAssignee = _currentAssignee ?? widget.conversation.assignee;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -281,10 +421,20 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       builder: (ctx) {
         return AssigneeSheet(
           agents: agents,
-          currentAssignee: widget.conversation.assignee,
+          currentAssignee: activeAssignee,
           onSelect: (agentId) {
             context.read<ChatCubit>().assignAgent(agentId);
             context.read<ConversationCubit>().loadConversations();
+            if (mounted) {
+              setState(() {
+                if (agentId == null) {
+                  _currentAssignee = null;
+                } else {
+                  _currentAssignee = agents.where((a) => a.id == agentId).firstOrNull ??
+                      User(id: agentId, name: 'Agent', email: '', accountId: 0);
+                }
+              });
+            }
           },
         );
       },
@@ -473,43 +623,48 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   ),
                 ),
               // Assignee avatar or button
-              if (widget.conversation.assignee != null)
-                InkWell(
-                  onTap: _showAssigneeSheet,
-                  borderRadius: BorderRadius.circular(16.r),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircleAvatar(
-                          radius: 12.r,
-                          backgroundColor: const Color(0xFF4162E3).withValues(alpha: 0.2),
-                          backgroundImage: widget.conversation.assignee!.avatarUrl != null &&
-                                  widget.conversation.assignee!.avatarUrl!.isNotEmpty
-                              ? NetworkImage(widget.conversation.assignee!.avatarUrl!)
-                              : null,
-                          child: widget.conversation.assignee!.avatarUrl == null ||
-                                  widget.conversation.assignee!.avatarUrl!.isEmpty
-                              ? Text(
-                                  widget.conversation.assignee!.name.isNotEmpty
-                                      ? widget.conversation.assignee!.name[0].toUpperCase()
-                                      : 'A',
-                                  style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: const Color(0xFF4162E3)),
-                                )
-                              : null,
+              Builder(
+                builder: (context) {
+                  final activeAssignee = _currentAssignee ?? widget.conversation.assignee;
+                  if (activeAssignee != null) {
+                    return InkWell(
+                      onTap: _showAssigneeSheet,
+                      borderRadius: BorderRadius.circular(16.r),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircleAvatar(
+                              radius: 12.r,
+                              backgroundColor: const Color(0xFF4162E3).withValues(alpha: 0.2),
+                              backgroundImage: activeAssignee.avatarUrl != null &&
+                                      activeAssignee.avatarUrl!.isNotEmpty
+                                  ? NetworkImage(activeAssignee.avatarUrl!)
+                                  : null,
+                              child: activeAssignee.avatarUrl == null ||
+                                      activeAssignee.avatarUrl!.isEmpty
+                                  ? Text(
+                                      activeAssignee.name.isNotEmpty
+                                          ? activeAssignee.name[0].toUpperCase()
+                                          : 'A',
+                                      style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: const Color(0xFF4162E3)),
+                                    )
+                                  : null,
+                            ),
+                            Icon(Icons.keyboard_arrow_down_rounded, size: 14.r, color: Colors.grey),
+                          ],
                         ),
-                        Icon(Icons.keyboard_arrow_down_rounded, size: 14.r, color: Colors.grey),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                IconButton(
-                  icon: Icon(Icons.person_add_alt_1_outlined, size: 20.r),
-                  tooltip: 'تعيين مسؤول',
-                  onPressed: _showAssigneeSheet,
-                ),
+                      ),
+                    );
+                  }
+                  return IconButton(
+                    icon: Icon(Icons.person_add_alt_1_outlined, size: 20.r),
+                    tooltip: 'تعيين مسؤول',
+                    onPressed: _showAssigneeSheet,
+                  );
+                },
+              ),
               // Collaborators button matching website/webview
               IconButton(
                 icon: HugeIcon(
@@ -764,24 +919,98 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
               Expanded(
                 child: chatState.isLoading && chatState.messages.isEmpty
                     ? const SizedBox.shrink()
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        itemCount: chatState.messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = chatState.messages[index];
-                          final showDateHeader = index == 0 ||
-                              chatState.messages[index - 1].createdAt.day != msg.createdAt.day ||
-                              chatState.messages[index - 1].createdAt.month != msg.createdAt.month;
-                          return MessageBubble(
-                            message: msg,
-                            contactName: msg.senderName ?? widget.conversation.contact.name,
-                            contactThumbnail: msg.senderAvatar ?? widget.conversation.contact.avatarUrl,
-                            showDateHeader: showDateHeader,
-                            onRetry: () => context.read<ChatCubit>().retryMessage(msg),
+                    : Builder(
+                        builder: (context) {
+                          final rawMessages = chatState.messages;
+                          final convReferral = widget.conversation.referral;
+                          final hasAnyReferral = rawMessages.any((m) => m.referral != null);
+
+                          final processedMessages = <Message>[];
+                          bool referralAttached = false;
+                          for (int i = 0; i < rawMessages.length; i++) {
+                            var msg = rawMessages[i];
+                            if (!hasAnyReferral && convReferral != null && !referralAttached) {
+                              if (!msg.isOutgoing && !msg.isActivity) {
+                                msg = msg.copyWith(referral: convReferral);
+                                referralAttached = true;
+                              } else if (i == 0) {
+                                msg = msg.copyWith(referral: convReferral);
+                                referralAttached = true;
+                              }
+                            }
+                            processedMessages.add(msg);
+                          }
+
+                          final listItems = <_ChatListItem>[];
+                          int idx = 0;
+                          while (idx < processedMessages.length) {
+                            final msg = processedMessages[idx];
+                            if (msg.isActivity) {
+                              final group = <Message>[msg];
+                              int j = idx + 1;
+                              while (j < processedMessages.length &&
+                                  processedMessages[j].isActivity &&
+                                  processedMessages[j].createdAt.day == msg.createdAt.day &&
+                                  processedMessages[j].createdAt.month == msg.createdAt.month) {
+                                group.add(processedMessages[j]);
+                                j++;
+                              }
+                              if (group.length >= 2) {
+                                listItems.add(_ChatActivityGroupItem(group));
+                                idx = j;
+                                continue;
+                              }
+                            }
+                            listItems.add(_ChatSingleMessageItem(msg));
+                            idx++;
+                          }
+
+                          return ListView.builder(
+                            controller: _scrollController,
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
+                            itemCount: listItems.length,
+                            itemBuilder: (context, index) {
+                              final item = listItems[index];
+                              final prevItem = index > 0 ? listItems[index - 1] : null;
+                              final showDateHeader = index == 0 ||
+                                  prevItem?.createdAt.day != item.createdAt.day ||
+                                  prevItem?.createdAt.month != item.createdAt.month;
+
+                              if (item is _ChatActivityGroupItem) {
+                                return WorkflowStepsGroupWidget(
+                                  key: ValueKey('activity_group_${item.messages.first.id}_${item.messages.length}'),
+                                  messages: item.messages,
+                                  showDateHeader: showDateHeader,
+                                );
+                              } else if (item is _ChatSingleMessageItem) {
+                                final msg = item.message;
+                                return MessageBubble(
+                                  message: msg,
+                                  contactName: msg.senderName ?? widget.conversation.contact.name,
+                                  contactThumbnail: msg.senderAvatar ?? widget.conversation.contact.avatarUrl,
+                                  showDateHeader: showDateHeader,
+                                  onRetry: () => context.read<ChatCubit>().retryMessage(msg),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
                           );
                         },
                       ),
+              ),
+
+              // AI Agent Takeover Banner
+              Builder(
+                builder: (context) {
+                  final isAiHandling = _isAiAgentHandling(widget.conversation, chatState.messages);
+                  if (!isAiHandling) return const SizedBox.shrink();
+                  final aiAgentName = _getAiAgentName(widget.conversation, chatState.messages);
+                  return AiAgentTakeoverBanner(
+                    agentName: aiAgentName,
+                    isLoading: _isTakingOver,
+                    onTakeover: _handleTakeover,
+                  );
+                },
               ),
 
               // Chat Composer

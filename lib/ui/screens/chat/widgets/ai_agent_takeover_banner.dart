@@ -1,0 +1,129 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+class AiAgentTakeoverBanner extends StatelessWidget {
+  final String agentName;
+  final bool isLoading;
+  final VoidCallback onTakeover;
+
+  const AiAgentTakeoverBanner({
+    super.key,
+    required this.agentName,
+    required this.isLoading,
+    required this.onTakeover,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final bgColor = isDark ? const Color(0xFF231D33) : const Color(0xFFFBF8FF);
+    final borderColor = isDark ? const Color(0xFF3F325E) : const Color(0xFFEDE9FE);
+    final titleColor = isDark ? Colors.white : const Color(0xFF1E1B4B);
+    final subtitleColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280);
+    const purplePrimary = Color(0xFF5850EC);
+
+    final displayName = agentName.isNotEmpty ? agentName : (isArabic ? 'مساعد الذكاء الاصطناعي' : 'AI Agent');
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          top: BorderSide(color: borderColor, width: 1),
+          bottom: BorderSide(color: borderColor, width: 1),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Emoji or Bot Icon
+          Container(
+            padding: EdgeInsets.all(7.r),
+            decoration: BoxDecoration(
+              color: purplePrimary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Text(
+              '🤖',
+              style: TextStyle(fontSize: 18.sp),
+            ),
+          ),
+          SizedBox(width: 10.w),
+
+          // Title & Subtitle
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isArabic
+                      ? '$displayName يتولى إدارة هذه المحادثة الآن'
+                      : '$displayName is handling this conversation',
+                  style: TextStyle(
+                    fontSize: 12.5.sp,
+                    fontWeight: FontWeight.bold,
+                    color: titleColor,
+                    fontFamily: 'Gontserrat',
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  isArabic
+                      ? "اضغط 'Takeover' وسيتوقف مساعد الذكاء الاصطناعي عن الرد. سيتم تعيين المحادثة لك."
+                      : "Click 'Takeover' and the AI Agent will stop responding. You will be assigned to the conversation.",
+                  style: TextStyle(
+                    fontSize: 10.5.sp,
+                    color: subtitleColor,
+                    height: 1.3,
+                    fontFamily: 'Gontserrat',
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 10.w),
+
+          // Takeover Button
+          ElevatedButton(
+            onPressed: isLoading ? null : onTakeover,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: purplePrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              minimumSize: Size(0, 34.h),
+            ),
+            child: isLoading
+                ? SizedBox(
+                    width: 16.r,
+                    height: 16.r,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Takeover',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Gontserrat',
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}

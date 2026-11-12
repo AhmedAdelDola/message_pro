@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'message_template.dart';
 import 'message_template_registry.dart';
 
@@ -49,15 +50,30 @@ class MessageReferral {
     this.videoUrl,
   });
 
+  bool get hasContent =>
+      (headline != null && headline!.trim().isNotEmpty) ||
+      (body != null && body!.trim().isNotEmpty) ||
+      (sourceUrl != null && sourceUrl!.trim().isNotEmpty) ||
+      (imageUrl != null && imageUrl!.trim().isNotEmpty) ||
+      (sourceId != null && sourceId!.trim().isNotEmpty);
+
   factory MessageReferral.fromJson(Map<String, dynamic> json) {
     return MessageReferral(
-      headline: json['headline']?.toString(),
-      body: json['body']?.toString(),
-      sourceType: json['source_type']?.toString(),
-      sourceUrl: json['source_url']?.toString(),
-      sourceId: json['source_id']?.toString(),
-      imageUrl: (json['image_url'] ?? json['thumbnail_url'] ?? json['media_url'])?.toString(),
-      videoUrl: json['video_url']?.toString(),
+      headline: (json['headline'] ?? json['title'] ?? json['header'] ?? json['name'])?.toString(),
+      body: (json['body'] ?? json['description'] ?? json['text'] ?? json['caption'] ?? json['ad_body'])?.toString(),
+      sourceType: (json['source_type'] ?? json['sourceType'] ?? json['type'] ?? json['media_type'])?.toString(),
+      sourceUrl: (json['source_url'] ?? json['sourceUrl'] ?? json['url'] ?? json['link'] ?? json['ad_url'])?.toString(),
+      sourceId: (json['source_id'] ?? json['sourceId'] ?? json['ad_id'] ?? json['id'] ?? json['ctwa_clid'])?.toString(),
+      imageUrl: (json['image_url'] ??
+              json['imageUrl'] ??
+              json['thumbnail_url'] ??
+              json['thumbnailUrl'] ??
+              json['media_url'] ??
+              json['mediaUrl'] ??
+              json['picture'] ??
+              json['preview_url'])
+          ?.toString(),
+      videoUrl: (json['video_url'] ?? json['videoUrl'])?.toString(),
     );
   }
 }
@@ -138,10 +154,12 @@ class Message {
   bool get isActivity =>
       messageType == 2 ||
       (content != null &&
-          (content!.toLowerCase().contains('assigned to') ||
+          (content!.toLowerCase().contains('workflow') ||
+           content!.toLowerCase().contains('assigned to') ||
            content!.toLowerCase().contains('contact assigned') ||
            content!.toLowerCase().contains('conversation was') ||
            content!.toLowerCase().contains('priority changed') ||
+           content!.toLowerCase().contains('automation') ||
            content!.toLowerCase().contains('system:')));
   bool get isPrivateNote => private;
   bool get isTemplate =>
@@ -295,9 +313,33 @@ class Message {
     }
 
     MessageReferral? ref;
-    final rawRef = cAttr['referral'] ?? aAttr['referral'] ?? json['referral'];
+    dynamic rawRef = cAttr['referral'] ??
+        cAttr['referral_params'] ??
+        cAttr['referral_data'] ??
+        cAttr['ad'] ??
+        cAttr['ad_referral'] ??
+        cAttr['data']?['referral'] ??
+        cAttr['values']?['referral'] ??
+        aAttr['referral'] ??
+        aAttr['referral_params'] ??
+        aAttr['ad'] ??
+        json['referral'] ??
+        json['referral_params'] ??
+        json['ad'] ??
+        json['sender']?['referral'];
+
+    if (rawRef is String && rawRef.trim().startsWith('{')) {
+      try {
+        rawRef = jsonDecode(rawRef);
+      } catch (_) {}
+    }
     if (rawRef is Map) {
-      ref = MessageReferral.fromJson(Map<String, dynamic>.from(rawRef));
+      try {
+        final parsedRef = MessageReferral.fromJson(Map<String, dynamic>.from(rawRef));
+        if (parsedRef.hasContent) {
+          ref = parsedRef;
+        }
+      } catch (_) {}
     }
 
     return Message(

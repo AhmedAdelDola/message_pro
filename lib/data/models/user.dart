@@ -150,6 +150,7 @@ class User {
   final String? avatarUrl;
   final String? pubsubToken;
   final String role;
+  final String? type;
   final int accountId;
   final String availabilityStatus; // 'online', 'offline', 'busy'
   final List<Account> accounts;
@@ -164,6 +165,26 @@ class User {
     return activeBreakEndsAt!.isAfter(DateTime.now());
   }
 
+  bool get isBot {
+    final t = (type ?? '').toLowerCase();
+    final r = role.toLowerCase();
+    final n = name.toLowerCase();
+    final dn = (displayName ?? '').toLowerCase();
+    final em = email.toLowerCase();
+    return t == 'agent_bot' ||
+        t == 'bot' ||
+        r == 'bot' ||
+        r == 'agent_bot' ||
+        n.contains('agent') ||
+        n.contains('bot') ||
+        n.contains('🤖') ||
+        dn.contains('agent') ||
+        dn.contains('bot') ||
+        dn.contains('🤖') ||
+        em.contains('bot') ||
+        em.contains('agent');
+  }
+
   User({
     required this.id,
     required this.name,
@@ -172,6 +193,7 @@ class User {
     this.avatarUrl,
     this.pubsubToken,
     this.role = 'agent',
+    this.type,
     required this.accountId,
     this.availabilityStatus = 'online',
     this.accounts = const [],
@@ -185,6 +207,7 @@ class User {
     String? avatarUrl,
     String? pubsubToken,
     String? role,
+    String? type,
     int? accountId,
     String? availabilityStatus,
     List<Account>? accounts,
@@ -197,6 +220,7 @@ class User {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       pubsubToken: pubsubToken ?? this.pubsubToken,
       role: role ?? this.role,
+      type: type ?? this.type,
       accountId: accountId ?? this.accountId,
       availabilityStatus: availabilityStatus ?? this.availabilityStatus,
       accounts: accounts ?? this.accounts,
@@ -289,6 +313,7 @@ class User {
       avatarUrl: avatar,
       pubsubToken: json['pubsub_token']?.toString(),
       role: json['role']?.toString() ?? 'agent',
+      type: json['type']?.toString() ?? json['user_type']?.toString(),
       accountId: parsedAccountId,
       availabilityStatus: userAvail ?? 'online',
       accounts: accountsList,
@@ -303,6 +328,7 @@ class User {
     'avatar_url': avatarUrl,
     'pubsub_token': pubsubToken,
     'role': role,
+    if (type != null) 'type': type,
     'account_id': accountId,
     'availability_status': availabilityStatus,
     'accounts': accounts.map((a) => a.toJson()).toList(),
