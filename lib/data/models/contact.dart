@@ -27,6 +27,32 @@ class Contact {
     this.lifecycleStage,
   });
 
+  Contact copyWith({
+    int? id,
+    String? name,
+    String? email,
+    String? phoneNumber,
+    String? avatarUrl,
+    String? identifier,
+    Map<String, dynamic>? customAttributes,
+    List<Collaborator>? collaborators,
+    bool? canManageCollaborators,
+    LifecycleStage? lifecycleStage,
+  }) {
+    return Contact(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      identifier: identifier ?? this.identifier,
+      customAttributes: customAttributes ?? this.customAttributes,
+      collaborators: collaborators ?? this.collaborators,
+      canManageCollaborators: canManageCollaborators ?? this.canManageCollaborators,
+      lifecycleStage: lifecycleStage ?? this.lifecycleStage,
+    );
+  }
+
   factory Contact.fromJson(Map<String, dynamic> json) {
     final rawName = json['name']?.toString().trim();
     final rawPhone = json['phone_number']?.toString().trim();

@@ -4,6 +4,7 @@ import 'package:message_pro/data/models/message.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/storage/secure_storage_service.dart';
+import '../../data/models/contact.dart';
 import '../../data/models/conversation.dart';
 import '../../data/repositories/conversation_repository.dart';
 import 'conversation_state.dart';
@@ -315,7 +316,35 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   List<Conversation> get filteredConversations {
     if (state.selectedLifecycleStageId == null) return state.conversations;
-    return state.conversations.where((c) => c.lifecycleStage?.id == state.selectedLifecycleStageId).toList();
+    return state.conversations.where((c) => (c.effectiveLifecycleStage?.id ?? c.lifecycleStage?.id) == state.selectedLifecycleStageId).toList();
+  }
+
+  void updateContactLifecycleStage(int contactId, String stageName, {int? conversationId}) {
+    final parsedStage = LifecycleStage.fromString(stageName);
+    final updatedList = state.conversations.map((c) {
+      if (c.contact.id == contactId || (conversationId != null && c.id == conversationId)) {
+        final updatedContact = c.contact.copyWith(
+          lifecycleStage: parsedStage,
+          customAttributes: {
+            ...c.contact.customAttributes,
+            'lifecycle_stage': stageName,
+            'lead_status': stageName,
+          },
+        );
+        return c.copyWith(
+          contact: updatedContact,
+          lifecycleStage: parsedStage,
+          customAttributes: {
+            ...c.customAttributes,
+            'lifecycle_stage': stageName,
+            'lead_status': stageName,
+          },
+        );
+      }
+      return c;
+    }).toList();
+
+    emit(state.copyWith(conversations: updatedList));
   }
 
   @override

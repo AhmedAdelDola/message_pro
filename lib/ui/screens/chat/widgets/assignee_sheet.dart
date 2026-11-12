@@ -5,12 +5,14 @@ import '../../../widgets/avatar_widget.dart';
 class AssigneeSheet extends StatefulWidget {
   final List<User> agents;
   final User? currentAssignee;
-  final Function(int? agentId) onSelect;
+  final bool isStatusBot;
+  final Function(int? agentId, {bool isAi}) onSelect;
 
   const AssigneeSheet({
     super.key,
     required this.agents,
     this.currentAssignee,
+    this.isStatusBot = false,
     required this.onSelect,
   });
 
@@ -21,27 +23,6 @@ class AssigneeSheet extends StatefulWidget {
 class _AssigneeSheetState extends State<AssigneeSheet> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
-  static const List<Map<String, dynamic>> _aiAgents = [
-    {
-      'id': -101,
-      'name': 'Sales agent',
-      'emoji': '🤑',
-      'role': 'AI Sales Assistant',
-    },
-    {
-      'id': -102,
-      'name': 'Message Pro | مساعد حنين',
-      'emoji': '🤠',
-      'role': 'AI Support Assistant',
-    },
-    {
-      'id': -103,
-      'name': 'Message Pro | مساعد حسنى',
-      'emoji': '🤖',
-      'role': 'AI Knowledge Assistant',
-    },
-  ];
 
   @override
   void dispose() {
@@ -60,7 +41,70 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
     final textPrimary = isDark ? const Color(0xFFEDEEF0) : const Color(0xFF282E34);
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F);
 
-    final filteredAiAgents = _aiAgents.where((ai) {
+    // Build dynamic list of AI agents
+    final List<Map<String, dynamic>> resolvedAiAgents = [];
+
+    final baseAiList = [
+      {
+        'id': -101,
+        'name': 'Sales agent',
+        'emoji': '🤠',
+        'role': 'AI Sales Assistant',
+      },
+      {
+        'id': -102,
+        'name': 'Message Pro | مساعد حنين',
+        'emoji': '🤖',
+        'role': 'AI Support Assistant',
+      },
+      {
+        'id': -103,
+        'name': 'Message Pro | مساعد حسنى',
+        'emoji': '💡',
+        'role': 'AI Knowledge Assistant',
+      },
+    ];
+
+    for (final base in baseAiList) {
+      final baseName = (base['name'] as String).toLowerCase();
+      final cleanBase = baseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '').trim();
+
+      // Look for a matching real agent in workspace
+      final matching = widget.agents.where((a) {
+        final aName = a.name.toLowerCase().replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '').trim();
+        return aName.contains(cleanBase) || cleanBase.contains(aName);
+      }).firstOrNull;
+
+      if (matching != null) {
+        resolvedAiAgents.add({
+          'id': matching.id,
+          'name': matching.name,
+          'emoji': base['emoji'],
+          'role': base['role'],
+          'isReal': true,
+        });
+      } else {
+        resolvedAiAgents.add({
+          ...base,
+          'isReal': false,
+        });
+      }
+    }
+
+    // Include any other bot user in workspace
+    for (final a in widget.agents) {
+      if (a.isBot && !resolvedAiAgents.any((ai) => ai['id'] == a.id)) {
+        resolvedAiAgents.add({
+          'id': a.id,
+          'name': a.name,
+          'emoji': '🤖',
+          'role': 'AI Agent',
+          'isReal': true,
+        });
+      }
+    }
+
+    final filteredAiAgents = resolvedAiAgents.where((ai) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       final name = (ai['name'] as String).toLowerCase();
@@ -68,6 +112,8 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
     }).toList();
 
     final filteredAgents = widget.agents.where((a) {
+      // Exclude agents that are shown in AI Agents section
+      if (resolvedAiAgents.any((ai) => ai['id'] == a.id)) return false;
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return a.name.toLowerCase().contains(q) || a.email.toLowerCase().contains(q);
@@ -178,7 +224,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 children: [
-                  // 1. AI Agents Section (Beta)
+                  // 1. AI Agents Section
                   if (filteredAiAgents.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -197,15 +243,15 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4162E3).withValues(alpha: 0.12),
+                              color: const Color(0xFF5850EC).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: const Text(
-                              'Beta',
+                              'AI',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF4162E3),
+                                color: Color(0xFF5850EC),
                                 fontFamily: 'Gontserrat',
                               ),
                             ),
@@ -214,7 +260,11 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       ),
                     ),
                     ...filteredAiAgents.map((ai) {
-                      final isSelected = widget.currentAssignee?.id == ai['id'];
+                      final isSelected = widget.currentAssignee?.id == ai['id'] ||
+                          (widget.isStatusBot &&
+                              widget.currentAssignee == null &&
+                              ai['name'].toString().toLowerCase().contains('sales'));
+
                       return ListTile(
                         dense: true,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -222,9 +272,9 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: surfaceColor,
+                            color: const Color(0xFF5850EC).withValues(alpha: 0.1),
                             shape: BoxShape.circle,
-                            border: Border.all(color: borderColor),
+                            border: Border.all(color: const Color(0xFF5850EC).withValues(alpha: 0.2)),
                           ),
                           alignment: Alignment.center,
                           child: Text(ai['emoji'], style: const TextStyle(fontSize: 18)),
@@ -247,11 +297,11 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           ),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_rounded, color: Color(0xFF4162E3), size: 20)
+                            ? const Icon(Icons.check_rounded, color: Color(0xFF5850EC), size: 20)
                             : null,
                         onTap: () {
                           Navigator.pop(context);
-                          widget.onSelect(ai['id']);
+                          widget.onSelect(ai['id'] as int?, isAi: true);
                         },
                       );
                     }),
@@ -293,18 +343,18 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                         fontFamily: 'Gontserrat',
                       ),
                     ),
-                    trailing: widget.currentAssignee == null
+                    trailing: (widget.currentAssignee == null && !widget.isStatusBot)
                         ? const Icon(Icons.check_rounded, color: Color(0xFF4162E3), size: 20)
                         : null,
                     onTap: () {
                       Navigator.pop(context);
-                      widget.onSelect(null);
+                      widget.onSelect(null, isAi: false);
                     },
                   ),
 
                   Divider(height: 16, color: borderColor),
 
-                  // 3. Team Members
+                  // 3. Team members
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     child: Text(
@@ -332,7 +382,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                     )
                   else
                     ...filteredAgents.map((agent) {
-                      final isSelected = widget.currentAssignee?.id == agent.id;
+                      final isSelected = widget.currentAssignee?.id == agent.id && !widget.isStatusBot;
                       final isOnline = agent.availabilityStatus == 'online';
 
                       return ListTile(
@@ -367,7 +417,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             : null,
                         onTap: () {
                           Navigator.pop(context);
-                          widget.onSelect(agent.id);
+                          widget.onSelect(agent.id, isAi: false);
                         },
                       );
                     }),

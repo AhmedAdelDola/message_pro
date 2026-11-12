@@ -48,6 +48,24 @@ class Conversation {
     return false;
   }
 
+  LifecycleStage? get effectiveLifecycleStage {
+    if (lifecycleStage != null) return lifecycleStage;
+    if (contact.lifecycleStage != null) return contact.lifecycleStage;
+    final ca = customAttributes;
+    final raw = ca['lifecycle_stage'] ??
+        ca['lead_status'] ??
+        contact.customAttributes['lifecycle_stage'] ??
+        contact.customAttributes['lead_status'];
+    if (raw is Map) {
+      try {
+        return LifecycleStage.fromJson(Map<String, dynamic>.from(raw));
+      } catch (_) {}
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      return LifecycleStage.fromString(raw);
+    }
+    return null;
+  }
+
   String get channelType {
     if (inbox != null && inbox!.channelType.isNotEmpty && inbox!.channelType != 'Channel::WebWidget') {
       return inbox!.channelType;
@@ -301,7 +319,11 @@ class Conversation {
         json['custom_attributes']?['lifecycle_stage'] ??
         json['custom_attributes']?['lead_status'] ??
         json['meta']?['sender']?['custom_attributes']?['lifecycle_stage'] ??
-        json['contact']?['custom_attributes']?['lifecycle_stage'];
+        json['meta']?['sender']?['custom_attributes']?['lead_status'] ??
+        json['contact']?['custom_attributes']?['lifecycle_stage'] ??
+        json['contact']?['custom_attributes']?['lead_status'] ??
+        json['meta']?['sender']?['stage'] ??
+        json['contact']?['stage'];
 
     if (rawStage is Map) {
       try {

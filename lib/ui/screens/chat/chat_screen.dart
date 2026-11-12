@@ -8,6 +8,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection_container.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../data/models/conversation.dart';
+import '../../../data/models/contact.dart';
 import '../../../data/models/message.dart';
 import '../../../data/models/user.dart';
 import '../../../logic/auth/auth_cubit.dart';
@@ -83,6 +84,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   int? _lastMessageId;
   bool _initialScrolled = false;
   double? _maxScrollBeforeLoad;
+  late Contact _contact;
 
   @override
   void initState() {
@@ -90,6 +92,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     _status = widget.conversation.status;
     _isMuted = widget.conversation.muted;
     _currentAssignee = widget.conversation.assignee;
+    _contact = widget.conversation.contact;
     _scrollController.addListener(_onScroll);
   }
 
@@ -429,6 +432,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   void _showAssigneeSheet() {
     final agents = context.read<ConversationCubit>().state.agents;
     final activeAssignee = _currentAssignee ?? widget.conversation.assignee;
+    final isStatusBot = _status.toLowerCase() == 'bot';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -439,18 +444,74 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         return AssigneeSheet(
           agents: agents,
           currentAssignee: activeAssignee,
-          onSelect: (agentId) {
-            context.read<ChatCubit>().assignAgent(agentId);
-            context.read<ConversationCubit>().loadConversations();
-            if (mounted) {
-              setState(() {
-                if (agentId == null) {
-                  _currentAssignee = null;
-                } else {
-                  _currentAssignee = agents.where((a) => a.id == agentId).firstOrNull ??
-                      User(id: agentId, name: 'Agent', email: '', accountId: 0);
-                }
-              });
+          isStatusBot: isStatusBot,
+          onSelect: (agentId, {bool isAi = false}) async {
+            final chatCubit = context.read<ChatCubit>();
+            final convCubit = context.read<ConversationCubit>();
+
+            final isAiSelected = isAi || (agentId != null && agentId < 0);
+
+            if (isAiSelected) {
+              // 1. Resolve real agent if present
+              int? realAgentId;
+              User? aiUser;
+
+              if (agentId != null && agentId > 0) {
+                realAgentId = agentId;
+                aiUser = agents.where((a) => a.id == agentId).firstOrNull;
+              } else {
+                aiUser = agents.where((a) {
+                  final n = a.name.toLowerCase();
+                  return n.contains('sales agent') || n.contains('bot') || n.contains('ai');
+                }).firstOrNull;
+                realAgentId = aiUser?.id;
+              }
+
+              // 2. Assign agent on server (real id or null)
+              await chatCubit.assignAgent(realAgentId);
+
+              // 3. Set conversation status to 'bot' on server so the AI responds!
+              await chatCubit.toggleStatus('bot');
+
+              // 4. Reload conversations to update inboxes and listings
+              convCubit.loadConversations();
+
+              if (mounted) {
+                setState(() {
+                  _isTakenOver = false;
+                  _status = 'bot';
+                  _currentAssignee = aiUser ??
+                      User(
+                        id: realAgentId ?? -101,
+                        name: 'Sales agent',
+                        email: 'ai@messagepro.com',
+                        accountId: widget.conversation.accountId,
+                      );
+                });
+              }
+            } else {
+              // Human agent or Unassigned
+              await chatCubit.assignAgent(agentId);
+
+              // If conversation was 'bot', transition to 'open'
+              if (_status == 'bot') {
+                await chatCubit.toggleStatus('open');
+              }
+
+              convCubit.loadConversations();
+
+              if (mounted) {
+                setState(() {
+                  _isTakenOver = true;
+                  if (_status == 'bot') _status = 'open';
+                  if (agentId == null) {
+                    _currentAssignee = null;
+                  } else {
+                    _currentAssignee = agents.where((a) => a.id == agentId).firstOrNull ??
+                        User(id: agentId, name: 'Agent', email: '', accountId: 0);
+                  }
+                });
+              }
             }
           },
         );
@@ -524,7 +585,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
   @override
   Widget build(BuildContext context) {
-    final contact = widget.conversation.contact;
+    final contact = _contact;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -569,12 +630,21 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
             ),
             titleSpacing: 0,
             title: InkWell(
-              onTap: () {
-                Navigator.of(context).push(
+              onTap: () async {
+                final updated = await Navigator.of(context).push<Contact>(
                   MaterialPageRoute(
-                    builder: (_) => ContactDetailsScreen(contact: contact),
+                    builder: (_) => ContactDetailsScreen(
+                      contact: _contact,
+                      conversationId: widget.conversation.id,
+                      onContactUpdated: (newContact) {
+                        if (mounted) setState(() => _contact = newContact);
+                      },
+                    ),
                   ),
                 );
+                if (updated != null && mounted) {
+                  setState(() => _contact = updated);
+                }
               },
               child: Row(
                 children: [
@@ -598,6 +668,38 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                            Builder(
+                              builder: (context) {
+                                final stage = widget.conversation.effectiveLifecycleStage ?? _contact.lifecycleStage;
+                                if (stage == null) return const SizedBox.shrink();
+                                final stageName = stage.name;
+                                final stageEmoji = stage.icon ?? LifecycleStage.getEmojiForStage(stageName);
+                                return Container(
+                                  margin: EdgeInsets.only(left: 6.w, right: 6.w),
+                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF2B2E35) : const Color(0xFFE5E7EB),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(stageEmoji, style: TextStyle(fontSize: 10.sp)),
+                                      SizedBox(width: 3.w),
+                                      Text(
+                                        stageName,
+                                        style: TextStyle(
+                                          fontSize: 10.5.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : const Color(0xFF374151),
+                                          fontFamily: 'Gontserrat',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -747,7 +849,13 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     case 'contact_details':
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ContactDetailsScreen(contact: widget.conversation.contact),
+                          builder: (_) => ContactDetailsScreen(
+                            contact: _contact,
+                            conversationId: widget.conversation.id,
+                            onContactUpdated: (newContact) {
+                              if (mounted) setState(() => _contact = newContact);
+                            },
+                          ),
                         ),
                       );
                       break;

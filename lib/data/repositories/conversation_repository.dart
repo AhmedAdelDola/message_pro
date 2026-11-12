@@ -69,6 +69,7 @@ abstract class IConversationRepository {
   Future<Either<Failure, void>> assignTeam(int conversationId, int? teamId);
   Future<Either<Failure, void>> updateLabels(int conversationId, List<String> labels);
   Future<Either<Failure, void>> updateLifecycleStage(int conversationId, int stageId);
+  Future<Either<Failure, void>> updateConversationCustomAttributes(int conversationId, Map<String, dynamic> customAttributes);
   Future<Either<Failure, void>> muteConversation(int conversationId);
   Future<Either<Failure, void>> unmuteConversation(int conversationId);
   Future<Either<Failure, void>> markAsRead(int conversationId);
@@ -922,6 +923,10 @@ class ConversationRepository implements IConversationRepository {
         }
       } else if (status == 'open') {
         payload['status'] = 'open';
+      } else if (status == 'bot') {
+        payload['status'] = 'bot';
+      } else if (status == 'pending') {
+        payload['status'] = 'pending';
       }
       // Note: Passing 'status': 'resolved' causes Chatwoot backend to throw 500 Internal Server Error.
       // Calling toggle_status with empty payload {} cleanly triggers Chatwoot's toggle_status
@@ -955,14 +960,13 @@ class ConversationRepository implements IConversationRepository {
   Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType}) async {
     try {
       final Map<String, dynamic> data;
-      if (agentId == null) {
+      if (agentId == null || agentId < 0) {
         data = {'assignee_id': null};
       } else {
-        final type = assigneeType ?? (agentId < 0 ? 'AgentBot' : 'User');
-        data = {
-          'assignee_id': agentId.abs(),
-          'assignee_type': type,
-        };
+        data = {'assignee_id': agentId};
+        if (assigneeType != null) {
+          data['assignee_type'] = assigneeType;
+        }
       }
 
       await _api.post(
@@ -1030,6 +1034,22 @@ class ConversationRepository implements IConversationRepository {
       await _api.patch(
         'conversations/$conversationId/lifecycle',
         data: {'lifecycle_stage_id': stageId},
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateConversationCustomAttributes(
+    int conversationId,
+    Map<String, dynamic> customAttributes,
+  ) async {
+    try {
+      await _api.post(
+        'conversations/$conversationId/custom_attributes',
+        data: {'custom_attributes': customAttributes},
       );
       return const Right(null);
     } catch (e) {

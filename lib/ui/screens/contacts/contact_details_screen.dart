@@ -16,8 +16,15 @@ import 'edit_contact_screen.dart';
 
 class ContactDetailsScreen extends StatefulWidget {
   final Contact contact;
+  final int? conversationId;
+  final Function(Contact updatedContact)? onContactUpdated;
 
-  const ContactDetailsScreen({super.key, required this.contact});
+  const ContactDetailsScreen({
+    super.key,
+    required this.contact,
+    this.conversationId,
+    this.onContactUpdated,
+  });
 
   @override
   State<ContactDetailsScreen> createState() => _ContactDetailsScreenState();
@@ -103,6 +110,27 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
       },
       (updated) {
         setState(() => _contact = updated);
+        widget.onContactUpdated?.call(updated);
+
+        // Update conversation cubit immediately so conversation tile outside reflects it
+        try {
+          context.read<ConversationCubit>().updateContactLifecycleStage(
+            _contact.id,
+            stage,
+            conversationId: widget.conversationId,
+          );
+        } catch (_) {}
+
+        // Also update conversation custom attributes on backend if conversationId is given
+        if (widget.conversationId != null) {
+          try {
+            sl<IConversationRepository>().updateConversationCustomAttributes(
+              widget.conversationId!,
+              {'lifecycle_stage': stage, 'lead_status': stage},
+            );
+          } catch (_) {}
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

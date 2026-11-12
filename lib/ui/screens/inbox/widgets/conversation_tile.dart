@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/models/conversation.dart';
+import '../../../../data/models/contact.dart';
 import '../../../../logic/conversation/conversation_cubit.dart';
 import '../../../widgets/avatar_widget.dart';
 
@@ -108,8 +109,9 @@ class ConversationTile extends StatelessWidget {
     final isClosed = conversation.status == 'resolved' || conversation.status == 'closed';
 
     // Lifecycle stage info
-    final stageName = conversation.lifecycleStage?.name ?? 'New Lead';
-    final stageEmoji = conversation.lifecycleStage?.icon ?? '🆕';
+    final stage = conversation.effectiveLifecycleStage ?? conversation.contact.lifecycleStage;
+    final stageName = stage?.name ?? 'New Lead';
+    final stageEmoji = stage?.icon ?? LifecycleStage.getEmojiForStage(stageName);
 
     // Assignee
     final assignee = conversation.assignee;
