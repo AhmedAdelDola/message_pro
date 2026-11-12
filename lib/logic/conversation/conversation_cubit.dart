@@ -134,7 +134,7 @@ class ConversationCubit extends Cubit<ConversationState> {
     final inboxesRes = await repo.fetchInboxes();
     final labelsRes = await repo.fetchLabels();
     final teamsRes = await repo.fetchTeams();
-    final agentsRes = await repo.fetchAgents();
+    final agentsRes = await repo.fetchAssignableAgents();
     final stagesRes = await repo.fetchLifecycleStages();
 
     emit(state.copyWith(

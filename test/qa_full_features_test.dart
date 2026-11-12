@@ -85,6 +85,9 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, List<User>>> fetchAgents() async => Right(agents);
 
   @override
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId}) async => Right(agents);
+
+  @override
   Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages() async => Right(stages);
 
   @override

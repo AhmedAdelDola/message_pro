@@ -400,8 +400,8 @@ class ChatCubit extends Cubit<ChatState> {
     return result.isRight();
   }
 
-  Future<void> assignAgent(int? agentId) async {
-    await repo.assignAgent(conversationId, agentId);
+  Future<void> assignAgent(int? agentId, {String? assigneeType}) async {
+    await repo.assignAgent(conversationId, agentId, assigneeType: assigneeType);
   }
 
   Future<void> assignTeam(int? teamId) async {

@@ -66,7 +66,7 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
       if (mounted) {
         setState(() {
           _playerState = state;
-          if (state == PlayerState.playing || state == PlayerState.paused) {
+          if (state == PlayerState.playing || state == PlayerState.paused || state == PlayerState.completed) {
             _isLoading = false;
           }
         });
@@ -75,13 +75,19 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
 
     _durationSub = _player.onDurationChanged.listen((dur) {
       if (mounted && dur > Duration.zero) {
-        setState(() => _duration = dur);
+        setState(() {
+          _duration = dur;
+          _isLoading = false;
+        });
       }
     });
 
     _positionSub = _player.onPositionChanged.listen((pos) {
       if (mounted && !_isSeeking) {
-        setState(() => _position = pos);
+        setState(() {
+          _position = pos;
+          if (_isLoading) _isLoading = false;
+        });
       }
     });
 
@@ -90,6 +96,7 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
         setState(() {
           _position = Duration.zero;
           _playerState = PlayerState.completed;
+          _isLoading = false;
         });
       }
     });
@@ -107,15 +114,31 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
   Future<void> _togglePlayPause() async {
     if (_playerState == PlayerState.playing) {
       await _player.pause();
+      if (mounted) {
+        setState(() {
+          _playerState = PlayerState.paused;
+          _isLoading = false;
+        });
+      }
     } else {
-      setState(() => _isLoading = true);
+      if (mounted) setState(() => _isLoading = true);
       try {
-        if (_playerState == PlayerState.completed) {
+        if (_playerState == PlayerState.completed || (_duration > Duration.zero && _position >= _duration)) {
           await _player.seek(Duration.zero);
+          _position = Duration.zero;
+          await _player.resume();
+        } else if (_playerState == PlayerState.paused) {
+          await _player.resume();
+        } else {
+          await _player.play(UrlSource(widget.audioUrl));
         }
-        await _player.play(UrlSource(widget.audioUrl));
         await _player.setPlaybackRate(_playbackSpeed);
-      } catch (_) {
+      } catch (e) {
+        try {
+          await _player.stop();
+          await _player.play(UrlSource(widget.audioUrl));
+        } catch (_) {}
+      } finally {
         if (mounted) {
           setState(() => _isLoading = false);
         }

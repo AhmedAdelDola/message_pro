@@ -199,7 +199,11 @@ class Conversation {
     final rawAssignee = json['meta']?['assignee'] ?? json['assignee'];
     if (rawAssignee is Map) {
       try {
-        parsedAssignee = User.fromJson(Map<String, dynamic>.from(rawAssignee));
+        final map = Map<String, dynamic>.from(rawAssignee);
+        if (json['meta']?['assignee_type'] != null && map['assignee_type'] == null) {
+          map['assignee_type'] = json['meta']['assignee_type'];
+        }
+        parsedAssignee = User.fromJson(map);
       } catch (_) {}
     }
 

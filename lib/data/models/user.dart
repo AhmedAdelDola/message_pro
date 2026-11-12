@@ -154,6 +154,9 @@ class User {
   final int accountId;
   final String availabilityStatus; // 'online', 'offline', 'busy'
   final List<Account> accounts;
+  final String? assigneeType; // 'User' or 'AgentBot'
+  final int? aiAgentId;
+  final String? emoji;
 
   String? get thumbnail => avatarUrl;
   Account? get activeAccount => accounts.where((a) => a.id == accountId).firstOrNull ?? (accounts.isNotEmpty ? accounts.first : null);
@@ -166,11 +169,13 @@ class User {
   }
 
   bool get isBot {
+    if (assigneeType == 'AgentBot') return true;
     final t = (type ?? '').toLowerCase();
     final r = role.toLowerCase();
-    if (t == 'agent_bot' || t == 'bot' || r == 'bot' || r == 'agent_bot') {
+    if (t == 'agent_bot' || t == 'ai_agent' || t == 'bot' || r == 'bot' || r == 'agent_bot') {
       return true;
     }
+    if (aiAgentId != null && aiAgentId! > 0) return true;
     final n = name.trim().toLowerCase();
     final dn = (displayName ?? '').trim().toLowerCase();
     return n == 'sales agent' ||
@@ -199,6 +204,9 @@ class User {
     required this.accountId,
     this.availabilityStatus = 'online',
     this.accounts = const [],
+    this.assigneeType,
+    this.aiAgentId,
+    this.emoji,
   });
 
   User copyWith({
@@ -213,6 +221,9 @@ class User {
     int? accountId,
     String? availabilityStatus,
     List<Account>? accounts,
+    String? assigneeType,
+    int? aiAgentId,
+    String? emoji,
   }) {
     return User(
       id: id ?? this.id,
@@ -226,6 +237,9 @@ class User {
       accountId: accountId ?? this.accountId,
       availabilityStatus: availabilityStatus ?? this.availabilityStatus,
       accounts: accounts ?? this.accounts,
+      assigneeType: assigneeType ?? this.assigneeType,
+      aiAgentId: aiAgentId ?? this.aiAgentId,
+      emoji: emoji ?? this.emoji,
     );
   }
 
@@ -307,9 +321,14 @@ class User {
       userAvail = 'break';
     }
 
+    final rawAssigneeType = json['assignee_type']?.toString();
+    final rawAiAgentId = json['ai_agent_id'] is int ? json['ai_agent_id'] : int.tryParse(json['ai_agent_id']?.toString() ?? '');
+    final rawEmoji = json['emoji']?.toString();
+    final rawName = json['available_name']?.toString() ?? json['name']?.toString() ?? '';
+
     return User(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
-      name: json['name']?.toString() ?? '',
+      name: rawName,
       displayName: json['display_name']?.toString() ?? json['displayName']?.toString(),
       email: json['email']?.toString() ?? '',
       avatarUrl: avatar,
@@ -319,6 +338,9 @@ class User {
       accountId: parsedAccountId,
       availabilityStatus: userAvail ?? 'online',
       accounts: accountsList,
+      assigneeType: rawAssigneeType,
+      aiAgentId: rawAiAgentId,
+      emoji: rawEmoji,
     );
   }
 

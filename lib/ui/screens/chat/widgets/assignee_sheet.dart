@@ -4,13 +4,15 @@ import '../../../widgets/avatar_widget.dart';
 
 class AssigneeSheet extends StatefulWidget {
   final List<User> agents;
+  final List<User>? aiAgents;
   final User? currentAssignee;
   final bool isStatusBot;
-  final Function(int? agentId, {bool isAi}) onSelect;
+  final Function(int? agentId, {bool isAi, String? assigneeType}) onSelect;
 
   const AssigneeSheet({
     super.key,
     required this.agents,
+    this.aiAgents,
     this.currentAssignee,
     this.isStatusBot = false,
     required this.onSelect,
@@ -41,25 +43,38 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
     final textPrimary = isDark ? const Color(0xFFEDEEF0) : const Color(0xFF282E34);
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F);
 
-    // AI Agents list - Virtual AI Bot
-    final List<Map<String, dynamic>> aiAgents = [
-      {
-        'id': -1,
-        'name': 'Sales agent',
-        'emoji': '🤠',
-        'role': isArabic ? 'مساعد المبيعات الذكي' : 'AI Sales Assistant',
-      },
-    ];
+    // Separate real AI Agents (AgentBot) and Human Agents
+    final List<User> realAiAgents = [];
+    if (widget.aiAgents != null && widget.aiAgents!.isNotEmpty) {
+      realAiAgents.addAll(widget.aiAgents!);
+    } else {
+      realAiAgents.addAll(widget.agents.where((a) => a.isBot || a.assigneeType == 'AgentBot'));
+    }
 
-    final filteredAiAgents = aiAgents.where((ai) {
+    if (realAiAgents.isEmpty) {
+      // Fallback AI Sales Assistant
+      realAiAgents.add(
+        User(
+          id: -1,
+          name: 'Sales agent',
+          email: 'ai@messagepro.com',
+          accountId: 0,
+          emoji: '🤠',
+          assigneeType: 'AgentBot',
+          displayName: isArabic ? 'مساعد المبيعات الذكي' : 'AI Sales Assistant',
+        ),
+      );
+    }
+
+    final filteredAiAgents = realAiAgents.where((ai) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
-      final name = (ai['name'] as String).toLowerCase();
-      return name.contains(q);
+      return ai.name.toLowerCase().contains(q) || (ai.displayName?.toLowerCase().contains(q) ?? false);
     }).toList();
 
-    // ALL workspace agents are team members
+    // Human workspace agents (excluding bots)
     final filteredAgents = widget.agents.where((a) {
+      if (a.isBot || a.assigneeType == 'AgentBot') return false;
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return a.name.toLowerCase().contains(q) || a.email.toLowerCase().contains(q);
@@ -206,7 +221,18 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       ),
                     ),
                     ...filteredAiAgents.map((ai) {
-                      final isSelected = widget.isStatusBot;
+                      final isSelected = (widget.currentAssignee != null &&
+                              (widget.currentAssignee!.id == ai.id ||
+                               widget.currentAssignee!.name.toLowerCase() == ai.name.toLowerCase())) ||
+                          (widget.isStatusBot && widget.currentAssignee == null);
+
+                      final emojiStr = ai.emoji ??
+                          (ai.name.trim().characters.firstOrNull != null &&
+                                  ai.name.trim().characters.first.runes.first > 255
+                              ? ai.name.trim().characters.first
+                              : '🤖');
+                      final roleStr = ai.displayName ??
+                          (isArabic ? 'وكيل ذكاء اصطناعي' : 'AI Agent');
 
                       return ListTile(
                         dense: true,
@@ -220,10 +246,10 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             border: Border.all(color: const Color(0xFF5850EC).withValues(alpha: 0.2)),
                           ),
                           alignment: Alignment.center,
-                          child: Text(ai['emoji'], style: const TextStyle(fontSize: 18)),
+                          child: Text(emojiStr, style: const TextStyle(fontSize: 18)),
                         ),
                         title: Text(
-                          ai['name'],
+                          ai.name,
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
@@ -232,7 +258,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           ),
                         ),
                         subtitle: Text(
-                          ai['role'],
+                          roleStr,
                           style: TextStyle(
                             fontSize: 11,
                             color: textSecondary,
@@ -244,7 +270,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             : null,
                         onTap: () {
                           Navigator.pop(context);
-                          widget.onSelect(null, isAi: true);
+                          widget.onSelect(ai.id > 0 ? ai.id : null, isAi: true, assigneeType: 'AgentBot');
                         },
                       );
                     }),
@@ -360,7 +386,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             : null,
                         onTap: () {
                           Navigator.pop(context);
-                          widget.onSelect(agent.id, isAi: false);
+                          widget.onSelect(agent.id, isAi: false, assigneeType: 'User');
                         },
                       );
                     }),

@@ -108,17 +108,22 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildActivityBubble(bool isDark) {
-    final text = message.content ?? '';
+    final rawText = message.content ?? '';
+    final text = rawText
+        .replaceAll(RegExp(r'</?(b|strong|p|span)[^>]*>', caseSensitive: false), '')
+        .replaceAll('*', '')
+        .trim();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 16),
       child: Center(
         child: Text(
           text,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 11.5,
-            height: 1.35,
+            fontSize: 10,
+            fontWeight: FontWeight.normal,
+            height: 1.25,
             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             fontFamily: 'Gontserrat',
           ),

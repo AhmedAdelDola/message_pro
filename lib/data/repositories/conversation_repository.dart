@@ -78,6 +78,7 @@ abstract class IConversationRepository {
   Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages();
   Future<Either<Failure, List<Team>>> fetchTeams();
   Future<Either<Failure, List<User>>> fetchAgents();
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId});
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses();
 }
 
@@ -1234,6 +1235,35 @@ class ConversationRepository implements IConversationRepository {
           .toList());
     } catch (_) {
       return const Right([]);
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId}) async {
+    try {
+      final query = <String, dynamic>{};
+      if (inboxId != null && inboxId > 0) {
+        query['inbox_ids[]'] = inboxId;
+      }
+      final response = await _api.get('assignable_agents', queryParameters: query.isNotEmpty ? query : null);
+      final data = response.data;
+      final List listData;
+      if (data is List) {
+        listData = data;
+      } else if (data is Map && data['payload'] is List) {
+        listData = data['payload'];
+      } else if (data is Map && data['data'] is List) {
+        listData = data['data'];
+      } else {
+        listData = [];
+      }
+      final agents = listData
+          .whereType<Map>()
+          .map((item) => User.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+      return Right(agents);
+    } catch (_) {
+      return fetchAgents();
     }
   }
 

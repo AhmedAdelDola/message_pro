@@ -84,6 +84,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   int? _lastMessageId;
   bool _initialScrolled = false;
   double? _maxScrollBeforeLoad;
+  double? _pixelsBeforeLoad;
   late Contact _contact;
 
   @override
@@ -99,8 +100,12 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels <= 120) {
-      _maxScrollBeforeLoad ??= _scrollController.position.maxScrollExtent;
-      context.read<ChatCubit>().loadPreviousMessages();
+      final chatState = context.read<ChatCubit>().state;
+      if (!chatState.isLoadingOlder && chatState.hasMoreMessages) {
+        _maxScrollBeforeLoad = _scrollController.position.maxScrollExtent;
+        _pixelsBeforeLoad = _scrollController.position.pixels;
+        context.read<ChatCubit>().loadPreviousMessages();
+      }
     }
   }
 
@@ -203,7 +208,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     });
 
     try {
-      await chatCubit.assignAgent(currentUserId);
+      await chatCubit.assignAgent(currentUserId, assigneeType: 'User');
       if (_status.toLowerCase() == 'bot') {
         await chatCubit.toggleStatus('open');
         _status = 'open';
@@ -432,7 +437,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   void _showAssigneeSheet() {
     final agents = context.read<ConversationCubit>().state.agents;
     final activeAssignee = _currentAssignee ?? widget.conversation.assignee;
-    final isStatusBot = _status.toLowerCase() == 'bot';
+    final isStatusBot = _status.toLowerCase() == 'bot' || (activeAssignee?.isBot ?? false);
 
     showModalBottomSheet(
       context: context,
@@ -445,47 +450,38 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
           agents: agents,
           currentAssignee: activeAssignee,
           isStatusBot: isStatusBot,
-          onSelect: (agentId, {bool isAi = false}) async {
+          onSelect: (agentId, {bool isAi = false, String? assigneeType}) async {
             final chatCubit = context.read<ChatCubit>();
             final convCubit = context.read<ConversationCubit>();
 
             if (isAi) {
-              // 1. Unassign human agent from server
-              await chatCubit.assignAgent(null);
-
-              // 2. Set conversation status to 'bot' on server so the AI responds!
-              await chatCubit.toggleStatus('bot');
-
-              // 3. Reload conversations to update inboxes and listings
+              await chatCubit.assignAgent(agentId, assigneeType: 'AgentBot');
               convCubit.loadConversations();
 
               if (mounted) {
+                final selectedBot = agents.where((a) => a.id == agentId).firstOrNull;
                 setState(() {
                   _isTakenOver = false;
-                  _status = 'bot';
-                  _currentAssignee = User(
-                    id: -1,
-                    name: 'Sales agent',
-                    email: 'ai@messagepro.com',
-                    accountId: widget.conversation.accountId,
-                  );
+                  _currentAssignee = selectedBot ??
+                      User(
+                        id: agentId ?? -1,
+                        name: 'Sales agent',
+                        email: 'ai@messagepro.com',
+                        accountId: widget.conversation.accountId,
+                        assigneeType: 'AgentBot',
+                        emoji: '🤠',
+                      );
                 });
               }
             } else {
               // Human agent or Unassigned
-              await chatCubit.assignAgent(agentId);
-
-              // If conversation was 'bot', transition to 'open'
-              if (_status == 'bot') {
-                await chatCubit.toggleStatus('open');
-              }
+              await chatCubit.assignAgent(agentId, assigneeType: agentId != null ? 'User' : null);
 
               convCubit.loadConversations();
 
               if (mounted) {
                 setState(() {
                   _isTakenOver = true;
-                  if (_status == 'bot') _status = 'open';
                   if (agentId == null) {
                     _currentAssignee = null;
                   } else {
@@ -589,16 +585,22 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
         if (state.isLoadingOlder && _maxScrollBeforeLoad == null && _scrollController.hasClients) {
           _maxScrollBeforeLoad = _scrollController.position.maxScrollExtent;
+          _pixelsBeforeLoad = _scrollController.position.pixels;
         }
 
         if (_maxScrollBeforeLoad != null && !state.isLoadingOlder) {
+          final oldMax = _maxScrollBeforeLoad!;
+          final oldPixels = _pixelsBeforeLoad ?? _scrollController.position.pixels;
+          _maxScrollBeforeLoad = null;
+          _pixelsBeforeLoad = null;
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients && _maxScrollBeforeLoad != null) {
-              final diff = _scrollController.position.maxScrollExtent - _maxScrollBeforeLoad!;
+            if (_scrollController.hasClients) {
+              final newMax = _scrollController.position.maxScrollExtent;
+              final diff = newMax - oldMax;
               if (diff > 0) {
-                _scrollController.jumpTo(_scrollController.position.pixels + diff);
+                _scrollController.jumpTo(oldPixels + diff);
               }
-              _maxScrollBeforeLoad = null;
             }
           });
         }
@@ -608,7 +610,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
           backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF3F4F6),
           appBar: AppBar(
             bottom: AppBarProgressBar(
-              isLoading: chatState.isLoading,
+              isLoading: chatState.isLoading || chatState.isLoadingOlder,
             ),
             titleSpacing: 0,
             title: InkWell(
@@ -641,49 +643,11 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                contact.name,
-                                style: TextStyle(fontSize: 14.5.sp, fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Builder(
-                              builder: (context) {
-                                final stage = widget.conversation.effectiveLifecycleStage ?? _contact.lifecycleStage;
-                                if (stage == null) return const SizedBox.shrink();
-                                final stageName = stage.name;
-                                final stageEmoji = stage.icon ?? LifecycleStage.getEmojiForStage(stageName);
-                                return Container(
-                                  margin: EdgeInsets.only(left: 6.w, right: 6.w),
-                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF2B2E35) : const Color(0xFFE5E7EB),
-                                    borderRadius: BorderRadius.circular(6.r),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(stageEmoji, style: TextStyle(fontSize: 10.sp)),
-                                      SizedBox(width: 3.w),
-                                      Text(
-                                        stageName,
-                                        style: TextStyle(
-                                          fontSize: 10.5.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark ? Colors.white : const Color(0xFF374151),
-                                          fontFamily: 'Gontserrat',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                        Text(
+                          contact.name,
+                          style: TextStyle(fontSize: 14.5.sp, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: 1.h),
                         if (_status == 'snoozed')
@@ -1119,8 +1083,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                             idx++;
                           }
 
-                          final hasTopLoader = chatState.isLoadingOlder;
-                          final totalCount = listItems.length + (hasTopLoader ? 1 : 0);
+                          final totalCount = listItems.length;
 
                           return RefreshIndicator(
                             onRefresh: () async {
@@ -1131,39 +1094,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                               padding: EdgeInsets.symmetric(vertical: 12.h),
                               itemCount: totalCount,
                               itemBuilder: (context, index) {
-                                if (hasTopLoader && index == 0) {
-                                  return Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 10.h),
-                                    child: Center(
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF282C35) : Colors.white,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.08),
-                                              blurRadius: 6,
-                                            ),
-                                          ],
-                                        ),
-                                        child: const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Color(0xFF4162E3),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-
-                                final actualIndex = hasTopLoader ? index - 1 : index;
-                                final item = listItems[actualIndex];
-                                final prevItem = actualIndex > 0 ? listItems[actualIndex - 1] : null;
-                                final showDateHeader = actualIndex == 0 ||
+                                final item = listItems[index];
+                                final prevItem = index > 0 ? listItems[index - 1] : null;
+                                final showDateHeader = index == 0 ||
                                     prevItem?.createdAt.day != item.createdAt.day ||
                                     prevItem?.createdAt.month != item.createdAt.month;
 

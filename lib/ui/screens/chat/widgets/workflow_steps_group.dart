@@ -37,16 +37,25 @@ class _WorkflowStepsGroupWidgetState extends State<WorkflowStepsGroupWidget> {
     }
   }
 
+  String _cleanText(String text) {
+    return text
+        .replaceAll(RegExp(r'</?(b|strong|p|span)[^>]*>', caseSensitive: false), '')
+        .replaceAll('*', '')
+        .trim();
+  }
+
   Widget _buildOriginalStep(String text, bool isDark) {
+    final clean = _cleanText(text);
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 2.5.h, horizontal: 20.w),
+      padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 16.w),
       child: Center(
         child: Text(
-          text,
+          clean,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 11.5.sp,
-            height: 1.35,
+            fontSize: 10.sp,
+            fontWeight: FontWeight.normal,
+            height: 1.25,
             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             fontFamily: 'Gontserrat',
           ),
@@ -103,19 +112,19 @@ class _WorkflowStepsGroupWidgetState extends State<WorkflowStepsGroupWidget> {
                   });
                 },
                 style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 3.h),
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   foregroundColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
                 ),
-                icon: Icon(Icons.expand_more_rounded, size: 16.r),
+                icon: Icon(Icons.expand_more_rounded, size: 15.r),
                 label: Text(
                   isArabic
                       ? 'عرض باقي الخطوات (${count - 2})'
                       : 'Show remaining steps (${count - 2})',
                   style: TextStyle(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 10.5.sp,
+                    fontWeight: FontWeight.normal,
                     fontFamily: 'Gontserrat',
                   ),
                 ),
