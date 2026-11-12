@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 
 class CannedResponsesSheet extends StatelessWidget {
   final List<Map<String, String>> responses;
   final Function(String content) onSelect;
+  final void Function(String content, String? imageUrl)? onSelectResponse;
 
   const CannedResponsesSheet({
     super.key,
     required this.responses,
     required this.onSelect,
+    this.onSelectResponse,
   });
 
   @override
@@ -54,6 +57,8 @@ class CannedResponsesSheet extends StatelessWidget {
                   final item = responses[index];
                   final code = item['short_code'] ?? '';
                   final content = item['content'] ?? '';
+                  final imageUrl = item['image_url'];
+                  final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
                   return ListTile(
                     leading: Container(
@@ -77,9 +82,31 @@ class CannedResponsesSheet extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 14.sp),
                     ),
+                    trailing: hasImage
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(6.r),
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              width: 44.r,
+                              height: 44.r,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                width: 44.r,
+                                height: 44.r,
+                                color: Colors.grey.withValues(alpha: 0.2),
+                                child: const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5))),
+                              ),
+                              errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, size: 20),
+                            ),
+                          )
+                        : null,
                     onTap: () {
                       Navigator.pop(context);
-                      onSelect(content);
+                      if (onSelectResponse != null) {
+                        onSelectResponse!(content, imageUrl);
+                      } else {
+                        onSelect(content);
+                      }
                     },
                   );
                 },

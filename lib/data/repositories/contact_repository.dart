@@ -18,7 +18,18 @@ abstract class IContactRepository {
     required String name,
     String? email,
     String? phoneNumber,
+    Map<String, dynamic>? customAttributes,
   });
+  Future<Either<Failure, Contact>> updateContact(
+    int id, {
+    String? name,
+    String? email,
+    String? phoneNumber,
+    Map<String, dynamic>? customAttributes,
+  });
+  Future<Either<Failure, List<String>>> getContactLabels(int contactId);
+  Future<Either<Failure, List<String>>> updateContactLabels(int contactId, List<String> labels);
+  Future<Either<Failure, Contact>> updateContactLifecycle(int contactId, String stage);
 }
 
 class ContactRepository implements IContactRepository {
@@ -113,23 +124,101 @@ class ContactRepository implements IContactRepository {
     required String name,
     String? email,
     String? phoneNumber,
+    Map<String, dynamic>? customAttributes,
   }) async {
     try {
+      final postData = <String, dynamic>{
+        'name': name,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (phoneNumber != null && phoneNumber.isNotEmpty) 'phone_number': phoneNumber,
+        if (customAttributes != null && customAttributes.isNotEmpty) 'custom_attributes': customAttributes,
+      };
+
       final response = await _api.post(
         'contacts',
-        data: {
-          'name': name,
-          'email': email,
-          'phone_number': phoneNumber,
-        },
+        data: postData,
       );
       final data = response.data;
-      final payload = data is Map && data['payload'] != null ? data['payload'] : data;
-      return Right(Contact.fromJson(payload as Map<String, dynamic>));
+      final payload = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null ? data['data'] : data);
+      final contactData = payload is Map && payload['contact'] != null ? payload['contact'] : payload;
+      return Right(Contact.fromJson(contactData as Map<String, dynamic>));
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل إنشاء جهة الاتصال'));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
+  }
+
+  @override
+  Future<Either<Failure, Contact>> updateContact(
+    int id, {
+    String? name,
+    String? email,
+    String? phoneNumber,
+    Map<String, dynamic>? customAttributes,
+  }) async {
+    try {
+      final patchData = <String, dynamic>{};
+      if (name != null) patchData['name'] = name;
+      if (email != null) patchData['email'] = email;
+      if (phoneNumber != null) patchData['phone_number'] = phoneNumber;
+      if (customAttributes != null) patchData['custom_attributes'] = customAttributes;
+
+      final response = await _api.patch(
+        'contacts/$id',
+        data: patchData,
+      );
+      final data = response.data;
+      final payload = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null ? data['data'] : data);
+      final contactData = payload is Map && payload['contact'] != null ? payload['contact'] : payload;
+      return Right(Contact.fromJson(contactData as Map<String, dynamic>));
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل تعديل جهة الاتصال'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<String>>> getContactLabels(int contactId) async {
+    try {
+      final response = await _api.get('contacts/$contactId/labels');
+      final data = response.data;
+      final list = data is Map && data['payload'] is List
+          ? data['payload'] as List
+          : (data is List ? data : []);
+      return Right(list.map((e) => e is Map ? (e['title'] ?? e['name'] ?? '').toString() : e.toString()).where((e) => e.isNotEmpty).toList());
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<String>>> updateContactLabels(int contactId, List<String> labels) async {
+    try {
+      final response = await _api.post(
+        'contacts/$contactId/labels',
+        data: {'labels': labels},
+      );
+      final data = response.data;
+      final list = data is Map && data['payload'] is List
+          ? data['payload'] as List
+          : (data is List ? data : []);
+      return Right(list.map((e) => e is Map ? (e['title'] ?? e['name'] ?? '').toString() : e.toString()).where((e) => e.isNotEmpty).toList());
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Contact>> updateContactLifecycle(int contactId, String stage) async {
+    return updateContact(
+      contactId,
+      customAttributes: {'lifecycle_stage': stage, 'lead_status': stage},
+    );
   }
 }

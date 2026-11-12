@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
+import '../../core/config/app_config.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage_service.dart';
@@ -1182,15 +1183,39 @@ class ConversationRepository implements IConversationRepository {
       final response = await _api.get('canned_responses');
       final data = response.data;
       List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-      return Right(list.map<Map<String, String>>((c) => {
-        'short_code': c['short_code']?.toString() ?? '',
-        'content': c['content']?.toString() ?? '',
+      return Right(list.map<Map<String, String>>((c) {
+        String mediaUrl = '';
+        if (c['attachments'] is List && (c['attachments'] as List).isNotEmpty) {
+          final first = c['attachments'][0];
+          if (first is Map) {
+            mediaUrl = (first['data_url'] ?? first['thumb_url'] ?? first['file_url'] ?? first['url'])?.toString() ?? '';
+          } else if (first is String) {
+            mediaUrl = first;
+          }
+        } else if (c['files'] is List && (c['files'] as List).isNotEmpty) {
+          final first = c['files'][0];
+          mediaUrl = first is Map ? (first['file_url'] ?? first['url'])?.toString() ?? '' : first.toString();
+        } else if (c['image_url'] != null && c['image_url'].toString().isNotEmpty) {
+          mediaUrl = c['image_url'].toString();
+        } else if (c['media_url'] != null && c['media_url'].toString().isNotEmpty) {
+          mediaUrl = c['media_url'].toString();
+        }
+
+        if (mediaUrl.isNotEmpty && mediaUrl.startsWith('/')) {
+          mediaUrl = '${AppConfig.defaultBaseUrl}$mediaUrl';
+        }
+
+        return {
+          'short_code': c['short_code']?.toString() ?? '',
+          'content': c['content']?.toString() ?? '',
+          'image_url': mediaUrl,
+        };
       }).toList());
     } catch (_) {
       return const Right([
-        {'short_code': 'hello', 'content': 'أهلاً بك! كيف يمكنني مساعدتك اليوم؟'},
-        {'short_code': 'thanks', 'content': 'شكراً لتواصلك مع Message Pro!'},
-        {'short_code': 'wait', 'content': 'يرجى الانتظار لحظات للتحقق من طلبك.'},
+        {'short_code': 'hello', 'content': 'أهلاً بك! كيف يمكنني مساعدتك اليوم؟', 'image_url': ''},
+        {'short_code': 'thanks', 'content': 'شكراً لتواصلك مع Message Pro!', 'image_url': ''},
+        {'short_code': 'wait', 'content': 'يرجى الانتظار لحظات للتحقق من طلبك.', 'image_url': ''},
       ]);
     }
   }

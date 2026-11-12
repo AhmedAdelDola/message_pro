@@ -150,6 +150,17 @@ class FakeConversationRepository implements IConversationRepository {
     required String sourceId,
     String? message,
   }) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber}) async => const Right([]);
+
+  @override
+  Future<Either<Failure, Conversation>> startDirectChat({
+    required int inboxId,
+    required String phoneNumber,
+    required String sourceId,
+    String? contactName,
+  }) async => throw UnimplementedError();
 }
 
 Conversation makeFakeConversation(int id) {

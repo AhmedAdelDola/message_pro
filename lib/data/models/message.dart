@@ -30,6 +30,38 @@ class MessageAttachment {
   }
 }
 
+class MessageReferral {
+  final String? headline;
+  final String? body;
+  final String? sourceType;
+  final String? sourceUrl;
+  final String? sourceId;
+  final String? imageUrl;
+  final String? videoUrl;
+
+  MessageReferral({
+    this.headline,
+    this.body,
+    this.sourceType,
+    this.sourceUrl,
+    this.sourceId,
+    this.imageUrl,
+    this.videoUrl,
+  });
+
+  factory MessageReferral.fromJson(Map<String, dynamic> json) {
+    return MessageReferral(
+      headline: json['headline']?.toString(),
+      body: json['body']?.toString(),
+      sourceType: json['source_type']?.toString(),
+      sourceUrl: json['source_url']?.toString(),
+      sourceId: json['source_id']?.toString(),
+      imageUrl: (json['image_url'] ?? json['thumbnail_url'] ?? json['media_url'])?.toString(),
+      videoUrl: json['video_url']?.toString(),
+    );
+  }
+}
+
 class Message {
   final int id;
   final String? content;
@@ -45,6 +77,7 @@ class Message {
   final List<MessageAttachment> attachments;
   final Map<String, dynamic> contentAttributes;
   final Map<String, dynamic> additionalAttributes;
+  final MessageReferral? referral;
 
   Message({
     required this.id,
@@ -61,6 +94,7 @@ class Message {
     this.attachments = const [],
     this.contentAttributes = const {},
     this.additionalAttributes = const {},
+    this.referral,
   });
 
   Message copyWith({
@@ -78,6 +112,7 @@ class Message {
     List<MessageAttachment>? attachments,
     Map<String, dynamic>? contentAttributes,
     Map<String, dynamic>? additionalAttributes,
+    MessageReferral? referral,
   }) {
     return Message(
       id: id ?? this.id,
@@ -94,6 +129,7 @@ class Message {
       attachments: attachments ?? this.attachments,
       contentAttributes: contentAttributes ?? this.contentAttributes,
       additionalAttributes: additionalAttributes ?? this.additionalAttributes,
+      referral: referral ?? this.referral,
     );
   }
 
@@ -258,6 +294,12 @@ class Message {
       parsedStatus = 'read';
     }
 
+    MessageReferral? ref;
+    final rawRef = cAttr['referral'] ?? aAttr['referral'] ?? json['referral'];
+    if (rawRef is Map) {
+      ref = MessageReferral.fromJson(Map<String, dynamic>.from(rawRef));
+    }
+
     return Message(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
       content: json['content']?.toString(),
@@ -277,6 +319,7 @@ class Message {
       attachments: attList,
       contentAttributes: cAttr,
       additionalAttributes: aAttr,
+      referral: ref,
     );
   }
 }

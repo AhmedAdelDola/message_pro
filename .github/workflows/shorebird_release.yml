@@ -96,9 +96,51 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           PP_PATH=$RUNNER_TEMP/profile.mobileprovision
           echo "$BUILD_PROVISION_PROFILE_BASE64" | tr -d '\r\n ' | base64 --decode > "$PP_PATH"
-          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i "$PP_PATH" 2>/dev/null) 2>/dev/null || echo "profile")
-          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "Provisioning profile installed ($UUID.mobileprovision)."
+
+          python3 -c '
+          import os, subprocess, plistlib, hashlib, shutil
+
+          pp_path = os.environ.get("PP_PATH")
+          dest_dir = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
+          os.makedirs(dest_dir, exist_ok=True)
+
+          try:
+              out = subprocess.check_output(["security", "cms", "-D", "-i", pp_path], stderr=subprocess.DEVNULL)
+              profile = plistlib.loads(out)
+          except Exception as e:
+              print(f"Error parsing provisioning profile: {e}")
+              profile = {}
+
+          uuid = profile.get("UUID", "profile")
+          name = profile.get("Name", "Unknown Profile")
+          certs = profile.get("DeveloperCertificates", [])
+          profile_sha1s = [hashlib.sha1(c).hexdigest().upper() for c in certs]
+
+          try:
+              keychain_identities = subprocess.check_output(["security", "find-identity", "-p", "codesigning", "-v"]).decode("utf-8", "ignore")
+          except Exception:
+              keychain_identities = ""
+
+          print(f"Provisioning Profile Name: {name}")
+          print(f"Provisioning Profile UUID: {uuid}")
+          print(f"Number of certificates in profile: {len(certs)}")
+          print(f"Keychain identities:\n{keychain_identities.strip()}")
+
+          # Check if any certificate in the profile matches one in the keychain
+          matches = [s for s in profile_sha1s if s in keychain_identities.upper()]
+          if matches or not keychain_identities.strip():
+              target = os.path.join(dest_dir, f"{uuid}.mobileprovision")
+              shutil.copyfile(pp_path, target)
+              print(f"Provisioning profile installed successfully to {target}")
+          else:
+              print("=" * 60)
+              print("⚠️ WARNING: Provisioning profile does NOT include the signing certificate installed in the keychain!")
+              print(f"Profile SHA1s: {profile_sha1s}")
+              print("Skipping local installation of this conflicting profile so Xcode (-allowProvisioningUpdates)")
+              print("can automatically download/generate the matching profile directly from App Store Connect.")
+              print("NOTE: If export fails, open developer.apple.com -> Profiles -> Edit this profile -> Check the 'Apple Distribution' certificate -> Save and download the updated profile.")
+              print("=" * 60)
+          '
 
       - name: Setup App Store Connect API Key
         if: env.HAVE_ASC_KEY == 'true'

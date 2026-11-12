@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection_container.dart';
 import '../../../data/repositories/contact_repository.dart';
+import '../../widgets/country_code_picker.dart';
 
 class AddContactScreen extends StatefulWidget {
   const AddContactScreen({super.key});
@@ -17,7 +18,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  final String _selectedCountryCode = 'EG';
+  CountryInfo _selectedCountry = getCountryByCode('EG');
   String? _selectedLifecycle;
   String? _selectedCollaborator;
   String? _selectedTag;
@@ -58,18 +59,23 @@ class _AddContactScreenState extends State<AddContactScreen> {
 
     String? phone = _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null;
     if (phone != null) {
-      // Normalize Egyptian/local numbers for WhatsApp international format
-      if (phone.startsWith('01') && phone.length == 11) {
-        phone = '+2$phone';
-      } else if (phone.startsWith('201') && phone.length == 12) {
-        phone = '+$phone';
-      }
+      phone = normalizePhoneNumber(phone, _selectedCountry);
+    }
+
+    final customAttrs = <String, dynamic>{};
+    if (_selectedLifecycle != null && _selectedLifecycle!.isNotEmpty) {
+      customAttrs['lifecycle_stage'] = _selectedLifecycle;
+      customAttrs['lead_status'] = _selectedLifecycle;
+    }
+    if (_selectedTag != null && _selectedTag!.isNotEmpty) {
+      customAttrs['tag'] = _selectedTag;
     }
 
     final result = await sl<IContactRepository>().createContact(
       name: fullName,
       email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
       phoneNumber: phone,
+      customAttributes: customAttrs.isNotEmpty ? customAttrs : null,
     );
 
     if (!mounted) return;
@@ -229,26 +235,40 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border(right: BorderSide(color: borderColor, width: 1)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _selectedCountryCode,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                              fontFamily: 'Gontserrat',
+                    InkWell(
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                      onTap: () async {
+                        final picked = await showCountryPickerModal(context);
+                        if (picked != null) {
+                          setState(() => _selectedCountry = picked);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border(right: BorderSide(color: borderColor, width: 1)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _selectedCountry.flag,
+                              style: const TextStyle(fontSize: 16),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: textSecondary),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              _selectedCountry.dialCode,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: textPrimary,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: textSecondary),
+                          ],
+                        ),
                       ),
                     ),
                     Expanded(
@@ -257,7 +277,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                         keyboardType: TextInputType.phone,
                         style: TextStyle(color: textPrimary, fontSize: 14, fontFamily: 'Gontserrat'),
                         decoration: InputDecoration(
-                          hintText: 'Add Phone Number',
+                          hintText: 'Add Phone Number (or +966...)',
                           hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

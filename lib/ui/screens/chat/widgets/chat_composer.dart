@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:dio/dio.dart';
 import '../../../../data/models/message_template_registry.dart';
 import 'send_template_modal.dart';
 
@@ -67,6 +68,31 @@ class ChatComposerState extends State<ChatComposer> {
       TextPosition(offset: _controller.text.length),
     );
     setState(() {});
+  }
+
+  Future<void> insertSnippet({required String text, String? imageUrl}) async {
+    insertText(text);
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final ext = imageUrl.split('?').first.split('.').last;
+        final validExt = (ext.length <= 4 && ext.isNotEmpty) ? ext : 'png';
+        final fileName = 'snippet_${DateTime.now().millisecondsSinceEpoch}.$validExt';
+        final file = File('${tempDir.path}/$fileName');
+        final response = await Dio().get<List<int>>(
+          imageUrl,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        if (response.data != null) {
+          await file.writeAsBytes(response.data!);
+          if (mounted) {
+            setState(() => _attachedPaths.add(file.path));
+          }
+        }
+      } catch (e) {
+        debugPrint('Error downloading snippet image: $e');
+      }
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {

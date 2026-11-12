@@ -194,6 +194,17 @@ class FakeConversationRepository implements IConversationRepository {
     required String sourceId,
     String? message,
   }) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber}) async => const Right([]);
+
+  @override
+  Future<Either<Failure, Conversation>> startDirectChat({
+    required int inboxId,
+    required String phoneNumber,
+    required String sourceId,
+    String? contactName,
+  }) async => throw UnimplementedError();
 }
 
 class FakeAuthRepository implements IAuthRepository {
@@ -226,7 +237,7 @@ class FakeAuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateAvailability(String status) async {
+  Future<Either<Failure, void>> updateAvailability({int? accountId, int? breakDurationMinutes, required String status}) async {
     if (shouldFailAvailability) {
       return const Left(ServerFailure('Failed to update availability'));
     }

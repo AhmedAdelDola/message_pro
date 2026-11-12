@@ -327,6 +327,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
           onSelect: (content) {
             _composerKey.currentState?.insertText(content);
           },
+          onSelectResponse: (content, imageUrl) {
+            _composerKey.currentState?.insertSnippet(text: content, imageUrl: imageUrl);
+          },
         );
       },
     );

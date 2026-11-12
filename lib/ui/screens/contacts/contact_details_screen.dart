@@ -6,11 +6,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection_container.dart';
 import '../../../data/models/contact.dart';
+import '../../../data/repositories/contact_repository.dart';
 import '../../../data/repositories/conversation_repository.dart';
 import '../../../logic/conversation/conversation_cubit.dart';
 import '../../../logic/conversation/conversation_state.dart';
 import '../../widgets/avatar_widget.dart';
 import '../chat/chat_screen.dart';
+import 'edit_contact_screen.dart';
 
 class ContactDetailsScreen extends StatefulWidget {
   final Contact contact;
@@ -24,7 +26,11 @@ class ContactDetailsScreen extends StatefulWidget {
 class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  String _lifecycleStage = 'Engaged Lead';
+  late Contact _contact;
+  late String _lifecycleStage;
+  List<String> _contactLabels = [];
+  bool _isLoadingLabels = false;
+
   final TextEditingController _noteController = TextEditingController();
   final List<Map<String, dynamic>> _notes = [];
 
@@ -48,12 +54,65 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _contact = widget.contact;
+
+    final stageFromAttrs = _contact.customAttributes['lifecycle_stage'] ??
+        _contact.customAttributes['lead_status'] ??
+        _contact.customAttributes['stage'];
+    _lifecycleStage = (stageFromAttrs != null && stageFromAttrs.toString().isNotEmpty)
+        ? stageFromAttrs.toString()
+        : 'New Lead';
+
+    _loadContactLabels();
+
     // Add sample initial note for realism if none
     _notes.add({
       'content': 'تم تسجيل العميل بنجاح في النظام ومتابعة متطلباته.',
       'author': 'فريق العمل',
       'createdAt': DateTime.now().subtract(const Duration(hours: 3)),
     });
+  }
+
+  Future<void> _loadContactLabels() async {
+    setState(() => _isLoadingLabels = true);
+    final res = await sl<IContactRepository>().getContactLabels(_contact.id);
+    if (!mounted) return;
+    res.fold(
+      (_) => setState(() => _isLoadingLabels = false),
+      (labels) => setState(() {
+        _contactLabels = labels;
+        _isLoadingLabels = false;
+      }),
+    );
+  }
+
+  Future<void> _updateLifecycleStage(String stage) async {
+    final old = _lifecycleStage;
+    setState(() => _lifecycleStage = stage);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final res = await sl<IContactRepository>().updateContactLifecycle(_contact.id, stage);
+    if (!mounted) return;
+    res.fold(
+      (failure) {
+        setState(() => _lifecycleStage = old);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(failure.message), backgroundColor: Colors.redAccent),
+        );
+      },
+      (updated) {
+        setState(() => _contact = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic ? 'تم تحديث مرحلة العميل إلى: $stage' : 'Lifecycle stage updated to: $stage',
+            ),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -96,7 +155,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
       final repo = sl<IConversationRepository>();
       List<Map<String, dynamic>> inboxes = [];
 
-      final phone = widget.contact.phoneNumber?.trim();
+      final phone = _contact.phoneNumber?.trim();
       if (phone != null && phone.isNotEmpty) {
         final phoneDestRes = await repo.getPhoneDestinations(phoneNumber: phone);
         phoneDestRes.fold((_) {}, (destList) {
@@ -133,7 +192,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
 
       // Also check contactable inboxes for existing non-phone channels (Facebook, Instagram, Email, WebWidget)
       if (inboxes.isEmpty) {
-        final inboxesResult = await repo.getContactableInboxes(widget.contact.id);
+        final inboxesResult = await repo.getContactableInboxes(_contact.id);
         inboxesResult.fold((_) {}, (list) {
           for (final item in list) {
             final inbMap = item['inbox'] is Map ? Map<String, dynamic>.from(item['inbox'] as Map) : null;
@@ -145,7 +204,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
             final matchingInbox = workspaceInboxes.where((wi) => wi.id == inboxId).firstOrNull;
             final name = inbMap?['name']?.toString() ?? matchingInbox?.name ?? 'قناة مراسلة';
             final channelType = inbMap?['channel_type']?.toString() ?? matchingInbox?.channelType ?? '';
-            final sourceId = item['source_id']?.toString() ?? widget.contact.phoneNumber ?? widget.contact.email ?? 'contact_${widget.contact.id}';
+            final sourceId = item['source_id']?.toString() ?? _contact.phoneNumber ?? _contact.email ?? 'contact_${_contact.id}';
 
             if (!inboxes.any((existing) => existing['id'] == inboxId)) {
               inboxes.add({
@@ -168,7 +227,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                 'id': inb.id,
                 'name': inb.name,
                 'channel_type': inb.channelType,
-                'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
+                'source_id': _contact.phoneNumber ?? _contact.email ?? _contact.name,
               });
             }
           }
@@ -181,7 +240,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   'id': inb.id,
                   'name': inb.name,
                   'channel_type': inb.channelType,
-                  'source_id': widget.contact.phoneNumber ?? widget.contact.email ?? widget.contact.name,
+                  'source_id': _contact.phoneNumber ?? _contact.email ?? _contact.name,
                 });
               }
             }
@@ -228,15 +287,15 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     final channel = inbox['channel_type']?.toString().toLowerCase() ?? '';
     final isWhatsApp = channel.contains('whatsapp');
 
-    final sourceId = (isWhatsApp && widget.contact.phoneNumber != null && widget.contact.phoneNumber!.isNotEmpty)
-        ? widget.contact.phoneNumber!
+    final sourceId = (isWhatsApp && _contact.phoneNumber != null && _contact.phoneNumber!.isNotEmpty)
+        ? _contact.phoneNumber!
         : (inbox['source_id']?.toString() ??
-            widget.contact.phoneNumber ??
-            widget.contact.email ??
-            'contact_${widget.contact.id}');
+            _contact.phoneNumber ??
+            _contact.email ??
+            'contact_${_contact.id}');
 
     final result = await repo.startNewConversation(
-      contactId: widget.contact.id,
+      contactId: _contact.id,
       inboxId: inboxId,
       sourceId: sourceId,
     );
@@ -442,8 +501,8 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                       ),
                       trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
                       onTap: () {
-                        setState(() => _lifecycleStage = stage);
                         Navigator.pop(ctx);
+                        _updateLifecycleStage(stage);
                       },
                     );
                   },
@@ -451,6 +510,113 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showLabelsPickerModal() async {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final repo = sl<IConversationRepository>();
+    final labelsResult = await repo.fetchLabels();
+    final allLabels = labelsResult.fold((_) => <Label>[], (list) => list);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
+            final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
+
+            return Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isArabic ? 'إدارة التصنيفات والوسوم' : 'Manage Labels & Tags',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary, fontFamily: 'Gontserrat'),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close_rounded, size: 20, color: textSecondary),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  if (allLabels.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        isArabic ? 'لا توجد تصنيفات مسجلة في النظام' : 'No labels found in workspace',
+                        style: TextStyle(color: textSecondary, fontSize: 13),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: allLabels.length,
+                        itemBuilder: (context, index) {
+                          final lbl = allLabels[index];
+                          final isSelected = _contactLabels.contains(lbl.title);
+                          Color lblColor;
+                          try {
+                            lblColor = Color(int.parse(lbl.color.replaceAll('#', '0xFF')));
+                          } catch (_) {
+                            lblColor = AppColors.primary;
+                          }
+
+                          return ListTile(
+                            leading: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(color: lblColor, shape: BoxShape.circle),
+                            ),
+                            title: Text(
+                              lbl.title,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: textPrimary,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                                : const Icon(Icons.circle_outlined, color: Colors.grey),
+                            onTap: () async {
+                              final updatedList = List<String>.from(_contactLabels);
+                              if (isSelected) {
+                                updatedList.remove(lbl.title);
+                              } else {
+                                updatedList.add(lbl.title);
+                              }
+                              setModalState(() => _contactLabels = updatedList);
+                              setState(() => _contactLabels = updatedList);
+                              await sl<IContactRepository>().updateContactLabels(_contact.id, updatedList);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -481,7 +647,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
 
-    final contact = widget.contact;
+    final contact = _contact;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -502,6 +668,24 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
           ),
         ),
         centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 21),
+            color: AppColors.primary,
+            tooltip: isArabic ? 'تعديل جهة الاتصال' : 'Edit Contact',
+            onPressed: () async {
+              final updated = await Navigator.of(context).push<Contact>(
+                MaterialPageRoute(
+                  builder: (_) => EditContactScreen(contact: _contact),
+                ),
+              );
+              if (updated != null) {
+                setState(() => _contact = updated);
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: borderColor, height: 1),
@@ -701,7 +885,8 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     Color borderColor,
     Color cardBg,
   ) {
-    final contact = widget.contact;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final contact = _contact;
     final phone = contact.phoneNumber;
     final email = contact.email;
     final identifier = contact.identifier;
@@ -758,6 +943,120 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
 
         Divider(color: borderColor, height: 1),
 
+        // Labels & Tags Section
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.label_outline_rounded, size: 16, color: textSecondary),
+                      const SizedBox(width: 6),
+                      Text(
+                        isArabic ? 'التصنيفات والوسوم' : 'Labels & Tags',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                          fontFamily: 'Gontserrat',
+                        ),
+                      ),
+                    ],
+                  ),
+                  InkWell(
+                    onTap: _showLabelsPickerModal,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add_rounded, size: 14, color: AppColors.primaryLight),
+                          const SizedBox(width: 2),
+                          Text(
+                            isArabic ? 'إضافة تصنيف' : 'Add Label',
+                            style: const TextStyle(
+                              color: AppColors.primaryLight,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_isLoadingLabels)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)),
+                )
+              else if (_contactLabels.isEmpty)
+                Text(
+                  isArabic ? 'لا توجد تصنيفات حالياً لهذا العميل' : 'No labels assigned to this contact',
+                  style: TextStyle(fontSize: 12, color: textSecondary.withValues(alpha: 0.7)),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _contactLabels.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE0E7FF),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFC7D2FE),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () async {
+                              final updated = List<String>.from(_contactLabels)..remove(tag);
+                              setState(() => _contactLabels = updated);
+                              await sl<IContactRepository>().updateContactLabels(_contact.id, updated);
+                            },
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 13,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
+        ),
+
+        Divider(color: borderColor, height: 1),
+
         // Contact Fields
         _buildFieldTile(
           label: isArabic ? 'رقم الهاتف' : 'Phone Number',
@@ -795,7 +1094,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     Color borderColor,
     Color cardBg,
   ) {
-    final attributes = widget.contact.customAttributes;
+    final attributes = _contact.customAttributes;
 
     if (attributes.isEmpty) {
       return Center(
@@ -987,9 +1286,9 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     return BlocBuilder<ConversationCubit, ConversationState>(
       builder: (context, state) {
         final contactConversations = state.conversations.where((c) {
-          return c.contact.id == widget.contact.id ||
+          return c.contact.id == _contact.id ||
               (c.contact.phoneNumber != null &&
-                  c.contact.phoneNumber == widget.contact.phoneNumber &&
+                  c.contact.phoneNumber == _contact.phoneNumber &&
                   c.contact.phoneNumber!.isNotEmpty);
         }).toList();
 

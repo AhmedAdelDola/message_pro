@@ -245,6 +245,12 @@ class MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // Ad Referral Card (if message is from a Meta / WhatsApp Click-to-Chat ad)
+                  if (message.referral != null) ...[
+                    _buildAdReferralCard(context, message.referral!, isDark, isArabic),
+                    const SizedBox(height: 6),
+                  ],
+
                   // Attachments
                   if (message.attachments.isNotEmpty) ...[
                     ...message.attachments.map((att) => _buildAttachment(context, att, isOutgoing: true)),
@@ -375,6 +381,12 @@ class MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Ad Referral Card (if message is from a Meta / WhatsApp Click-to-Chat ad)
+                  if (message.referral != null) ...[
+                    _buildAdReferralCard(context, message.referral!, isDark, isArabic),
+                    const SizedBox(height: 6),
+                  ],
+
                   // Attachments
                   if (message.attachments.isNotEmpty) ...[
                     ...message.attachments.map((att) => _buildAttachment(context, att, isOutgoing: false)),
@@ -860,6 +872,128 @@ class MessageBubble extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           _buildOutgoingSenderBadge(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdReferralCard(BuildContext context, MessageReferral referral, bool isDark, bool isArabic) {
+    final adCardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    final headline = referral.headline?.trim() ?? (isArabic ? 'إعلان ممول' : 'Sponsored Ad');
+    final body = referral.body?.trim();
+    final sourceUrl = referral.sourceUrl;
+    final imageUrl = referral.imageUrl;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: adCardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                if (sourceUrl != null && sourceUrl.isNotEmpty) {
+                  launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
+                }
+              },
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                height: 140,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  height: 140,
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1877F2).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.campaign_rounded, size: 14, color: Color(0xFF1877F2)),
+                          const SizedBox(width: 4),
+                          Text(
+                            isArabic ? 'إعلان فيسبوك / واتساب' : 'Meta Ad',
+                            style: const TextStyle(
+                              color: Color(0xFF1877F2),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (sourceUrl != null && sourceUrl.isNotEmpty)
+                      InkWell(
+                        onTap: () => launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication),
+                        child: Row(
+                          children: [
+                            Text(
+                              isArabic ? 'عرض الإعلان' : 'View Ad',
+                              style: const TextStyle(
+                                color: Color(0xFF2563EB),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(Icons.open_in_new_rounded, size: 12, color: Color(0xFF2563EB)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  headline,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    fontFamily: 'Gontserrat',
+                  ),
+                ),
+                if (body != null && body.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    body,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                      fontFamily: 'Gontserrat',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
