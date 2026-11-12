@@ -396,22 +396,36 @@ class Conversation {
         ? Map<String, dynamic>.from(json['additional_attributes'])
         : {};
 
-    MessageReferral? convReferral;
-    dynamic rawConvRef = aAttrs['referral'] ??
-        cAttrs['referral'] ??
-        aAttrs['referral_params'] ??
-        cAttrs['referral_params'] ??
-        aAttrs['ad'] ??
-        cAttrs['ad'] ??
-        json['referral'] ??
-        json['meta']?['referral'] ??
-        json['meta']?['sender']?['referral'];
-
-    if (rawConvRef is String && rawConvRef.trim().startsWith('{')) {
-      try {
-        rawConvRef = jsonDecode(rawConvRef);
-      } catch (_) {}
+    dynamic findReferralMap(dynamic obj) {
+      if (obj == null) return null;
+      if (obj is String && obj.trim().startsWith('{')) {
+        try {
+          final decoded = jsonDecode(obj);
+          final res = findReferralMap(decoded);
+          if (res != null) return res;
+        } catch (_) {}
+      }
+      if (obj is Map) {
+        if (obj['ad_referral'] != null) return findReferralMap(obj['ad_referral']);
+        if (obj['referral'] != null) return findReferralMap(obj['referral']);
+        if (obj['referral_params'] != null) return findReferralMap(obj['referral_params']);
+        if (obj['source_id'] != null || obj['headline'] != null || obj['ctwa_clid'] != null || obj['source_url'] != null) {
+          return obj;
+        }
+        for (final entry in obj.entries) {
+          final res = findReferralMap(entry.value);
+          if (res != null) return res;
+        }
+      }
+      return null;
     }
+
+    MessageReferral? convReferral;
+    final rawConvRef = findReferralMap(aAttrs) ??
+        findReferralMap(cAttrs) ??
+        findReferralMap(json['meta']) ??
+        findReferralMap(json);
+
     if (rawConvRef is Map) {
       try {
         final parsed = MessageReferral.fromJson(Map<String, dynamic>.from(rawConvRef));

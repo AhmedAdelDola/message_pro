@@ -923,20 +923,51 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         builder: (context) {
                           final rawMessages = chatState.messages;
                           final convReferral = widget.conversation.referral;
-                          final hasAnyReferral = rawMessages.any((m) => m.referral != null);
+
+                          MessageReferral? targetReferral;
+                          for (final m in rawMessages) {
+                            if (m.referral != null && m.referral!.hasContent) {
+                              targetReferral = m.referral;
+                              break;
+                            }
+                          }
+                          targetReferral ??= convReferral;
+
+                          // User requirement: referral appears ONLY on the first message
+                          int firstTargetIdx = -1;
+                          for (int i = 0; i < rawMessages.length; i++) {
+                            if (!rawMessages[i].isActivity) {
+                              firstTargetIdx = i;
+                              break;
+                            }
+                          }
+                          if (firstTargetIdx == -1 && rawMessages.isNotEmpty) {
+                            firstTargetIdx = 0;
+                          }
 
                           final processedMessages = <Message>[];
-                          bool referralAttached = false;
                           for (int i = 0; i < rawMessages.length; i++) {
                             var msg = rawMessages[i];
-                            if (!hasAnyReferral && convReferral != null && !referralAttached) {
-                              if (!msg.isOutgoing && !msg.isActivity) {
-                                msg = msg.copyWith(referral: convReferral);
-                                referralAttached = true;
-                              } else if (i == 0) {
-                                msg = msg.copyWith(referral: convReferral);
-                                referralAttached = true;
-                              }
+                            if (i == firstTargetIdx && targetReferral != null) {
+                              msg = msg.copyWith(referral: targetReferral);
+                            } else if (msg.referral != null) {
+                              msg = Message(
+                                id: msg.id,
+                                content: msg.content,
+                                conversationId: msg.conversationId,
+                                inboxId: msg.inboxId,
+                                messageType: msg.messageType,
+                                contentType: msg.contentType,
+                                private: msg.private,
+                                status: msg.status,
+                                createdAt: msg.createdAt,
+                                senderName: msg.senderName,
+                                senderAvatar: msg.senderAvatar,
+                                attachments: msg.attachments,
+                                contentAttributes: msg.contentAttributes,
+                                additionalAttributes: msg.additionalAttributes,
+                                referral: null,
+                              );
                             }
                             processedMessages.add(msg);
                           }

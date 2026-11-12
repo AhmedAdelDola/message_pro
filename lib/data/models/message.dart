@@ -39,6 +39,9 @@ class MessageReferral {
   final String? sourceId;
   final String? imageUrl;
   final String? videoUrl;
+  final String? mediaType;
+  final String? platform;
+  final String? ctwaClid;
 
   MessageReferral({
     this.headline,
@@ -48,6 +51,9 @@ class MessageReferral {
     this.sourceId,
     this.imageUrl,
     this.videoUrl,
+    this.mediaType,
+    this.platform,
+    this.ctwaClid,
   });
 
   bool get hasContent =>
@@ -55,18 +61,19 @@ class MessageReferral {
       (body != null && body!.trim().isNotEmpty) ||
       (sourceUrl != null && sourceUrl!.trim().isNotEmpty) ||
       (imageUrl != null && imageUrl!.trim().isNotEmpty) ||
+      (videoUrl != null && videoUrl!.trim().isNotEmpty) ||
       (sourceId != null && sourceId!.trim().isNotEmpty);
 
   factory MessageReferral.fromJson(Map<String, dynamic> json) {
     return MessageReferral(
       headline: (json['headline'] ?? json['title'] ?? json['header'] ?? json['name'])?.toString(),
       body: (json['body'] ?? json['description'] ?? json['text'] ?? json['caption'] ?? json['ad_body'])?.toString(),
-      sourceType: (json['source_type'] ?? json['sourceType'] ?? json['type'] ?? json['media_type'])?.toString(),
+      sourceType: (json['source_type'] ?? json['sourceType'] ?? json['type'])?.toString(),
       sourceUrl: (json['source_url'] ?? json['sourceUrl'] ?? json['url'] ?? json['link'] ?? json['ad_url'])?.toString(),
-      sourceId: (json['source_id'] ?? json['sourceId'] ?? json['ad_id'] ?? json['id'] ?? json['ctwa_clid'])?.toString(),
-      imageUrl: (json['image_url'] ??
+      sourceId: (json['source_id'] ?? json['sourceId'] ?? json['ad_id'] ?? json['id'])?.toString(),
+      imageUrl: (json['thumbnail_url'] ??
+              json['image_url'] ??
               json['imageUrl'] ??
-              json['thumbnail_url'] ??
               json['thumbnailUrl'] ??
               json['media_url'] ??
               json['mediaUrl'] ??
@@ -74,6 +81,9 @@ class MessageReferral {
               json['preview_url'])
           ?.toString(),
       videoUrl: (json['video_url'] ?? json['videoUrl'])?.toString(),
+      mediaType: (json['media_type'] ?? json['mediaType'])?.toString(),
+      platform: json['platform']?.toString(),
+      ctwaClid: (json['ctwa_clid'] ?? json['ctwaClid'])?.toString(),
     );
   }
 }
@@ -312,27 +322,36 @@ class Message {
       parsedStatus = 'read';
     }
 
-    MessageReferral? ref;
-    dynamic rawRef = cAttr['referral'] ??
-        cAttr['referral_params'] ??
-        cAttr['referral_data'] ??
-        cAttr['ad'] ??
-        cAttr['ad_referral'] ??
-        cAttr['data']?['referral'] ??
-        cAttr['values']?['referral'] ??
-        aAttr['referral'] ??
-        aAttr['referral_params'] ??
-        aAttr['ad'] ??
-        json['referral'] ??
-        json['referral_params'] ??
-        json['ad'] ??
-        json['sender']?['referral'];
-
-    if (rawRef is String && rawRef.trim().startsWith('{')) {
-      try {
-        rawRef = jsonDecode(rawRef);
-      } catch (_) {}
+    dynamic findReferralMap(dynamic obj) {
+      if (obj == null) return null;
+      if (obj is String && obj.trim().startsWith('{')) {
+        try {
+          final decoded = jsonDecode(obj);
+          final res = findReferralMap(decoded);
+          if (res != null) return res;
+        } catch (_) {}
+      }
+      if (obj is Map) {
+        if (obj['ad_referral'] != null) return findReferralMap(obj['ad_referral']);
+        if (obj['referral'] != null) return findReferralMap(obj['referral']);
+        if (obj['referral_params'] != null) return findReferralMap(obj['referral_params']);
+        if (obj['source_id'] != null || obj['headline'] != null || obj['ctwa_clid'] != null || obj['source_url'] != null) {
+          return obj;
+        }
+        for (final entry in obj.entries) {
+          final res = findReferralMap(entry.value);
+          if (res != null) return res;
+        }
+      }
+      return null;
     }
+
+    MessageReferral? ref;
+    final rawRef = findReferralMap(cAttr) ??
+        findReferralMap(aAttr) ??
+        findReferralMap(json['meta']) ??
+        findReferralMap(json);
+
     if (rawRef is Map) {
       try {
         final parsedRef = MessageReferral.fromJson(Map<String, dynamic>.from(rawRef));

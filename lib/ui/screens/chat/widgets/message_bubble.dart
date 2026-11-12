@@ -230,7 +230,9 @@ class MessageBubble extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.74,
             ),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: message.referral != null
+                  ? const EdgeInsets.fromLTRB(6, 6, 6, 8)
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isFailed
                     ? (isDark ? const Color(0xFF3B181E) : const Color(0xFFDC2626))
@@ -358,7 +360,9 @@ class MessageBubble extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: message.referral != null
+                  ? const EdgeInsets.fromLTRB(6, 6, 6, 8)
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: bubbleBg,
                 border: Border.all(
@@ -885,150 +889,180 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildAdReferralCard(BuildContext context, MessageReferral referral, bool isDark, bool isArabic) {
-    final adCardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
     final headline = (referral.headline != null && referral.headline!.trim().isNotEmpty)
         ? referral.headline!.trim()
         : (isArabic ? 'إعلان فيسبوك / واتساب' : 'Sponsored Meta Ad');
     final body = referral.body?.trim();
     final sourceUrl = referral.sourceUrl;
+    final videoUrl = referral.videoUrl;
+    final targetUrl = (sourceUrl != null && sourceUrl.isNotEmpty) ? sourceUrl : videoUrl;
+    final isVideo = referral.mediaType == 'video' || (videoUrl != null && videoUrl.isNotEmpty);
+
     String? imageUrl = referral.imageUrl?.trim();
     if (imageUrl != null && imageUrl.isNotEmpty && imageUrl.startsWith('/')) {
       imageUrl = '${AppConfig.defaultBaseUrl}$imageUrl';
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: adCardBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor, width: 1),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (imageUrl != null && imageUrl.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                if (sourceUrl != null && sourceUrl.isNotEmpty) {
-                  launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
+    final platformName = referral.platform?.toLowerCase() == 'facebook'
+        ? (isArabic ? 'إعلان فيسبوك (واتساب)' : 'Facebook Ad (CTWA)')
+        : (isArabic ? 'إعلان فيسبوك / واتساب' : 'Meta Ad');
+
+    final dividerColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (imageUrl != null && imageUrl.isNotEmpty)
+          GestureDetector(
+            onTap: () {
+              if (targetUrl != null && targetUrl.isNotEmpty) {
+                final uri = Uri.tryParse(targetUrl);
+                if (uri != null) {
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
-              },
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                height: 140,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  height: 140,
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  height: 90,
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                  child: Center(
-                    child: Icon(
-                      Icons.campaign_rounded,
-                      size: 32,
-                      color: isDark ? Colors.white38 : Colors.black26,
+              }
+            },
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                      height: 140,
+                      color: isDark ? const Color(0xFF262C36) : const Color(0xFFE2E8F0),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
                   ),
-                ),
+                  if (isVideo)
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 34,
+                      ),
+                    ),
+                ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1877F2).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.campaign_rounded, size: 14, color: Color(0xFF1877F2)),
-                          const SizedBox(width: 4),
-                          Text(
-                            isArabic ? 'إعلان فيسبوك / واتساب' : 'Meta Ad',
-                            style: const TextStyle(
-                              color: Color(0xFF1877F2),
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Gontserrat',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    if (sourceUrl != null && sourceUrl.isNotEmpty)
-                      InkWell(
-                        onTap: () => launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication),
-                        child: Row(
-                          children: [
-                            Text(
-                              isArabic ? 'عرض الإعلان' : 'View Ad',
-                              style: const TextStyle(
-                                color: Color(0xFF2563EB),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Gontserrat',
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            const Icon(Icons.open_in_new_rounded, size: 12, color: Color(0xFF2563EB)),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  headline,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    fontFamily: 'Gontserrat',
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isVideo ? Icons.play_circle_outline_rounded : Icons.campaign_rounded,
+                    size: 13,
+                    color: const Color(0xFF1877F2),
                   ),
-                ),
-                if (body != null && body.isNotEmpty) ...[
-                  const SizedBox(height: 3),
+                  const SizedBox(width: 4),
                   Text(
-                    body,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                    platformName,
+                    style: const TextStyle(
+                      color: Color(0xFF1877F2),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                       fontFamily: 'Gontserrat',
                     ),
                   ),
-                ],
-                if (referral.sourceId != null && referral.sourceId!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Ad ID: ${referral.sourceId}',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                      fontFamily: 'monospace',
+                  const Spacer(),
+                  if (targetUrl != null && targetUrl.isNotEmpty)
+                    InkWell(
+                      onTap: () {
+                        final uri = Uri.tryParse(targetUrl);
+                        if (uri != null) {
+                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          Text(
+                            isArabic ? 'عرض الإعلان' : 'View Ad',
+                            style: const TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFF2563EB)),
+                        ],
+                      ),
                     ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Builder(
+                builder: (context) {
+                  final isHeadAr = _isArabicText(headline);
+                  return Align(
+                    alignment: isHeadAr ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Text(
+                      headline,
+                      textDirection: isHeadAr ? TextDirection.rtl : TextDirection.ltr,
+                      textAlign: isHeadAr ? TextAlign.right : TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontFamily: 'Gontserrat',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (body != null && body.isNotEmpty && body != message.content) ...[
+                const SizedBox(height: 3),
+                Builder(
+                  builder: (context) {
+                    final isBodyAr = _isArabicText(body);
+                    return Align(
+                      alignment: isBodyAr ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Text(
+                        body,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textDirection: isBodyAr ? TextDirection.rtl : TextDirection.ltr,
+                        textAlign: isBodyAr ? TextAlign.right : TextAlign.left,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          fontFamily: 'Gontserrat',
+                        )),
+                      );
+                    },
                   ),
                 ],
-              ],
-            ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 2),
+                child: Divider(
+                  height: 1,
+                  thickness: 0.8,
+                  color: dividerColor,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
