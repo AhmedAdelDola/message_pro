@@ -922,68 +922,19 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     : Builder(
                         builder: (context) {
                           final rawMessages = chatState.messages;
-                          final convReferral = widget.conversation.referral;
-
-                          MessageReferral? targetReferral;
-                          for (final m in rawMessages) {
-                            if (m.referral != null && m.referral!.hasContent) {
-                              targetReferral = m.referral;
-                              break;
-                            }
-                          }
-                          targetReferral ??= convReferral;
-
-                          // User requirement: referral appears ONLY on the first message
-                          int firstTargetIdx = -1;
-                          for (int i = 0; i < rawMessages.length; i++) {
-                            if (!rawMessages[i].isActivity) {
-                              firstTargetIdx = i;
-                              break;
-                            }
-                          }
-                          if (firstTargetIdx == -1 && rawMessages.isNotEmpty) {
-                            firstTargetIdx = 0;
-                          }
-
-                          final processedMessages = <Message>[];
-                          for (int i = 0; i < rawMessages.length; i++) {
-                            var msg = rawMessages[i];
-                            if (i == firstTargetIdx && targetReferral != null) {
-                              msg = msg.copyWith(referral: targetReferral);
-                            } else if (msg.referral != null) {
-                              msg = Message(
-                                id: msg.id,
-                                content: msg.content,
-                                conversationId: msg.conversationId,
-                                inboxId: msg.inboxId,
-                                messageType: msg.messageType,
-                                contentType: msg.contentType,
-                                private: msg.private,
-                                status: msg.status,
-                                createdAt: msg.createdAt,
-                                senderName: msg.senderName,
-                                senderAvatar: msg.senderAvatar,
-                                attachments: msg.attachments,
-                                contentAttributes: msg.contentAttributes,
-                                additionalAttributes: msg.additionalAttributes,
-                                referral: null,
-                              );
-                            }
-                            processedMessages.add(msg);
-                          }
 
                           final listItems = <_ChatListItem>[];
                           int idx = 0;
-                          while (idx < processedMessages.length) {
-                            final msg = processedMessages[idx];
+                          while (idx < rawMessages.length) {
+                            final msg = rawMessages[idx];
                             if (msg.isActivity) {
                               final group = <Message>[msg];
                               int j = idx + 1;
-                              while (j < processedMessages.length &&
-                                  processedMessages[j].isActivity &&
-                                  processedMessages[j].createdAt.day == msg.createdAt.day &&
-                                  processedMessages[j].createdAt.month == msg.createdAt.month) {
-                                group.add(processedMessages[j]);
+                              while (j < rawMessages.length &&
+                                  rawMessages[j].isActivity &&
+                                  rawMessages[j].createdAt.day == msg.createdAt.day &&
+                                  rawMessages[j].createdAt.month == msg.createdAt.month) {
+                                group.add(rawMessages[j]);
                                 j++;
                               }
                               if (group.length >= 2) {
@@ -1030,36 +981,42 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                       ),
               ),
 
-              // AI Agent Takeover Banner
+              // Bottom Area: AI Agent Takeover Banner IN PLACE OF Chat Composer when bot is handling
               Builder(
                 builder: (context) {
                   final isAiHandling = _isAiAgentHandling(widget.conversation, chatState.messages);
-                  if (!isAiHandling) return const SizedBox.shrink();
-                  final aiAgentName = _getAiAgentName(widget.conversation, chatState.messages);
-                  return AiAgentTakeoverBanner(
-                    agentName: aiAgentName,
-                    isLoading: _isTakingOver,
-                    onTakeover: _handleTakeover,
-                  );
-                },
-              ),
+                  if (isAiHandling) {
+                    final aiAgentName = _getAiAgentName(widget.conversation, chatState.messages);
+                    return SafeArea(
+                      top: false,
+                      child: AiAgentTakeoverBanner(
+                        agentName: aiAgentName,
+                        isLoading: _isTakingOver,
+                        onTakeover: _handleTakeover,
+                      ),
+                    );
+                  }
 
-              // Chat Composer
-              ChatComposer(
-                key: _composerKey,
-                isSending: chatState.isSending,
-                channelName: widget.conversation.inboxName ?? (widget.conversation.channelType.toLowerCase().contains('whatsapp') ? 'Message-pro' : widget.conversation.channelType),
-                channelType: widget.conversation.channelType,
-                canReply: widget.conversation.canReply,
-                onOpenCannedResponses: _showCannedResponses,
-                onOpenTemplates: _showTemplatesDialog,
-                onSend: (text, isPrivate, attachments) {
-                  context.read<ChatCubit>().sendMessage(
-                    content: text,
-                    isPrivate: isPrivate,
-                    attachmentPaths: attachments,
+                  return ChatComposer(
+                    key: _composerKey,
+                    isSending: chatState.isSending,
+                    channelName: widget.conversation.inboxName ??
+                        (widget.conversation.channelType.toLowerCase().contains('whatsapp')
+                            ? 'Message-pro'
+                            : widget.conversation.channelType),
+                    channelType: widget.conversation.channelType,
+                    canReply: widget.conversation.canReply,
+                    onOpenCannedResponses: _showCannedResponses,
+                    onOpenTemplates: _showTemplatesDialog,
+                    onSend: (text, isPrivate, attachments) {
+                      context.read<ChatCubit>().sendMessage(
+                        content: text,
+                        isPrivate: isPrivate,
+                        attachmentPaths: attachments,
+                      );
+                      _scrollToBottom();
+                    },
                   );
-                  _scrollToBottom();
                 },
               ),
             ],
