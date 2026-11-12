@@ -116,7 +116,7 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, List<User>>> fetchAgents() async => const Right([]);
 
   @override
-  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId}) async => const Right([]);
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds}) async => const Right([]);
 
   @override
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses() async => const Right([]);

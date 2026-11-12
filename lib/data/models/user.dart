@@ -157,6 +157,7 @@ class User {
   final String? assigneeType; // 'User' or 'AgentBot'
   final int? aiAgentId;
   final String? emoji;
+  final String? assigneeKey; // e.g. "AgentBot:14" or "User:14"
 
   String? get thumbnail => avatarUrl;
   Account? get activeAccount => accounts.where((a) => a.id == accountId).firstOrNull ?? (accounts.isNotEmpty ? accounts.first : null);
@@ -175,21 +176,9 @@ class User {
     if (t == 'agent_bot' || t == 'ai_agent' || t == 'bot' || r == 'bot' || r == 'agent_bot') {
       return true;
     }
+    if (assigneeKey != null && assigneeKey!.toLowerCase().startsWith('agentbot:')) return true;
     if (aiAgentId != null && aiAgentId! > 0) return true;
-    final n = name.trim().toLowerCase();
-    final dn = (displayName ?? '').trim().toLowerCase();
-    return n == 'sales agent' ||
-        n == 'ai agent' ||
-        n == 'bot' ||
-        n == 'chatbot' ||
-        n.startsWith('🤖') ||
-        n.startsWith('🤠 sales agent') ||
-        dn == 'sales agent' ||
-        dn == 'ai agent' ||
-        dn == 'bot' ||
-        dn == 'chatbot' ||
-        dn.startsWith('🤖') ||
-        dn.startsWith('🤠 sales agent');
+    return false;
   }
 
   User({
@@ -207,6 +196,7 @@ class User {
     this.assigneeType,
     this.aiAgentId,
     this.emoji,
+    this.assigneeKey,
   });
 
   User copyWith({
@@ -224,6 +214,7 @@ class User {
     String? assigneeType,
     int? aiAgentId,
     String? emoji,
+    String? assigneeKey,
   }) {
     return User(
       id: id ?? this.id,
@@ -240,6 +231,7 @@ class User {
       assigneeType: assigneeType ?? this.assigneeType,
       aiAgentId: aiAgentId ?? this.aiAgentId,
       emoji: emoji ?? this.emoji,
+      assigneeKey: assigneeKey ?? this.assigneeKey,
     );
   }
 
@@ -321,10 +313,21 @@ class User {
       userAvail = 'break';
     }
 
-    final rawAssigneeType = json['assignee_type']?.toString();
+    final rawAssigneeKey = json['assignee_key']?.toString();
+    final rawType = json['type']?.toString() ?? json['user_type']?.toString();
+    final rawAssigneeType = json['assignee_type']?.toString() ??
+        (rawType == 'ai_agent' || rawAssigneeKey?.startsWith('AgentBot:') == true ? 'AgentBot' : null);
     final rawAiAgentId = json['ai_agent_id'] is int ? json['ai_agent_id'] : int.tryParse(json['ai_agent_id']?.toString() ?? '');
-    final rawEmoji = json['emoji']?.toString();
-    final rawName = json['available_name']?.toString() ?? json['name']?.toString() ?? '';
+    
+    // For AI bot or agent name, prefer json['name'] which has the complete title (or emoji)
+    final rawName = json['name']?.toString() ?? json['available_name']?.toString() ?? '';
+    String? rawEmoji = json['emoji']?.toString();
+    if (rawEmoji == null && rawName.trim().runes.isNotEmpty) {
+      final firstRune = rawName.trim().runes.first;
+      if (firstRune > 255) {
+        rawEmoji = String.fromCharCode(firstRune);
+      }
+    }
 
     return User(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
@@ -334,13 +337,14 @@ class User {
       avatarUrl: avatar,
       pubsubToken: json['pubsub_token']?.toString(),
       role: json['role']?.toString() ?? 'agent',
-      type: json['type']?.toString() ?? json['user_type']?.toString(),
+      type: rawType,
       accountId: parsedAccountId,
       availabilityStatus: userAvail ?? 'online',
       accounts: accountsList,
       assigneeType: rawAssigneeType,
       aiAgentId: rawAiAgentId,
       emoji: rawEmoji,
+      assigneeKey: rawAssigneeKey,
     );
   }
 
@@ -356,6 +360,10 @@ class User {
     'account_id': accountId,
     'availability_status': availabilityStatus,
     'accounts': accounts.map((a) => a.toJson()).toList(),
+    if (assigneeType != null) 'assignee_type': assigneeType,
+    if (aiAgentId != null) 'ai_agent_id': aiAgentId,
+    if (emoji != null) 'emoji': emoji,
+    if (assigneeKey != null) 'assignee_key': assigneeKey,
   };
 
   @override
@@ -371,7 +379,8 @@ class User {
           pubsubToken == other.pubsubToken &&
           role == other.role &&
           accountId == other.accountId &&
-          availabilityStatus == other.availabilityStatus;
+          availabilityStatus == other.availabilityStatus &&
+          assigneeType == other.assigneeType;
 
   @override
   int get hashCode =>
@@ -382,5 +391,6 @@ class User {
       (avatarUrl?.hashCode ?? 0) ^
       role.hashCode ^
       accountId.hashCode ^
-      availabilityStatus.hashCode;
+      availabilityStatus.hashCode ^
+      (assigneeType?.hashCode ?? 0);
 }

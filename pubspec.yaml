@@ -1,7 +1,7 @@
 name: message_pro
 description: "Message Pro - Smart Multi-Channel Customer Communication Platform"
 publish_to: 'none'
-version: 1.0.9+32
+version: 1.0.9+33
 
 environment:
   sdk: ^3.12.2

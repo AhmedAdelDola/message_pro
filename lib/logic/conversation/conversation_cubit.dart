@@ -132,13 +132,14 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   Future<void> loadAuxiliaryData() async {
     final inboxesRes = await repo.fetchInboxes();
+    final inboxes = inboxesRes.getOrElse(() => []);
     final labelsRes = await repo.fetchLabels();
     final teamsRes = await repo.fetchTeams();
-    final agentsRes = await repo.fetchAssignableAgents();
+    final agentsRes = await repo.fetchAssignableAgents(inboxIds: inboxes.map((i) => i.id).toList());
     final stagesRes = await repo.fetchLifecycleStages();
 
     emit(state.copyWith(
-      inboxes: inboxesRes.getOrElse(() => []),
+      inboxes: inboxes,
       labels: labelsRes.getOrElse(() => []),
       teams: teamsRes.getOrElse(() => []),
       agents: agentsRes.getOrElse(() => []),

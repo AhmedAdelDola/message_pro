@@ -78,7 +78,7 @@ abstract class IConversationRepository {
   Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages();
   Future<Either<Failure, List<Team>>> fetchTeams();
   Future<Either<Failure, List<User>>> fetchAgents();
-  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId});
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds});
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses();
 }
 
@@ -1239,13 +1239,26 @@ class ConversationRepository implements IConversationRepository {
   }
 
   @override
-  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId}) async {
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds}) async {
     try {
-      final query = <String, dynamic>{};
+      final List<int> ids = [];
       if (inboxId != null && inboxId > 0) {
-        query['inbox_ids[]'] = inboxId;
+        ids.add(inboxId);
+      } else if (inboxIds != null && inboxIds.isNotEmpty) {
+        ids.addAll(inboxIds);
+      } else {
+        // Fallback: fetch available inboxes so assignable_agents gets the required parameter
+        final inboxesRes = await fetchInboxes();
+        inboxesRes.fold((_) {}, (inboxes) => ids.addAll(inboxes.map((i) => i.id)));
       }
-      final response = await _api.get('assignable_agents', queryParameters: query.isNotEmpty ? query : null);
+
+      String path = 'assignable_agents';
+      if (ids.isNotEmpty) {
+        final queryParams = ids.map((id) => 'inbox_ids[]=$id').join('&');
+        path = '$path?$queryParams';
+      }
+
+      final response = await _api.get(path);
       final data = response.data;
       final List listData;
       if (data is List) {

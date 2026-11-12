@@ -434,8 +434,22 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     }
   }
 
-  void _showAssigneeSheet() {
-    final agents = context.read<ConversationCubit>().state.agents;
+  void _showAssigneeSheet() async {
+    final convCubit = context.read<ConversationCubit>();
+    var agents = List<User>.from(convCubit.state.agents);
+
+    // Fetch fresh assignable agents specifically for this conversation's inbox
+    try {
+      final repo = convCubit.repo;
+      final freshRes = await repo.fetchAssignableAgents(inboxId: widget.conversation.inboxId);
+      freshRes.fold((_) {}, (freshList) {
+        if (freshList.isNotEmpty) {
+          agents = freshList;
+        }
+      });
+    } catch (_) {}
+
+    if (!mounted) return;
     final activeAssignee = _currentAssignee ?? widget.conversation.assignee;
     final isStatusBot = _status.toLowerCase() == 'bot' || (activeAssignee?.isBot ?? false);
 
@@ -452,24 +466,25 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
           isStatusBot: isStatusBot,
           onSelect: (agentId, {bool isAi = false, String? assigneeType}) async {
             final chatCubit = context.read<ChatCubit>();
-            final convCubit = context.read<ConversationCubit>();
 
             if (isAi) {
               await chatCubit.assignAgent(agentId, assigneeType: 'AgentBot');
               convCubit.loadConversations();
 
               if (mounted) {
-                final selectedBot = agents.where((a) => a.id == agentId).firstOrNull;
+                final selectedBot = agents.where((a) => a.isBot && a.id == agentId).firstOrNull;
                 setState(() {
                   _isTakenOver = false;
+                  _status = 'bot';
                   _currentAssignee = selectedBot ??
                       User(
                         id: agentId ?? -1,
-                        name: 'Sales agent',
-                        email: 'ai@messagepro.com',
+                        name: 'AI Agent',
+                        email: '',
                         accountId: widget.conversation.accountId,
                         assigneeType: 'AgentBot',
-                        emoji: '🤠',
+                        type: 'ai_agent',
+                        emoji: '🤖',
                       );
                 });
               }
@@ -485,8 +500,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   if (agentId == null) {
                     _currentAssignee = null;
                   } else {
-                    _currentAssignee = agents.where((a) => a.id == agentId).firstOrNull ??
-                        User(id: agentId, name: 'Agent', email: '', accountId: 0);
+                    _currentAssignee = agents.where((a) => !a.isBot && a.id == agentId).firstOrNull ??
+                        User(id: agentId, name: 'Agent', email: '', accountId: 0, assigneeType: 'User');
                   }
                 });
               }
@@ -720,6 +735,11 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 builder: (context) {
                   final activeAssignee = _currentAssignee ?? widget.conversation.assignee;
                   if (activeAssignee != null) {
+                    final isBot = activeAssignee.isBot || activeAssignee.assigneeType == 'AgentBot';
+                    final botEmoji = activeAssignee.emoji ??
+                        (activeAssignee.name.isNotEmpty && activeAssignee.name.trim().characters.first.runes.first > 255
+                            ? activeAssignee.name.trim().characters.first
+                            : '🤖');
                     return InkWell(
                       onTap: _showAssigneeSheet,
                       borderRadius: BorderRadius.circular(16.r),
@@ -730,20 +750,22 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           children: [
                             CircleAvatar(
                               radius: 12.r,
-                              backgroundColor: const Color(0xFF4162E3).withValues(alpha: 0.2),
-                              backgroundImage: activeAssignee.avatarUrl != null &&
-                                      activeAssignee.avatarUrl!.isNotEmpty
+                              backgroundColor: isBot
+                                  ? const Color(0xFF5850EC).withValues(alpha: 0.2)
+                                  : const Color(0xFF4162E3).withValues(alpha: 0.2),
+                              backgroundImage: (!isBot && activeAssignee.avatarUrl != null && activeAssignee.avatarUrl!.isNotEmpty)
                                   ? NetworkImage(activeAssignee.avatarUrl!)
                                   : null,
-                              child: activeAssignee.avatarUrl == null ||
-                                      activeAssignee.avatarUrl!.isEmpty
-                                  ? Text(
-                                      activeAssignee.name.isNotEmpty
-                                          ? activeAssignee.name[0].toUpperCase()
-                                          : 'A',
-                                      style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: const Color(0xFF4162E3)),
-                                    )
-                                  : null,
+                              child: isBot
+                                  ? Text(botEmoji, style: TextStyle(fontSize: 12.sp))
+                                  : (activeAssignee.avatarUrl == null || activeAssignee.avatarUrl!.isEmpty
+                                      ? Text(
+                                          activeAssignee.name.isNotEmpty
+                                              ? activeAssignee.name[0].toUpperCase()
+                                              : 'A',
+                                          style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: const Color(0xFF4162E3)),
+                                        )
+                                      : null),
                             ),
                             Icon(Icons.keyboard_arrow_down_rounded, size: 14.r, color: Colors.grey),
                           ],

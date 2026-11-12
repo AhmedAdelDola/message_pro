@@ -43,12 +43,12 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
     final textPrimary = isDark ? const Color(0xFFEDEEF0) : const Color(0xFF282E34);
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F);
 
-    // Separate real AI Agents (AgentBot) and Human Agents
+    // Separate real AI Agents (AgentBot / ai_agent) and Human Agents
     final List<User> realAiAgents = [];
     if (widget.aiAgents != null && widget.aiAgents!.isNotEmpty) {
       realAiAgents.addAll(widget.aiAgents!);
     } else {
-      realAiAgents.addAll(widget.agents.where((a) => a.isBot || a.assigneeType == 'AgentBot'));
+      realAiAgents.addAll(widget.agents.where((a) => a.isBot || a.assigneeType == 'AgentBot' || a.type == 'ai_agent'));
     }
 
     if (realAiAgents.isEmpty) {
@@ -61,6 +61,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
           accountId: 0,
           emoji: '🤠',
           assigneeType: 'AgentBot',
+          type: 'ai_agent',
           displayName: isArabic ? 'مساعد المبيعات الذكي' : 'AI Sales Assistant',
         ),
       );
@@ -72,9 +73,9 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
       return ai.name.toLowerCase().contains(q) || (ai.displayName?.toLowerCase().contains(q) ?? false);
     }).toList();
 
-    // Human workspace agents (excluding bots)
+    // Human workspace agents (strictly excluding bots)
     final filteredAgents = widget.agents.where((a) {
-      if (a.isBot || a.assigneeType == 'AgentBot') return false;
+      if (a.isBot || a.assigneeType == 'AgentBot' || a.type == 'ai_agent') return false;
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return a.name.toLowerCase().contains(q) || a.email.toLowerCase().contains(q);
@@ -221,16 +222,23 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       ),
                     ),
                     ...filteredAiAgents.map((ai) {
-                      final isSelected = (widget.currentAssignee != null &&
-                              (widget.currentAssignee!.id == ai.id ||
-                               widget.currentAssignee!.name.toLowerCase() == ai.name.toLowerCase())) ||
-                          (widget.isStatusBot && widget.currentAssignee == null);
+                      final isSelected = widget.currentAssignee != null &&
+                          widget.currentAssignee!.isBot &&
+                          widget.currentAssignee!.id == ai.id;
 
                       final emojiStr = ai.emoji ??
                           (ai.name.trim().characters.firstOrNull != null &&
                                   ai.name.trim().characters.first.runes.first > 255
                               ? ai.name.trim().characters.first
                               : '🤖');
+                      var cleanName = ai.name.trim();
+                      if (ai.emoji != null && cleanName.startsWith(ai.emoji!)) {
+                        cleanName = cleanName.substring(ai.emoji!.length).trim();
+                      } else if (emojiStr != '🤖' && cleanName.startsWith(emojiStr)) {
+                        cleanName = cleanName.substring(emojiStr.length).trim();
+                      }
+                      if (cleanName.isEmpty) cleanName = ai.name;
+
                       final roleStr = ai.displayName ??
                           (isArabic ? 'وكيل ذكاء اصطناعي' : 'AI Agent');
 
@@ -249,7 +257,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           child: Text(emojiStr, style: const TextStyle(fontSize: 18)),
                         ),
                         title: Text(
-                          ai.name,
+                          cleanName,
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
@@ -351,7 +359,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                     )
                   else
                     ...filteredAgents.map((agent) {
-                      final isSelected = widget.currentAssignee?.id == agent.id && !widget.isStatusBot;
+                      final isSelected = widget.currentAssignee != null && !widget.currentAssignee!.isBot && widget.currentAssignee!.id == agent.id;
                       final isOnline = agent.availabilityStatus == 'online';
 
                       return ListTile(
