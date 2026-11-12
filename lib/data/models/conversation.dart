@@ -221,16 +221,45 @@ class Conversation {
       }
     }
 
-    // Labels
+    // Labels / Tags
     final labelsList = <String>[];
-    final rawLabels = json['labels'];
+    final rawLabels = json['labels'] ??
+        json['tags'] ??
+        json['cached_labels'] ??
+        json['applied_labels'] ??
+        json['meta']?['labels'] ??
+        json['meta']?['sender']?['labels'] ??
+        json['contact']?['labels'];
+
     if (rawLabels is List) {
       for (final l in rawLabels) {
         if (l is String) {
-          labelsList.add(l);
-        } else if (l is Map && l['title'] != null) {
-          labelsList.add(l['title'].toString());
+          final s = l.trim();
+          if (s.isNotEmpty && !labelsList.contains(s)) labelsList.add(s);
+        } else if (l is Map) {
+          final t = (l['title'] ?? l['name'] ?? l['label'] ?? l['id'])?.toString().trim();
+          if (t != null && t.isNotEmpty && !labelsList.contains(t)) labelsList.add(t);
         }
+      }
+    } else if (rawLabels is String && rawLabels.trim().isNotEmpty) {
+      for (final part in rawLabels.split(RegExp(r'[,;\n]'))) {
+        final trimmed = part.trim();
+        if (trimmed.isNotEmpty && !labelsList.contains(trimmed)) labelsList.add(trimmed);
+      }
+    }
+
+    // Also check custom_attributes for tag or labels
+    final caTag = json['custom_attributes']?['tag'] ??
+        json['custom_attributes']?['tags'] ??
+        json['custom_attributes']?['labels'] ??
+        json['meta']?['sender']?['custom_attributes']?['tag'] ??
+        json['contact']?['custom_attributes']?['tag'];
+    if (caTag is String && caTag.trim().isNotEmpty && !labelsList.contains(caTag.trim())) {
+      labelsList.add(caTag.trim());
+    } else if (caTag is List) {
+      for (final item in caTag) {
+        final s = item.toString().trim();
+        if (s.isNotEmpty && !labelsList.contains(s)) labelsList.add(s);
       }
     }
 
@@ -238,19 +267,18 @@ class Conversation {
     LifecycleStage? stage;
     final rawStage = json['lifecycle_stage'] ??
         json['meta']?['sender']?['lifecycle_stage'] ??
-        json['contact']?['lifecycle_stage'];
+        json['contact']?['lifecycle_stage'] ??
+        json['custom_attributes']?['lifecycle_stage'] ??
+        json['custom_attributes']?['lead_status'] ??
+        json['meta']?['sender']?['custom_attributes']?['lifecycle_stage'] ??
+        json['contact']?['custom_attributes']?['lifecycle_stage'];
+
     if (rawStage is Map) {
       try {
         stage = LifecycleStage.fromJson(Map<String, dynamic>.from(rawStage));
       } catch (_) {}
-    } else {
-      final caStage = json['custom_attributes']?['lifecycle_stage'] ??
-          json['meta']?['sender']?['custom_attributes']?['lifecycle_stage'];
-      if (caStage is String && caStage.trim().isNotEmpty) {
-        final words = caStage.replaceAll('_', ' ').split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
-        final name = words.map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
-        stage = LifecycleStage(id: 0, name: name, color: '#4162E3', icon: '🌱');
-      }
+    } else if (rawStage is String && rawStage.trim().isNotEmpty) {
+      stage = LifecycleStage.fromString(rawStage);
     }
 
     DateTime dtCreated = DateTime.fromMillisecondsSinceEpoch(0);

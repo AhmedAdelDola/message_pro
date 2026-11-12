@@ -33,22 +33,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
 
   final TextEditingController _noteController = TextEditingController();
   final List<Map<String, dynamic>> _notes = [];
-
-  final List<String> _lifecycleStages = [
-    'Prospect',
-    'New Lead',
-    'Outbound Lead',
-    'Engaged Lead',
-    'Call Booked',
-    'Demo Booked',
-    'Trial Active',
-    'Payment Pending',
-    'Lead Qualified',
-    'Sales Assigned',
-    'Negotiation',
-    'Customer',
-    'Lost',
-  ];
+  List<LifecycleStage> _lifecycleStages = [];
 
   @override
   void initState() {
@@ -59,18 +44,34 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     final stageFromAttrs = _contact.customAttributes['lifecycle_stage'] ??
         _contact.customAttributes['lead_status'] ??
         _contact.customAttributes['stage'];
-    _lifecycleStage = (stageFromAttrs != null && stageFromAttrs.toString().isNotEmpty)
+    final rawStageStr = (stageFromAttrs != null && stageFromAttrs.toString().isNotEmpty)
         ? stageFromAttrs.toString()
-        : 'New Lead';
+        : (_contact.lifecycleStage?.name ?? '');
+
+    if (rawStageStr.isNotEmpty) {
+      final emoji = _contact.lifecycleStage?.icon ?? LifecycleStage.getEmojiForStage(rawStageStr);
+      _lifecycleStage = rawStageStr.startsWith(emoji) ? rawStageStr : '$emoji $rawStageStr';
+    } else {
+      _lifecycleStage = '';
+    }
 
     _loadContactLabels();
+    _loadBackendLifecycleStages();
+  }
 
-    // Add sample initial note for realism if none
-    _notes.add({
-      'content': 'تم تسجيل العميل بنجاح في النظام ومتابعة متطلباته.',
-      'author': 'فريق العمل',
-      'createdAt': DateTime.now().subtract(const Duration(hours: 3)),
-    });
+  Future<void> _loadBackendLifecycleStages() async {
+    try {
+      final convCubit = context.read<ConversationCubit>();
+      if (convCubit.state.lifecycleStages.isNotEmpty) {
+        if (mounted) setState(() => _lifecycleStages = List.from(convCubit.state.lifecycleStages));
+      } else {
+        final res = await sl<IConversationRepository>().fetchLifecycleStages();
+        if (!mounted) return;
+        res.fold((_) {}, (stages) {
+          setState(() => _lifecycleStages = stages);
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadContactLabels() async {
@@ -455,6 +456,8 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
   void _showLifecyclePicker() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     showModalBottomSheet(
       context: context,
@@ -476,37 +479,58 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(
-                  'Select Lifecycle Stage',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Gontserrat'),
+                  isArabic ? 'تحديد مرحلة العميل' : 'Select Lifecycle Stage',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Gontserrat'),
                 ),
               ),
               const Divider(),
               Expanded(
-                child: ListView.builder(
-                  itemCount: _lifecycleStages.length,
-                  itemBuilder: (context, index) {
-                    final stage = _lifecycleStages[index];
-                    final isSelected = stage == _lifecycleStage;
-                    return ListTile(
-                      title: Text(
-                        stage,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppColors.primary : null,
-                          fontFamily: 'Gontserrat',
+                child: _lifecycleStages.isEmpty
+                    ? Center(
+                        child: Text(
+                          isArabic ? 'لا توجد مراحل محددة في النظام' : 'No lifecycle stages defined on backend',
+                          style: TextStyle(color: textSecondary),
                         ),
+                      )
+                    : ListView.builder(
+                        itemCount: _lifecycleStages.length,
+                        itemBuilder: (context, index) {
+                          final stage = _lifecycleStages[index];
+                          final emoji = stage.icon ?? LifecycleStage.getEmojiForStage(stage.name);
+                          final colorHex = stage.color;
+                          final color = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+                          final cleanName = stage.name.startsWith(emoji) ? stage.name.substring(emoji.length).trim() : stage.name;
+                          final fullStage = '$emoji $cleanName';
+                          final isSelected = _lifecycleStage.contains(cleanName);
+
+                          return ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(emoji, style: const TextStyle(fontSize: 16)),
+                            ),
+                            title: Text(
+                              cleanName,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: isSelected ? AppColors.primary : null,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                            trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _updateLifecycleStage(fullStage);
+                            },
+                          );
+                        },
                       ),
-                      trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _updateLifecycleStage(stage);
-                      },
-                    );
-                  },
-                ),
               ),
             ],
           ),
@@ -747,6 +771,78 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                       ),
                                     ),
                                   ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  // Lifecycle stage badge with emoji & shape
+                                  InkWell(
+                                    onTap: _showLifecyclePicker,
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: Color(int.parse(LifecycleStage.getColorForStage(_lifecycleStage).replaceFirst('#', '0xFF'))).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Color(int.parse(LifecycleStage.getColorForStage(_lifecycleStage).replaceFirst('#', '0xFF'))).withValues(alpha: 0.35),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            LifecycleStage.getEmojiForStage(_lifecycleStage),
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _lifecycleStage.startsWith(LifecycleStage.getEmojiForStage(_lifecycleStage))
+                                                ? _lifecycleStage.substring(LifecycleStage.getEmojiForStage(_lifecycleStage).length).trim()
+                                                : _lifecycleStage,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: textPrimary,
+                                              fontFamily: 'Gontserrat',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Contact Labels
+                                  ..._contactLabels.map((tag) => Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.label_outline_rounded, size: 10, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          tag,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                            fontFamily: 'Gontserrat',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
                                 ],
                               ),
                             ],

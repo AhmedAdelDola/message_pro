@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../../core/config/app_config.dart';
 
 class Contact {
@@ -10,6 +12,7 @@ class Contact {
   final Map<String, dynamic> customAttributes;
   final List<Collaborator> collaborators;
   final bool canManageCollaborators;
+  final LifecycleStage? lifecycleStage;
 
   Contact({
     required this.id,
@@ -21,6 +24,7 @@ class Contact {
     this.customAttributes = const {},
     this.collaborators = const [],
     this.canManageCollaborators = false,
+    this.lifecycleStage,
   });
 
   factory Contact.fromJson(Map<String, dynamic> json) {
@@ -69,6 +73,21 @@ class Contact {
       }
     }
 
+    // Lifecycle stage resolution
+    LifecycleStage? stage;
+    final rawStage = json['lifecycle_stage'] ??
+        json['custom_attributes']?['lifecycle_stage'] ??
+        json['custom_attributes']?['lead_status'] ??
+        json['stage'];
+
+    if (rawStage is Map) {
+      try {
+        stage = LifecycleStage.fromJson(Map<String, dynamic>.from(rawStage));
+      } catch (_) {}
+    } else if (rawStage is String && rawStage.trim().isNotEmpty) {
+      stage = LifecycleStage.fromString(rawStage);
+    }
+
     return Contact(
       id: contactId,
       name: displayName,
@@ -81,6 +100,7 @@ class Contact {
           : {},
       collaborators: collabsList,
       canManageCollaborators: json['can_manage_collaborators'] == true,
+      lifecycleStage: stage,
     );
   }
 
@@ -192,12 +212,71 @@ class LifecycleStage {
   });
 
   factory LifecycleStage.fromJson(Map<String, dynamic> json) {
+    final rawName = (json['name'] ?? json['title'] ?? '').toString();
+    final rawIcon = json['icon'] ?? json['emoji'] ?? json['symbol'] ?? json['shape'];
+    final iconStr = (rawIcon != null && rawIcon.toString().isNotEmpty)
+        ? rawIcon.toString()
+        : getEmojiForStage(rawName);
+
     return LifecycleStage(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
-      name: json['name'] ?? '',
-      color: json['color'] ?? '#4162E3',
-      icon: json['icon'],
+      name: rawName,
+      color: json['color'] ?? getColorForStage(rawName),
+      icon: iconStr,
     );
+  }
+
+  factory LifecycleStage.fromString(String raw) {
+    final trimmed = raw.trim();
+    final emoji = getEmojiForStage(trimmed);
+    String cleanName = trimmed;
+    if (cleanName.startsWith(emoji)) {
+      cleanName = cleanName.substring(emoji.length).trim();
+    }
+    return LifecycleStage(
+      id: 0,
+      name: cleanName.isNotEmpty ? cleanName : trimmed,
+      color: getColorForStage(trimmed),
+      icon: emoji,
+    );
+  }
+
+  static String getEmojiForStage(String stageName) {
+    final trimmed = stageName.trim();
+    if (trimmed.isEmpty) return '🌱';
+
+    // If string already begins with an emoji / non-ASCII symbol
+    final firstRune = trimmed.runes.firstOrNull;
+    if (firstRune != null && (firstRune > 127 || firstRune == 0x2B50 || firstRune == 0x203C || firstRune == 0x21A9)) {
+      final chars = trimmed.characters;
+      return chars.first;
+    }
+
+    final lower = trimmed.toLowerCase();
+    if (lower.contains('prospect')) return '⭐';
+    if (lower.contains('new') || lower.contains('lead')) return '🆕';
+    if (lower.contains('outbound')) return '⭐';
+    if (lower.contains('engage') || lower.contains('active')) return '🔥';
+    if (lower.contains('call')) return '📞';
+    if (lower.contains('demo')) return '💻';
+    if (lower.contains('trial')) return '⏳';
+    if (lower.contains('payment') || lower.contains('pending')) return '😇';
+    if (lower.contains('qualif')) return '💰';
+    if (lower.contains('sale') || lower.contains('assign')) return '🤩';
+    if (lower.contains('negotia')) return '🙄';
+    if (lower.contains('customer') || lower.contains('won')) return '👑';
+    if (lower.contains('lost')) return '😔';
+    return '🌱';
+  }
+
+  static String getColorForStage(String stageName) {
+    final lower = stageName.toLowerCase();
+    if (lower.contains('customer') || lower.contains('won')) return '#10B981';
+    if (lower.contains('lost')) return '#EF4444';
+    if (lower.contains('engage') || lower.contains('fire')) return '#F97316';
+    if (lower.contains('qualif') || lower.contains('payment')) return '#F59E0B';
+    if (lower.contains('prospect') || lower.contains('lead')) return '#3B82F6';
+    return '#4162E3';
   }
 }
 

@@ -319,7 +319,7 @@ class ConversationTile extends StatelessWidget {
                       Expanded(
                         child: Row(
                           children: [
-                            // Tag Badge
+                            // Lifecycle Stage Badge
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
@@ -351,6 +351,66 @@ class ConversationTile extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            // Labels / Tags Badges
+                            if (conversation.labels.isNotEmpty) ...[
+                              for (final tag in conversation.labels.take(2)) ...[
+                                const SizedBox(width: 5),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.label_outline_rounded,
+                                        size: 10,
+                                        color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(maxWidth: 65),
+                                        child: Text(
+                                          tag,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'Gontserrat',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              if (conversation.labels.length > 2) ...[
+                                const SizedBox(width: 3),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '+${conversation.labels.length - 2}',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                             if (conversation.inboxName != null && conversation.inboxName!.trim().isNotEmpty) ...[
                               const SizedBox(width: 6),
                               Container(

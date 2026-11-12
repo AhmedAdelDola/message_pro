@@ -1111,6 +1111,7 @@ class ConversationRepository implements IConversationRepository {
 
   @override
   Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages() async {
+    // 1. Try dedicated lifecycle_stages endpoint
     try {
       final response = await _api.get('lifecycle_stages');
       final data = response.data;
@@ -1121,18 +1122,57 @@ class ConversationRepository implements IConversationRepository {
               : (data is Map && data['data'] is List
                   ? data['data']
                   : (data is List ? data : [])));
-      return Right(list
-          .whereType<Map>()
-          .map((s) => LifecycleStage.fromJson(Map<String, dynamic>.from(s)))
-          .toList());
-    } catch (_) {
-      return Right([
-        LifecycleStage(id: 1, name: 'New Lead', color: '#3B82F6', icon: '🌱'),
-        LifecycleStage(id: 2, name: 'Qualified', color: '#10B981', icon: '⭐'),
-        LifecycleStage(id: 3, name: 'In Progress', color: '#F59E0B', icon: '⏳'),
-        LifecycleStage(id: 4, name: 'Customer', color: '#6366F1', icon: '💎'),
-      ]);
-    }
+      if (list.isNotEmpty) {
+        return Right(list
+            .whereType<Map>()
+            .map((s) => LifecycleStage.fromJson(Map<String, dynamic>.from(s)))
+            .toList());
+      }
+    } catch (_) {}
+
+    // 2. Try custom_attribute_definitions endpoint (where lifecycle stage / lead status options live)
+    try {
+      final response = await _api.get('custom_attribute_definitions');
+      final data = response.data;
+      List list = data is Map && data['payload'] != null
+          ? data['payload']
+          : (data is Map && data['data'] != null && data['data']['payload'] != null
+              ? data['data']['payload']
+              : (data is Map && data['data'] is List
+                  ? data['data']
+                  : (data is List ? data : [])));
+
+      for (final item in list) {
+        if (item is Map) {
+          final key = item['attribute_key']?.toString().toLowerCase();
+          if (key == 'lifecycle_stage' || key == 'lead_status' || key == 'stage') {
+            final rawValues = item['attribute_values'];
+            if (rawValues is List && rawValues.isNotEmpty) {
+              final stages = <LifecycleStage>[];
+              for (int i = 0; i < rawValues.length; i++) {
+                final v = rawValues[i];
+                if (v is Map) {
+                  stages.add(LifecycleStage.fromJson(Map<String, dynamic>.from(v)));
+                } else if (v is String && v.trim().isNotEmpty) {
+                  final parsed = LifecycleStage.fromString(v);
+                  stages.add(LifecycleStage(
+                    id: i + 1,
+                    name: parsed.name,
+                    color: parsed.color,
+                    icon: parsed.icon,
+                  ));
+                }
+              }
+              if (stages.isNotEmpty) {
+                return Right(stages);
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return const Right([]);
   }
 
   @override
