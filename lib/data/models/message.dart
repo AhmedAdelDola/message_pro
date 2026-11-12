@@ -9,6 +9,8 @@ class MessageAttachment {
   final String? thumbUrl;
   final int? fileSize;
   final String? fileName;
+  final double? duration;
+  final String? transcribedText;
 
   MessageAttachment({
     this.id,
@@ -17,9 +19,25 @@ class MessageAttachment {
     this.thumbUrl,
     this.fileSize,
     this.fileName,
+    this.duration,
+    this.transcribedText,
   });
 
   factory MessageAttachment.fromJson(Map<String, dynamic> json) {
+    final rawDuration = json['duration'] ??
+        json['metadata']?['duration'] ??
+        json['file_metadata']?['duration'];
+    double? parsedDuration;
+    if (rawDuration is num) {
+      parsedDuration = rawDuration.toDouble();
+    } else if (rawDuration is String) {
+      parsedDuration = double.tryParse(rawDuration);
+    }
+
+    final transcript = json['transcribed_text'] ??
+        json['metadata']?['transcribed_text'] ??
+        json['transcription'];
+
     return MessageAttachment(
       id: json['id'],
       fileType: json['file_type'] ?? 'file',
@@ -27,6 +45,8 @@ class MessageAttachment {
       thumbUrl: json['thumb_url'],
       fileSize: json['file_size'],
       fileName: json['file_name'] ?? json['filename'] ?? json['name'] ?? json['title'],
+      duration: parsedDuration,
+      transcribedText: transcript?.toString(),
     );
   }
 }

@@ -787,10 +787,47 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                       ),
                     );
                   }
-                  return IconButton(
-                    icon: Icon(Icons.person_add_alt_1_outlined, size: 20.r),
-                    tooltip: 'تعيين مسؤول',
-                    onPressed: _showAssigneeSheet,
+                  return InkWell(
+                    onTap: _showAssigneeSheet,
+                    borderRadius: BorderRadius.circular(16.r),
+                    child: Container(
+                      margin: EdgeInsets.symmetric(vertical: 12.h, horizontal: 4.w),
+                      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF282C35) : const Color(0xFFEFF2F6),
+                        borderRadius: BorderRadius.circular(16.r),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF3E4451) : const Color(0xFFD1D5DB),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 13.r,
+                            color: isDark ? Colors.grey[300] : const Color(0xFF4B5563),
+                          ),
+                          SizedBox(width: 3.w),
+                          Text(
+                            Localizations.localeOf(context).languageCode == 'ar' ? 'غير معيّن' : 'Unassigned',
+                            style: TextStyle(
+                              fontSize: 10.5.sp,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.grey[300] : const Color(0xFF4B5563),
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                          SizedBox(width: 2.w),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 13.r,
+                            color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
@@ -1082,35 +1119,73 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                             idx++;
                           }
 
-                          return ListView.builder(
-                            controller: _scrollController,
-                            padding: EdgeInsets.symmetric(vertical: 12.h),
-                            itemCount: listItems.length,
-                            itemBuilder: (context, index) {
-                              final item = listItems[index];
-                              final prevItem = index > 0 ? listItems[index - 1] : null;
-                              final showDateHeader = index == 0 ||
-                                  prevItem?.createdAt.day != item.createdAt.day ||
-                                  prevItem?.createdAt.month != item.createdAt.month;
+                          final hasTopLoader = chatState.isLoadingOlder;
+                          final totalCount = listItems.length + (hasTopLoader ? 1 : 0);
 
-                              if (item is _ChatActivityGroupItem) {
-                                return WorkflowStepsGroupWidget(
-                                  key: ValueKey('activity_group_${item.messages.first.id}_${item.messages.length}'),
-                                  messages: item.messages,
-                                  showDateHeader: showDateHeader,
-                                );
-                              } else if (item is _ChatSingleMessageItem) {
-                                final msg = item.message;
-                                return MessageBubble(
-                                  message: msg,
-                                  contactName: msg.senderName ?? widget.conversation.contact.name,
-                                  contactThumbnail: msg.senderAvatar ?? widget.conversation.contact.avatarUrl,
-                                  showDateHeader: showDateHeader,
-                                  onRetry: () => context.read<ChatCubit>().retryMessage(msg),
-                                );
-                              }
-                              return const SizedBox.shrink();
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await context.read<ChatCubit>().loadPreviousMessages();
                             },
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              itemCount: totalCount,
+                              itemBuilder: (context, index) {
+                                if (hasTopLoader && index == 0) {
+                                  return Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 10.h),
+                                    child: Center(
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF282C35) : Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.08),
+                                              blurRadius: 6,
+                                            ),
+                                          ],
+                                        ),
+                                        child: const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Color(0xFF4162E3),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final actualIndex = hasTopLoader ? index - 1 : index;
+                                final item = listItems[actualIndex];
+                                final prevItem = actualIndex > 0 ? listItems[actualIndex - 1] : null;
+                                final showDateHeader = actualIndex == 0 ||
+                                    prevItem?.createdAt.day != item.createdAt.day ||
+                                    prevItem?.createdAt.month != item.createdAt.month;
+
+                                if (item is _ChatActivityGroupItem) {
+                                  return WorkflowStepsGroupWidget(
+                                    key: ValueKey('activity_group_${item.messages.first.id}_${item.messages.length}'),
+                                    messages: item.messages,
+                                    showDateHeader: showDateHeader,
+                                  );
+                                } else if (item is _ChatSingleMessageItem) {
+                                  final msg = item.message;
+                                  return MessageBubble(
+                                    message: msg,
+                                    contactName: msg.senderName ?? widget.conversation.contact.name,
+                                    contactThumbnail: msg.senderAvatar ?? widget.conversation.contact.avatarUrl,
+                                    showDateHeader: showDateHeader,
+                                    onRetry: () => context.read<ChatCubit>().retryMessage(msg),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
                           );
                         },
                       ),
@@ -1195,6 +1270,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     );
                   }
 
+                  final convCubit = context.read<ConversationCubit>();
+                  final workspaceAgents = convCubit.state.agents;
+
                   return ChatComposer(
                     key: _composerKey,
                     isSending: chatState.isSending,
@@ -1204,6 +1282,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                             : widget.conversation.channelType),
                     channelType: widget.conversation.channelType,
                     canReply: widget.conversation.canReply,
+                    cannedResponses: chatState.cannedResponses,
+                    agents: workspaceAgents,
                     onOpenCannedResponses: _showCannedResponses,
                     onOpenTemplates: _showTemplatesDialog,
                     onSend: (text, isPrivate, attachments) {

@@ -1128,6 +1128,8 @@ class MessageBubble extends StatelessWidget {
         audioUrl: att.dataUrl,
         isOutgoing: isOutgoing,
         fileName: att.fileName,
+        initialDurationSeconds: att.duration,
+        transcribedText: att.transcribedText,
       );
     }
 

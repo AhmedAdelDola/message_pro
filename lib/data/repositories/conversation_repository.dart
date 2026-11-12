@@ -1264,18 +1264,33 @@ class ConversationRepository implements IConversationRepository {
           }
         }
 
-        // 1. Check attachments list or map
-        final rawAttachments = c['attachments'] ?? c['files'] ?? c['attached_files'] ?? c['media'];
-        if (rawAttachments is List) {
-          for (final a in rawAttachments) {
-            if (a is Map) {
-              addUrl(a['data_url'] ?? a['file_url'] ?? a['thumb_url'] ?? a['url'] ?? a['blob_url'] ?? a['download_url']);
-            } else if (a is String) {
-              addUrl(a);
-            }
+        // 1. Check attachments list or map from all possible Chatwoot/Message-Pro fields
+        void processAttachmentEntry(dynamic a) {
+          if (a is Map) {
+            addUrl(a['data_url'] ?? a['file_url'] ?? a['thumb_url'] ?? a['url'] ?? a['blob_url'] ?? a['download_url']);
+          } else if (a is String) {
+            addUrl(a);
           }
-        } else if (rawAttachments is Map) {
-          addUrl(rawAttachments['data_url'] ?? rawAttachments['file_url'] ?? rawAttachments['thumb_url'] ?? rawAttachments['url']);
+        }
+
+        final possibleAttachmentKeys = [
+          'media_attachments',
+          'media_attachment',
+          'attachments',
+          'files',
+          'attached_files',
+          'media'
+        ];
+
+        for (final key in possibleAttachmentKeys) {
+          final val = c[key];
+          if (val is List) {
+            for (final item in val) {
+              processAttachmentEntry(item);
+            }
+          } else if (val != null) {
+            processAttachmentEntry(val);
+          }
         }
 
         // 2. Check direct URL fields

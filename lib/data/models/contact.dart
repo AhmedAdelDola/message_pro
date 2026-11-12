@@ -13,6 +13,7 @@ class Contact {
   final List<Collaborator> collaborators;
   final bool canManageCollaborators;
   final LifecycleStage? lifecycleStage;
+  final int? lifecycleStageId;
 
   Contact({
     required this.id,
@@ -25,6 +26,7 @@ class Contact {
     this.collaborators = const [],
     this.canManageCollaborators = false,
     this.lifecycleStage,
+    this.lifecycleStageId,
   });
 
   Contact copyWith({
@@ -38,6 +40,7 @@ class Contact {
     List<Collaborator>? collaborators,
     bool? canManageCollaborators,
     LifecycleStage? lifecycleStage,
+    int? lifecycleStageId,
   }) {
     return Contact(
       id: id ?? this.id,
@@ -48,6 +51,11 @@ class Contact {
       identifier: identifier ?? this.identifier,
       customAttributes: customAttributes ?? this.customAttributes,
       collaborators: collaborators ?? this.collaborators,
+      canManageCollaborators: canManageCollaborators ?? this.canManageCollaborators,
+      lifecycleStage: lifecycleStage ?? this.lifecycleStage,
+      lifecycleStageId: lifecycleStageId ?? this.lifecycleStageId,
+    );
+  }
       canManageCollaborators: canManageCollaborators ?? this.canManageCollaborators,
       lifecycleStage: lifecycleStage ?? this.lifecycleStage,
     );
@@ -99,6 +107,11 @@ class Contact {
       }
     }
 
+    final rawStageId = json['lifecycle_stage_id'];
+    final stageId = rawStageId is int
+        ? rawStageId
+        : int.tryParse(rawStageId?.toString() ?? '');
+
     // Lifecycle stage resolution
     LifecycleStage? stage;
     final rawStage = json['lifecycle_stage'] ??
@@ -114,6 +127,10 @@ class Contact {
       stage = LifecycleStage.fromString(rawStage);
     }
 
+    if (stage != null && stageId != null && stage.id != stageId) {
+      stage = stage.copyWith(id: stageId);
+    }
+
     return Contact(
       id: contactId,
       name: displayName,
@@ -127,6 +144,7 @@ class Contact {
       collaborators: collabsList,
       canManageCollaborators: json['can_manage_collaborators'] == true,
       lifecycleStage: stage,
+      lifecycleStageId: stageId ?? stage?.id,
     );
   }
 
@@ -140,6 +158,7 @@ class Contact {
     'custom_attributes': customAttributes,
     'collaborators': collaborators.map((c) => c.toJson()).toList(),
     'can_manage_collaborators': canManageCollaborators,
+    'lifecycle_stage_id': lifecycleStageId,
   };
 }
 

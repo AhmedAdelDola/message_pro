@@ -6,12 +6,16 @@ class AudioPlayerBubble extends StatefulWidget {
   final String audioUrl;
   final bool isOutgoing;
   final String? fileName;
+  final double? initialDurationSeconds;
+  final String? transcribedText;
 
   const AudioPlayerBubble({
     super.key,
     required this.audioUrl,
     required this.isOutgoing,
     this.fileName,
+    this.initialDurationSeconds,
+    this.transcribedText,
   });
 
   @override
@@ -24,6 +28,8 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   bool _isLoading = false;
+  bool _isSeeking = false;
+  double _playbackSpeed = 1.0;
 
   StreamSubscription<PlayerState>? _stateSub;
   StreamSubscription<Duration>? _durationSub;
@@ -33,7 +39,26 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
   void initState() {
     super.initState();
     _player = AudioPlayer();
+
+    if (widget.initialDurationSeconds != null && widget.initialDurationSeconds! > 0) {
+      _duration = Duration(milliseconds: (widget.initialDurationSeconds! * 1000).toInt());
+    }
+
+    _initAudio();
+  }
+
+  void _initAudio() async {
     _initAudioListeners();
+
+    try {
+      if (widget.audioUrl.isNotEmpty) {
+        await _player.setSource(UrlSource(widget.audioUrl));
+        final dur = await _player.getDuration();
+        if (dur != null && dur > Duration.zero && mounted) {
+          setState(() => _duration = dur);
+        }
+      }
+    } catch (_) {}
   }
 
   void _initAudioListeners() {
@@ -49,13 +74,13 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
     });
 
     _durationSub = _player.onDurationChanged.listen((dur) {
-      if (mounted) {
+      if (mounted && dur > Duration.zero) {
         setState(() => _duration = dur);
       }
     });
 
     _positionSub = _player.onPositionChanged.listen((pos) {
-      if (mounted) {
+      if (mounted && !_isSeeking) {
         setState(() => _position = pos);
       }
     });
@@ -89,12 +114,29 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
           await _player.seek(Duration.zero);
         }
         await _player.play(UrlSource(widget.audioUrl));
+        await _player.setPlaybackRate(_playbackSpeed);
       } catch (_) {
         if (mounted) {
           setState(() => _isLoading = false);
         }
       }
     }
+  }
+
+  Future<void> _toggleSpeed() async {
+    double nextSpeed = 1.0;
+    if (_playbackSpeed == 1.0) {
+      nextSpeed = 1.5;
+    } else if (_playbackSpeed == 1.5) {
+      nextSpeed = 2.0;
+    } else {
+      nextSpeed = 1.0;
+    }
+
+    setState(() => _playbackSpeed = nextSpeed);
+    try {
+      await _player.setPlaybackRate(nextSpeed);
+    } catch (_) {}
   }
 
   String _formatDuration(Duration d) {
@@ -114,8 +156,8 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
     final currentSeconds = _position.inSeconds.toDouble().clamp(0.0, maxSeconds);
 
     return Container(
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      constraints: const BoxConstraints(minWidth: 230, maxWidth: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isOutgoing ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(12),
@@ -142,11 +184,11 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
                     shape: BoxShape.circle,
                   ),
                   child: _isLoading
-                      ? Padding(
-                          padding: const EdgeInsets.all(9),
+                      ? const Padding(
+                          padding: EdgeInsets.all(9),
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: isOutgoing ? Colors.white : Colors.white,
+                            color: Colors.white,
                           ),
                         )
                       : Icon(
@@ -175,9 +217,44 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
                     value: currentSeconds,
                     min: 0.0,
                     max: maxSeconds,
-                    onChanged: (val) {
-                      _player.seek(Duration(seconds: val.toInt()));
+                    onChangeStart: (_) {
+                      _isSeeking = true;
                     },
+                    onChanged: (val) {
+                      setState(() {
+                        _position = Duration(seconds: val.toInt());
+                      });
+                    },
+                    onChangeEnd: (val) async {
+                      _isSeeking = false;
+                      try {
+                        await _player.seek(Duration(seconds: val.toInt()));
+                      } catch (_) {}
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 4),
+
+              // Speed button (1x / 1.5x / 2x)
+              InkWell(
+                onTap: _toggleSpeed,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isOutgoing ? Colors.white24 : const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_playbackSpeed == 1.0 ? "1" : _playbackSpeed == 1.5 ? "1.5" : "2"}x',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isOutgoing ? Colors.white : const Color(0xFF334155),
+                      fontFamily: 'Gontserrat',
+                    ),
                   ),
                 ),
               ),
@@ -186,7 +263,7 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
 
           // Duration display & Voice Note label
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -210,12 +287,10 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
                   ],
                 ),
                 Text(
-                  _position.inSeconds > 0
-                      ? '${_formatDuration(_position)} / ${_formatDuration(_duration)}'
-                      : _formatDuration(_duration),
+                  '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
                   style: TextStyle(
                     fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                     color: secondaryColor,
                     fontFamily: 'Gontserrat',
                   ),
@@ -223,6 +298,31 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
               ],
             ),
           ),
+
+          // AI Transcript if present (matching web interface)
+          if (widget.transcribedText != null && widget.transcribedText!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isOutgoing ? Colors.black12 : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isOutgoing ? Colors.white12 : const Color(0xFFE2E8F0),
+                  width: 0.6,
+                ),
+              ),
+              child: Text(
+                widget.transcribedText!,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: isOutgoing ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1E293B),
+                  fontFamily: 'Gontserrat',
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

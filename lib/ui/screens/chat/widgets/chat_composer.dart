@@ -7,8 +7,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import '../../../../core/config/app_config.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../data/models/message_template_registry.dart';
+import '../../../../data/models/user.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'send_template_modal.dart';
 
 class ChatComposer extends StatefulWidget {
@@ -19,6 +23,8 @@ class ChatComposer extends StatefulWidget {
   final String channelType;
   final bool canReply;
   final VoidCallback? onOpenTemplates;
+  final List<Map<String, String>> cannedResponses;
+  final List<User> agents;
 
   const ChatComposer({
     super.key,
@@ -29,6 +35,8 @@ class ChatComposer extends StatefulWidget {
     this.channelType = 'whatsapp',
     this.canReply = true,
     this.onOpenTemplates,
+    this.cannedResponses = const [],
+    this.agents = const [],
   });
 
   @override
@@ -48,18 +56,118 @@ class ChatComposerState extends State<ChatComposer> {
   String? _currentRecordingPath;
   int _smartReplyIndex = 0;
 
+  bool _isAttachingSnippet = false;
+  String? _suggestionTrigger; // '/' or '@'
+  String _suggestionQuery = '';
+  int _triggerStartPos = -1;
+
   @override
   void initState() {
     super.initState();
     _audioRecorder = AudioRecorder();
+    _controller.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
     _recordTimer?.cancel();
     _audioRecorder?.dispose();
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    final text = _controller.text;
+    final selection = _controller.selection;
+
+    if (!selection.isValid || selection.baseOffset < 0) {
+      if (_suggestionTrigger != null) {
+        setState(() => _suggestionTrigger = null);
+      }
+      return;
+    }
+
+    final cursor = selection.baseOffset;
+    final textBefore = text.substring(0, cursor);
+
+    final lastWhitespace = textBefore.lastIndexOf(RegExp(r'\s'));
+    final startOfToken = lastWhitespace == -1 ? 0 : lastWhitespace + 1;
+    final currentToken = textBefore.substring(startOfToken);
+
+    if (currentToken.startsWith('/') && !_isPrivateNote) {
+      final q = currentToken.substring(1).toLowerCase().trim();
+      setState(() {
+        _suggestionTrigger = '/';
+        _suggestionQuery = q;
+        _triggerStartPos = startOfToken;
+      });
+    } else if (currentToken.startsWith('@')) {
+      final q = currentToken.substring(1).toLowerCase().trim();
+      setState(() {
+        _suggestionTrigger = '@';
+        _suggestionQuery = q;
+        _triggerStartPos = startOfToken;
+      });
+    } else {
+      if (_suggestionTrigger != null) {
+        setState(() {
+          _suggestionTrigger = null;
+          _suggestionQuery = '';
+          _triggerStartPos = -1;
+        });
+      }
+    }
+  }
+
+  void _selectCannedResponse(Map<String, String> item) {
+    final content = item['content'] ?? '';
+    final rawFiles = item['files'] ?? '';
+    final imageUrl = item['image_url'];
+    final fileUrls = rawFiles.isNotEmpty
+        ? rawFiles.split('|||').where((u) => u.trim().isNotEmpty).toList()
+        : (imageUrl != null && imageUrl.isNotEmpty ? [imageUrl] : <String>[]);
+
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset;
+    final prefix = _triggerStartPos >= 0 ? text.substring(0, _triggerStartPos) : '';
+    final suffix = (cursor >= 0 && cursor <= text.length) ? text.substring(cursor) : '';
+
+    final newText = '$prefix$content $suffix'.trim();
+    _controller.text = newText;
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: (prefix.length + content.length + 1).clamp(0, newText.length)),
+    );
+
+    setState(() {
+      _suggestionTrigger = null;
+      _suggestionQuery = '';
+      _triggerStartPos = -1;
+    });
+
+    if (fileUrls.isNotEmpty) {
+      insertSnippet(text: '', fileUrls: fileUrls);
+    }
+  }
+
+  void _selectAgentMention(User agent) {
+    final mentionText = '@${agent.name} ';
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset;
+    final prefix = _triggerStartPos >= 0 ? text.substring(0, _triggerStartPos) : '';
+    final suffix = (cursor >= 0 && cursor <= text.length) ? text.substring(cursor) : '';
+
+    final newText = '$prefix$mentionText$suffix';
+    _controller.text = newText;
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: (prefix.length + mentionText.length).clamp(0, newText.length)),
+    );
+
+    setState(() {
+      _suggestionTrigger = null;
+      _suggestionQuery = '';
+      _triggerStartPos = -1;
+    });
   }
 
   void insertText(String text) {
@@ -72,12 +180,20 @@ class ChatComposerState extends State<ChatComposer> {
   }
 
   Future<void> insertSnippet({required String text, List<String> fileUrls = const []}) async {
-    insertText(text);
+    if (text.isNotEmpty) {
+      insertText(text);
+    }
 
     if (fileUrls.isEmpty) return;
 
+    setState(() => _isAttachingSnippet = true);
+
     try {
       final tempDir = await getTemporaryDirectory();
+      final base = await SecureStorageService().getBaseUrl();
+      final uri = Uri.tryParse(base.isNotEmpty ? base : AppConfig.defaultBaseUrl);
+      final domainRoot = uri != null ? '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}' : AppConfig.defaultBaseUrl;
+
       final authHeaders = await SecureStorageService().getAuthHeaders();
       final headers = <String, String>{};
       if (authHeaders != null) {
@@ -95,8 +211,11 @@ class ChatComposerState extends State<ChatComposer> {
       ));
 
       for (int i = 0; i < fileUrls.length; i++) {
-        final url = fileUrls[i].trim();
+        var url = fileUrls[i].trim();
         if (url.isEmpty) continue;
+        if (url.startsWith('/')) {
+          url = '$domainRoot$url';
+        }
 
         try {
           final cleanUrl = url.split('?').first;
@@ -130,6 +249,10 @@ class ChatComposerState extends State<ChatComposer> {
       }
     } catch (e) {
       debugPrint('Error in insertSnippet: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isAttachingSnippet = false);
+      }
     }
   }
 
@@ -755,52 +878,86 @@ class ChatComposerState extends State<ChatComposer> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Attached files preview bar
-            if (_attachedPaths.isNotEmpty)
+            // Autocomplete Popup for '/' (Canned responses) and '@' (Mentions)
+            _buildSuggestionsPopup(isDark, isArabic, textPrimary, textSecondary),
+
+            // Attached files preview bar & loading indicator
+            if (_attachedPaths.isNotEmpty || _isAttachingSnippet)
               Container(
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                child: ListView.builder(
+                child: ListView(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _attachedPaths.length,
-                  itemBuilder: (context, index) {
-                    final path = _attachedPaths[index];
-                    final isImage = path.endsWith('.png') ||
-                        path.endsWith('.jpg') ||
-                        path.endsWith('.jpeg') ||
-                        path.endsWith('.webp');
-
-                    return Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF212121) : const Color(0xFFEAEAEA),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isImage)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Image.file(File(path), width: 36, height: 36, fit: BoxFit.cover),
-                            )
-                          else
-                            const HugeIcon(
-                              icon: HugeIcons.strokeRoundedFile01,
-                              color: Color(0xFF4162E3),
-                              size: 24,
+                  children: [
+                    if (_isAttachingSnippet)
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.primary),
                             ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 16),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => setState(() => _attachedPaths.removeAt(index)),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Text(
+                              isArabic ? 'جاري إرفاق صورة الرد الجاهز...' : 'Attaching snippet image...',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  },
+                    ...List.generate(_attachedPaths.length, (index) {
+                      final path = _attachedPaths[index];
+                      final isImage = path.endsWith('.png') ||
+                          path.endsWith('.jpg') ||
+                          path.endsWith('.jpeg') ||
+                          path.endsWith('.webp');
+
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF212121) : const Color(0xFFEAEAEA),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isImage)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.file(File(path), width: 36, height: 36, fit: BoxFit.cover),
+                              )
+                            else
+                              const HugeIcon(
+                                icon: HugeIcons.strokeRoundedFile01,
+                                color: Color(0xFF4162E3),
+                                size: 24,
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => setState(() => _attachedPaths.removeAt(index)),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
                 ),
               ),
 
@@ -1273,4 +1430,250 @@ class ChatComposerState extends State<ChatComposer> {
     ),
   );
 }
+
+  Widget _buildSuggestionsPopup(bool isDark, bool isArabic, Color textPrimary, Color textSecondary) {
+    if (_suggestionTrigger == null) return const SizedBox.shrink();
+
+    final isSlash = _suggestionTrigger == '/';
+
+    if (isSlash) {
+      final filtered = widget.cannedResponses.where((c) {
+        if (_suggestionQuery.isEmpty) return true;
+        final code = (c['short_code'] ?? '').toLowerCase();
+        final content = (c['content'] ?? '').toLowerCase();
+        return code.contains(_suggestionQuery) || content.contains(_suggestionQuery);
+      }).toList();
+
+      if (filtered.isEmpty) return const SizedBox.shrink();
+
+      return Container(
+        constraints: const BoxConstraints(maxHeight: 220),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E2128) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2E333D) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF282C35) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF4162E3)),
+                  const SizedBox(width: 6),
+                  Text(
+                    isArabic ? 'الردود الجاهزة (${filtered.length})' : 'Canned Responses (${filtered.length})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textPrimary,
+                      fontFamily: 'Gontserrat',
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    isArabic ? 'اضغط للإدراج' : 'Tap to insert',
+                    style: TextStyle(fontSize: 10.5, color: textSecondary, fontFamily: 'Gontserrat'),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  color: isDark ? const Color(0xFF2E333D) : const Color(0xFFF1F5F9),
+                ),
+                itemBuilder: (context, index) {
+                  final item = filtered[index];
+                  final code = item['short_code'] ?? '';
+                  final content = item['content'] ?? '';
+                  final rawFiles = item['files'] ?? '';
+                  final imageUrl = item['image_url'];
+                  final hasImage = (imageUrl != null && imageUrl.isNotEmpty) || rawFiles.isNotEmpty;
+
+                  return InkWell(
+                    onTap: () => _selectCannedResponse(item),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4162E3).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '/$code',
+                              style: const TextStyle(
+                                color: Color(0xFF4162E3),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              content,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: textPrimary,
+                                fontFamily: 'Gontserrat',
+                              ),
+                            ),
+                          ),
+                          if (hasImage) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.image_outlined, size: 16, color: Color(0xFF4162E3)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Agent Mentions (@)
+      final filtered = widget.agents.where((a) {
+        if (_suggestionQuery.isEmpty) return true;
+        final name = a.name.toLowerCase();
+        final email = a.email.toLowerCase();
+        return name.contains(_suggestionQuery) || email.contains(_suggestionQuery);
+      }).toList();
+
+      if (filtered.isEmpty) return const SizedBox.shrink();
+
+      return Container(
+        constraints: const BoxConstraints(maxHeight: 220),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E2128) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2E333D) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF282C35) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.alternate_email_rounded, size: 16, color: Color(0xFF10B981)),
+                  const SizedBox(width: 6),
+                  Text(
+                    isArabic ? 'منشن أعضاء الفريق (${filtered.length})' : 'Mention Team Member (${filtered.length})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textPrimary,
+                      fontFamily: 'Gontserrat',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  color: isDark ? const Color(0xFF2E333D) : const Color(0xFFF1F5F9),
+                ),
+                itemBuilder: (context, index) {
+                  final agent = filtered[index];
+                  return InkWell(
+                    onTap: () => _selectAgentMention(agent),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: const Color(0xFF4162E3).withValues(alpha: 0.15),
+                            backgroundImage: agent.avatarUrl != null && agent.avatarUrl!.isNotEmpty
+                                ? CachedNetworkImageProvider(agent.avatarUrl!)
+                                : null,
+                            child: agent.avatarUrl == null || agent.avatarUrl!.isEmpty
+                                ? Text(
+                                    agent.name.isNotEmpty ? agent.name[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4162E3)),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  agent.name,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                    fontFamily: 'Gontserrat',
+                                  ),
+                                ),
+                                if (agent.email.isNotEmpty)
+                                  Text(
+                                    agent.email,
+                                    style: TextStyle(fontSize: 11, color: textSecondary),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 }

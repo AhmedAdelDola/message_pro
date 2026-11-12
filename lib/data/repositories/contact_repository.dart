@@ -26,10 +26,17 @@ abstract class IContactRepository {
     String? email,
     String? phoneNumber,
     Map<String, dynamic>? customAttributes,
+    int? lifecycleStageId,
+    bool clearLifecycleStage = false,
   });
   Future<Either<Failure, List<String>>> getContactLabels(int contactId);
   Future<Either<Failure, List<String>>> updateContactLabels(int contactId, List<String> labels);
-  Future<Either<Failure, Contact>> updateContactLifecycle(int contactId, String stage);
+  Future<Either<Failure, Contact>> updateContactLifecycle(
+    int contactId,
+    String stage, {
+    int? stageId,
+    bool clearStage = false,
+  });
 }
 
 class ContactRepository implements IContactRepository {
@@ -158,6 +165,8 @@ class ContactRepository implements IContactRepository {
     String? email,
     String? phoneNumber,
     Map<String, dynamic>? customAttributes,
+    int? lifecycleStageId,
+    bool clearLifecycleStage = false,
   }) async {
     try {
       final patchData = <String, dynamic>{};
@@ -165,6 +174,11 @@ class ContactRepository implements IContactRepository {
       if (email != null) patchData['email'] = email;
       if (phoneNumber != null) patchData['phone_number'] = phoneNumber;
       if (customAttributes != null) patchData['custom_attributes'] = customAttributes;
+      if (lifecycleStageId != null) {
+        patchData['lifecycle_stage_id'] = lifecycleStageId;
+      } else if (clearLifecycleStage) {
+        patchData['lifecycle_stage_id'] = null;
+      }
 
       final response = await _api.patch(
         'contacts/$id',
@@ -215,9 +229,16 @@ class ContactRepository implements IContactRepository {
   }
 
   @override
-  Future<Either<Failure, Contact>> updateContactLifecycle(int contactId, String stage) async {
+  Future<Either<Failure, Contact>> updateContactLifecycle(
+    int contactId,
+    String stage, {
+    int? stageId,
+    bool clearStage = false,
+  }) async {
     return updateContact(
       contactId,
+      lifecycleStageId: stageId,
+      clearLifecycleStage: clearStage,
       customAttributes: {'lifecycle_stage': stage, 'lead_status': stage},
     );
   }

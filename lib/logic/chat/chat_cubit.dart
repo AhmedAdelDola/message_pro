@@ -162,7 +162,7 @@ class ChatCubit extends Cubit<ChatState> {
 
     final validMessages = state.messages.where((m) => m.id > 0);
     if (validMessages.isEmpty) return;
-    final oldestMessageId = validMessages.first.id;
+    final oldestMessageId = validMessages.map((m) => m.id).reduce((min, id) => id < min ? id : min);
 
     emit(state.copyWith(isLoadingOlder: true));
 

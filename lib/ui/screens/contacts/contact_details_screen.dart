@@ -94,12 +94,27 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
     );
   }
 
-  Future<void> _updateLifecycleStage(String stage) async {
+  Future<void> _updateLifecycleStage(String stage, {int? stageId}) async {
     final old = _lifecycleStage;
     setState(() => _lifecycleStage = stage);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    final res = await sl<IContactRepository>().updateContactLifecycle(_contact.id, stage);
+    // If stageId is not explicitly provided, try to find it in _lifecycleStages
+    int? resolvedId = stageId;
+    if (resolvedId == null && _lifecycleStages.isNotEmpty) {
+      for (final s in _lifecycleStages) {
+        if (stage.contains(s.name) || s.name.contains(stage)) {
+          resolvedId = s.id;
+          break;
+        }
+      }
+    }
+
+    final res = await sl<IContactRepository>().updateContactLifecycle(
+      _contact.id,
+      stage,
+      stageId: resolvedId,
+    );
     if (!mounted) return;
     res.fold(
       (failure) {
@@ -554,7 +569,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                             trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
                             onTap: () {
                               Navigator.pop(ctx);
-                              _updateLifecycleStage(fullStage);
+                              _updateLifecycleStage(fullStage, stageId: stage.id);
                             },
                           );
                         },
