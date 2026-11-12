@@ -160,6 +160,9 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, void>> updateLifecycleStage(int conversationId, int stageId) async => const Right(null);
 
   @override
+  Future<Either<Failure, void>> updateConversationCustomAttributes(int conversationId, Map<String, dynamic> customAttributes) async => const Right(null);
+
+  @override
   Future<Either<Failure, void>> markAsRead(int conversationId) async => const Right(null);
 
   @override

@@ -252,6 +252,20 @@ class LifecycleStage {
     this.icon,
   });
 
+  LifecycleStage copyWith({
+    int? id,
+    String? name,
+    String? color,
+    String? icon,
+  }) {
+    return LifecycleStage(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+    );
+  }
+
   factory LifecycleStage.fromJson(Map<String, dynamic> json) {
     final rawName = (json['name'] ?? json['title'] ?? '').toString();
     final rawIcon = json['icon'] ?? json['emoji'] ?? json['symbol'] ?? json['shape'];

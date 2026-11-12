@@ -119,7 +119,10 @@ class ConversationTile extends StatelessWidget {
     final assigneeInitial = aName.isNotEmpty ? aName[0].toUpperCase() : 'A';
 
     // Robust channel resolution matching workspace inboxes, phone number and names
-    final inboxes = context.read<ConversationCubit>().state.inboxes;
+    List<Inbox> inboxes = const [];
+    try {
+      inboxes = context.read<ConversationCubit>().state.inboxes;
+    } catch (_) {}
     final matchingInbox = inboxes.where((i) => i.id == conversation.inboxId).firstOrNull;
 
     String resolvedChannel = (matchingInbox != null && matchingInbox.channelType.isNotEmpty)

@@ -28,9 +28,12 @@ class AiAgentTakeoverBanner extends StatelessWidget {
 
     // Extract leading emoji if present (e.g. 🤠 Sales agent)
     String iconEmoji = '🤖';
-    final emojiMatch = RegExp(r'^(\p{Emoji_Presentation}|\p{Extended_Pictographic})', unicode: true).firstMatch(displayName.trim());
-    if (emojiMatch != null) {
-      iconEmoji = emojiMatch.group(1) ?? '🤖';
+    final trimmed = displayName.trim();
+    if (trimmed.isNotEmpty) {
+      final firstChar = trimmed.characters.first;
+      if (firstChar.runes.isNotEmpty && (firstChar.runes.first > 255 || firstChar.runes.first == 0x2B50)) {
+        iconEmoji = firstChar;
+      }
     }
 
     return Container(
