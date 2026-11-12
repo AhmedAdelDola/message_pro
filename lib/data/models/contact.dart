@@ -56,10 +56,6 @@ class Contact {
       lifecycleStageId: lifecycleStageId ?? this.lifecycleStageId,
     );
   }
-      canManageCollaborators: canManageCollaborators ?? this.canManageCollaborators,
-      lifecycleStage: lifecycleStage ?? this.lifecycleStage,
-    );
-  }
 
   factory Contact.fromJson(Map<String, dynamic> json) {
     final rawName = json['name']?.toString().trim();
