@@ -138,7 +138,7 @@ jobs:
               print(f"Profile SHA1s: {profile_sha1s}")
               print("Skipping local installation of this conflicting profile so Xcode (-allowProvisioningUpdates)")
               print("can automatically download/generate the matching profile directly from App Store Connect.")
-              print("NOTE: If export fails, open developer.apple.com -> Profiles -> Edit this profile -> Check the 'Apple Distribution' certificate -> Save and download the updated profile.")
+              print("NOTE: If export fails, open developer.apple.com -> Profiles -> Edit this profile -> Check the Apple Distribution certificate -> Save and download the updated profile.")
               print("=" * 60)
           '
 
