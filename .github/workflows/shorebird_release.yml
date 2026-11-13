@@ -293,7 +293,7 @@ jobs:
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          shorebird release android --no-confirm
+          shorebird release android --no-confirm --flutter-version=8352242a910a1f79747cb1c6d2aa02edc5f3fc12
 
       - name: Upload Android AAB Bundle
         uses: actions/upload-artifact@v4
