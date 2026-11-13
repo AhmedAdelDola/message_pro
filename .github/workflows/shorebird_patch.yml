@@ -54,89 +54,17 @@ jobs:
           mkdir -p build/ios/SourcePackages
           shorebird flutter config --no-enable-swift-package-manager
 
-      - name: Install Apple Certificate
-        if: env.HAVE_CERT == 'true'
-        env:
-          HAVE_CERT: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' }}
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
-          KEYCHAIN_PWD=$(openssl rand -base64 12)
-
-          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
-
-          CERT_PATH=$RUNNER_TEMP/certificate.p12
-          echo "$BUILD_CERTIFICATE_BASE64" | tr -d '\r\n ' | base64 --decode > "$CERT_PATH"
-          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-          echo "Certificate imported to temporary keychain successfully."
-
-      - name: Install Provisioning Profile
-        if: env.HAVE_PROFILE == 'true'
-        env:
-          HAVE_PROFILE: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 != '' }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
-          echo "$BUILD_PROVISION_PROFILE_BASE64" | tr -d '\r\n ' | base64 --decode > "$PP_PATH"
-
-          python3 -c '
-          import os, subprocess, plistlib, hashlib, shutil
-
-          pp_path = os.environ.get("PP_PATH")
-          dest_dir = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
-          os.makedirs(dest_dir, exist_ok=True)
-
-          try:
-              out = subprocess.check_output(["security", "cms", "-D", "-i", pp_path], stderr=subprocess.DEVNULL)
-              profile = plistlib.loads(out)
-          except Exception as e:
-              print(f"Error parsing provisioning profile: {e}")
-              profile = {}
-
-          uuid = profile.get("UUID", "profile")
-          name = profile.get("Name", "Unknown Profile")
-          certs = profile.get("DeveloperCertificates", [])
-          profile_sha1s = [hashlib.sha1(c).hexdigest().upper() for c in certs]
-
-          try:
-              keychain_identities = subprocess.check_output(["security", "find-identity", "-p", "codesigning", "-v"]).decode("utf-8", "ignore")
-          except Exception:
-              keychain_identities = ""
-
-          print(f"Provisioning Profile Name: {name}")
-          print(f"Provisioning Profile UUID: {uuid}")
-          print(f"Number of certificates in profile: {len(certs)}")
-          print(f"Keychain identities:\n{keychain_identities.strip()}")
-
-          matches = [s for s in profile_sha1s if s in keychain_identities.upper()]
-          if matches or not keychain_identities.strip():
-              target = os.path.join(dest_dir, f"{uuid}.mobileprovision")
-              shutil.copyfile(pp_path, target)
-              print(f"Provisioning profile installed successfully to {target}")
-          else:
-              print("Skipping local installation of conflicting profile.")
-          '
-
       - name: Shorebird Patch iOS
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
           COCOAPODS_DISABLE_STATS: 'true'
         run: |
-          FLAGS="--release-version=${{ inputs.ios_release_version }}"
+          FLAGS="--release-version=${{ inputs.ios_release_version }} --no-codesign"
           if [ "${{ inputs.allow_native_diffs }}" = "true" ]; then
             FLAGS="$FLAGS --allow-native-diffs"
           fi
           if [ "${{ inputs.allow_asset_diffs }}" = "true" ]; then
             FLAGS="$FLAGS --allow-asset-diffs"
-          fi
-          if [ "${{ secrets.BUILD_CERTIFICATE_BASE64 }}" = "" ]; then
-            FLAGS="$FLAGS --no-codesign"
           fi
 
           echo "Executing: shorebird patch ios $FLAGS"
