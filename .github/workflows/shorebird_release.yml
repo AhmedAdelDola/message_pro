@@ -94,25 +94,26 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+          export PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
           echo "$BUILD_PROVISION_PROFILE_BASE64" | tr -d '\r\n ' | base64 --decode > "$PP_PATH"
 
           python3 -c '
           import os, subprocess, plistlib, hashlib, shutil
 
-          pp_path = os.environ.get("PP_PATH")
+          pp_path = os.environ.get("PP_PATH") or os.path.join(os.environ.get("RUNNER_TEMP", "/tmp"), "profile.mobileprovision")
           dest_dir = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
           os.makedirs(dest_dir, exist_ok=True)
 
-          try:
-              out = subprocess.check_output(["security", "cms", "-D", "-i", pp_path], stderr=subprocess.DEVNULL)
-              profile = plistlib.loads(out)
-          except Exception as e:
-              print(f"Error parsing provisioning profile: {e}")
-              profile = {}
+          profile = {}
+          if os.path.exists(pp_path):
+              try:
+                  out = subprocess.check_output(["security", "cms", "-D", "-i", pp_path], stderr=subprocess.DEVNULL)
+                  profile = plistlib.loads(out)
+              except Exception as e:
+                  print(f"Error parsing provisioning profile: {e}")
 
           uuid = profile.get("UUID", "profile")
-          name = profile.get("Name", "Unknown Profile")
+          name = profile.get("Name", "MessagePro")
           certs = profile.get("DeveloperCertificates", [])
           profile_sha1s = [hashlib.sha1(c).hexdigest().upper() for c in certs]
 
@@ -126,14 +127,16 @@ jobs:
           print(f"Number of certificates in profile: {len(certs)}")
           print(f"Keychain identities:\n{keychain_identities.strip()}")
 
-          # Always install provisioning profile locally
-          target_uuid = os.path.join(dest_dir, f"{uuid}.mobileprovision")
-          shutil.copyfile(pp_path, target_uuid)
-          target_name = os.path.join(dest_dir, f"{name}.mobileprovision")
-          shutil.copyfile(pp_path, target_name)
-          target_fixed = os.path.join(dest_dir, "MessagePro.mobileprovision")
-          shutil.copyfile(pp_path, target_fixed)
-          print(f"Provisioning profile installed successfully to {target_uuid} and {target_fixed}")
+          if os.path.exists(pp_path):
+              target_uuid = os.path.join(dest_dir, f"{uuid}.mobileprovision")
+              shutil.copyfile(pp_path, target_uuid)
+              target_name = os.path.join(dest_dir, f"{name}.mobileprovision")
+              shutil.copyfile(pp_path, target_name)
+              target_fixed = os.path.join(dest_dir, "MessagePro.mobileprovision")
+              shutil.copyfile(pp_path, target_fixed)
+              print(f"Provisioning profile installed successfully to {target_uuid} and {target_fixed}")
+          else:
+              print(f"Warning: Provisioning profile file not found at {pp_path}")
           '
 
       - name: Setup App Store Connect API Key
