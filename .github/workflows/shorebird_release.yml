@@ -126,20 +126,14 @@ jobs:
           print(f"Number of certificates in profile: {len(certs)}")
           print(f"Keychain identities:\n{keychain_identities.strip()}")
 
-          # Check if any certificate in the profile matches one in the keychain
-          matches = [s for s in profile_sha1s if s in keychain_identities.upper()]
-          if matches or not keychain_identities.strip():
-              target = os.path.join(dest_dir, f"{uuid}.mobileprovision")
-              shutil.copyfile(pp_path, target)
-              print(f"Provisioning profile installed successfully to {target}")
-          else:
-              print("=" * 60)
-              print("⚠️ WARNING: Provisioning profile does NOT include the signing certificate installed in the keychain!")
-              print(f"Profile SHA1s: {profile_sha1s}")
-              print("Skipping local installation of this conflicting profile so Xcode (-allowProvisioningUpdates)")
-              print("can automatically download/generate the matching profile directly from App Store Connect.")
-              print("NOTE: If export fails, open developer.apple.com -> Profiles -> Edit this profile -> Check the Apple Distribution certificate -> Save and download the updated profile.")
-              print("=" * 60)
+          # Always install provisioning profile locally
+          target_uuid = os.path.join(dest_dir, f"{uuid}.mobileprovision")
+          shutil.copyfile(pp_path, target_uuid)
+          target_name = os.path.join(dest_dir, f"{name}.mobileprovision")
+          shutil.copyfile(pp_path, target_name)
+          target_fixed = os.path.join(dest_dir, "MessagePro.mobileprovision")
+          shutil.copyfile(pp_path, target_fixed)
+          print(f"Provisioning profile installed successfully to {target_uuid} and {target_fixed}")
           '
 
       - name: Setup App Store Connect API Key
@@ -222,11 +216,16 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>destination</key>
               <string>export</string>
               <key>signingStyle</key>
               <string>automatic</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.message.pro.com</key>
+                  <string>MessagePro</string>
+              </dict>
               <key>manageAppVersionAndBuildNumber</key>
               <false/>
               <key>teamID</key>
