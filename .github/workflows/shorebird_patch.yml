@@ -15,11 +15,11 @@ on:
       ios_release_version:
         description: 'iOS Release version to patch'
         required: true
-        default: '1.0.9+34'
+        default: '1.0.9+35'
       android_release_version:
         description: 'Android Release version to patch'
         required: true
-        default: '1.0.9+34'
+        default: '1.0.9+35'
       allow_native_diffs:
         description: 'Allow native diffs (--allow-native-diffs)'
         required: false
