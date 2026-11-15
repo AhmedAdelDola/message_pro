@@ -86,15 +86,22 @@ class ConversationTile extends StatelessWidget {
       if (lastMsg.content != null && lastMsg.content!.trim().isNotEmpty) {
         clastMsg = lastMsg.content!.trim();
       } else if (lastMsg.attachments.isNotEmpty) {
+        final count = lastMsg.attachments.length;
         final firstType = lastMsg.attachments.first.fileType;
         if (firstType == 'image') {
-          clastMsg = isArabic ? '📷 صورة' : '📷 Image';
+          clastMsg = isArabic
+              ? (count > 1 ? '📷 $count صور' : '📷 صورة')
+              : (count > 1 ? '📷 $count Photos' : '📷 Image');
         } else if (firstType == 'audio') {
           clastMsg = isArabic ? '🎵 تسجيل صوتي' : '🎵 Audio';
         } else if (firstType == 'video') {
-          clastMsg = isArabic ? '🎥 فيديو' : '🎥 Video';
+          clastMsg = isArabic
+              ? (count > 1 ? '🎥 $count فيديوهات' : '🎥 فيديو')
+              : (count > 1 ? '🎥 $count Videos' : '🎥 Video');
         } else {
-          clastMsg = isArabic ? '📎 ملف مرفق' : '📎 Attachment';
+          clastMsg = isArabic
+              ? (count > 1 ? '📎 $count ملفات' : '📎 ملف مرفق')
+              : (count > 1 ? '📎 $count Files' : '📎 Attachment');
         }
       } else if (lastMsg.isActivity) {
         clastMsg = lastMsg.content ?? (isArabic ? 'نشاط في المحادثة' : 'Activity');

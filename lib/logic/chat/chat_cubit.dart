@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:message_pro/data/models/contact.dart';
+import '../../core/error/failures.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/services/sound_service.dart';
 import '../../data/models/message.dart';
@@ -62,10 +64,11 @@ class ChatCubit extends Cubit<ChatState> {
             repo.markAsRead(conversationId);
           }
         }
-      } else if (name == 'message.updated') {
+      } else if (name == 'message.updated' || name == 'message.reactions_updated') {
         final convId = payload['conversation_id'];
         if (convId != null && convId == conversationId) {
-          final updatedMsg = Message.fromJson(payload);
+          final msgData = payload['message'] is Map ? payload['message'] : payload;
+          final updatedMsg = Message.fromJson(Map<String, dynamic>.from(msgData));
           final index = state.messages.indexWhere((m) => m.id == updatedMsg.id);
           if (index != -1) {
             final updatedList = List<Message>.from(state.messages);
@@ -205,6 +208,42 @@ class ChatCubit extends Cubit<ChatState> {
     );
   }
 
+  /// Loads a specific target message by ID if not already present in the list,
+  /// using the after=id and before=id+1 parameters per the backend specification.
+  Future<bool> loadTargetMessage(int messageId) async {
+    if (state.messages.any((m) => m.id == messageId)) {
+      return true;
+    }
+
+    final result = await repo.getMessages(
+      conversationId,
+      afterId: messageId,
+      beforeId: messageId + 1,
+    );
+
+    return result.fold(
+      (failure) => false,
+      (fetched) {
+        if (fetched.isEmpty) return false;
+
+        final existingIds = state.messages.map((m) => m.id).toSet();
+        final newItems = fetched.where((m) => !existingIds.contains(m.id)).toList();
+
+        if (newItems.isNotEmpty) {
+          final updated = [...state.messages, ...newItems]
+            ..sort((a, b) {
+              final cmp = a.createdAt.compareTo(b.createdAt);
+              if (cmp != 0) return cmp;
+              return a.id.compareTo(b.id);
+            });
+          emit(state.copyWith(messages: updated));
+        }
+
+        return state.messages.any((m) => m.id == messageId);
+      },
+    );
+  }
+
   Future<void> loadCannedResponses() async {
     final result = await repo.fetchCannedResponses();
     result.fold((_) {}, (list) {
@@ -216,6 +255,7 @@ class ChatCubit extends Cubit<ChatState> {
     required String content,
     bool isPrivate = false,
     List<String>? attachmentPaths,
+    int? inReplyToId,
   }) async {
     emit(state.copyWith(isSending: true));
     final result = await repo.sendMessage(
@@ -223,6 +263,7 @@ class ChatCubit extends Cubit<ChatState> {
       content: content,
       isPrivate: isPrivate,
       attachmentPaths: attachmentPaths,
+      inReplyToId: inReplyToId,
     );
 
     return result.fold(
@@ -410,6 +451,57 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> updateLifecycleStage(int stageId) async {
     await repo.updateLifecycleStage(conversationId, stageId);
+  }
+
+  Future<String?> editMessage(int messageId, String newContent) async {
+    final result = await repo.editMessage(
+      conversationId: conversationId,
+      messageId: messageId,
+      content: newContent,
+    );
+    return result.fold(
+      (failure) => failure.message,
+      (updatedMsg) {
+        final index = state.messages.indexWhere((m) => m.id == messageId);
+        if (index != -1) {
+          final updatedList = List<Message>.from(state.messages);
+          updatedList[index] = updatedMsg;
+          emit(state.copyWith(messages: updatedList));
+        }
+        return null;
+      },
+    );
+  }
+
+  Future<String?> sendReaction(int messageId, String emoji) async {
+    final result = await repo.sendReaction(
+      conversationId: conversationId,
+      messageId: messageId,
+      emoji: emoji,
+    );
+    return result.fold(
+      (failure) => failure.message,
+      (updatedMsg) {
+        final index = state.messages.indexWhere((m) => m.id == messageId);
+        if (index != -1) {
+          final updatedList = List<Message>.from(state.messages);
+          updatedList[index] = updatedMsg;
+          emit(state.copyWith(messages: updatedList));
+        }
+        return null;
+      },
+    );
+  }
+
+  Future<Either<Failure, List<ReactionParticipant>>> getReactions(
+    int messageId, {
+    Map<String, dynamic>? contentAttributes,
+  }) async {
+    return await repo.getReactions(
+      conversationId: conversationId,
+      messageId: messageId,
+      contentAttributes: contentAttributes,
+    );
   }
 
   @override

@@ -11,6 +11,7 @@ import 'package:message_pro/core/services/push_notification_service.dart';
 import 'package:message_pro/core/storage/secure_storage_service.dart';
 import 'package:message_pro/data/models/contact.dart';
 import 'package:message_pro/data/models/conversation.dart';
+import 'package:message_pro/data/models/conversation_filter_options.dart';
 import 'package:message_pro/data/models/message.dart';
 import 'package:message_pro/data/models/message_template.dart';
 import 'package:message_pro/data/models/notification_item.dart';
@@ -60,6 +61,8 @@ class FakeConversationRepository implements IConversationRepository {
     int? inboxId,
     int? teamId,
     String? label,
+    int? assigneeId,
+    int? assigneeAgentBotId,
     int page = 1,
   }) async {
     getConversationsCallCount++;
@@ -121,7 +124,7 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1}) async => Right(conversations);
 
   @override
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId}) async => const Right([]);
+  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId}) async => const Right([]);
 
   @override
   Future<Either<Failure, Message>> sendMessage({
@@ -129,7 +132,11 @@ class FakeConversationRepository implements IConversationRepository {
     required String content,
     bool isPrivate = false,
     List<String>? attachmentPaths,
+    int? inReplyToId,
   }) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions() async => const Right(ConversationFilterOptions());
 
   @override
   Future<Either<Failure, Message>> sendTemplateMessage({
@@ -211,6 +218,9 @@ class FakeConversationRepository implements IConversationRepository {
     required String sourceId,
     String? contactName,
   }) async => throw UnimplementedError();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class FakeAuthRepository implements IAuthRepository {
@@ -760,7 +770,7 @@ void main() {
       await tester.pumpWidget(
         wrapWithMaterialAndScreenUtil(
           const ImageViewerScreen(
-            imageUrl: 'https://example.com/sample_image.png',
+            imageUrls: ['https://example.com/sample_image.png'],
             title: 'sample_image.png',
           ),
         ),

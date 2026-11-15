@@ -46,6 +46,10 @@ class DocumentAttachmentTile extends StatelessWidget {
     final ext = _getFileExtension();
     if (ext == 'pdf' || fileType.toLowerCase() == 'pdf') {
       return Icons.picture_as_pdf_rounded;
+    } else if (['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].contains(ext) || fileType.toLowerCase() == 'video') {
+      return Icons.play_circle_fill_rounded;
+    } else if (['mp3', 'wav', 'ogg', 'm4a', 'aac'].contains(ext) || fileType.toLowerCase() == 'audio') {
+      return Icons.audiotrack_rounded;
     } else if (['doc', 'docx', 'rtf'].contains(ext)) {
       return Icons.description_rounded;
     } else if (['xls', 'xlsx', 'csv'].contains(ext)) {
@@ -64,6 +68,10 @@ class DocumentAttachmentTile extends StatelessWidget {
     final ext = _getFileExtension();
     if (ext == 'pdf' || fileType.toLowerCase() == 'pdf') {
       return const Color(0xFFEF4444); // Red
+    } else if (['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].contains(ext) || fileType.toLowerCase() == 'video') {
+      return const Color(0xFF8B5CF6); // Violet / Purple
+    } else if (['mp3', 'wav', 'ogg', 'm4a', 'aac'].contains(ext) || fileType.toLowerCase() == 'audio') {
+      return const Color(0xFF06B6D4); // Cyan
     } else if (['doc', 'docx', 'rtf'].contains(ext)) {
       return const Color(0xFF2563EB); // Blue
     } else if (['xls', 'xlsx', 'csv'].contains(ext)) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../logic/auth/auth_cubit.dart';
 import '../../../logic/settings/settings_cubit.dart';
 import '../auth/login_screen.dart';
@@ -62,6 +63,9 @@ class _SplashScreenState extends State<SplashScreen>
           transitionDuration: const Duration(milliseconds: 300),
         ),
       );
+      Future.delayed(const Duration(milliseconds: 400), () {
+        PushNotificationService.processPendingNotification();
+      });
     } else {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(

@@ -14,6 +14,7 @@ import '../../../logic/conversation/conversation_state.dart';
 import '../chat/chat_screen.dart';
 import '../contacts/add_contact_screen.dart';
 import 'widgets/conversation_tile.dart';
+import 'widgets/inbox_filter_drawer.dart';
 import '../../widgets/app_bar_progress_bar.dart';
 import '../../widgets/break_countdown_banner.dart';
 import '../chat/widgets/start_direct_chat_sheet.dart';
@@ -58,6 +59,7 @@ class _InboxScreenState extends State<InboxScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final cubit = context.read<ConversationCubit>();
       cubit.loadAuxiliaryData();
+      cubit.loadFilterOptions();
       cubit.setAssigneeType('all');
       cubit.setStatus('all');
     });
@@ -574,6 +576,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
+      drawer: const InboxFilterDrawer(),
       backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
@@ -591,6 +594,67 @@ class _InboxScreenState extends State<InboxScreen> {
                   context.watch<ConversationCubit>().state.isLoadingMore ||
                   _isSearchingServer,
             ),
+
+            // Active Filter Indicator Bar
+            if (!_isSearching)
+              BlocBuilder<ConversationCubit, ConversationState>(
+                builder: (context, state) {
+                  final cubit = context.read<ConversationCubit>();
+                  String? activeFilterName;
+
+                  if (state.selectedAssigneeAgentBotId != null) {
+                    final ai = state.filterOptions?.aiAgents.where((a) => a.agentBotId == state.selectedAssigneeAgentBotId).firstOrNull;
+                    activeFilterName = '${isArabic ? "بوت ذكي" : "AI Agent"}: ${ai?.name ?? "#${state.selectedAssigneeAgentBotId}"}';
+                  } else if (state.selectedAssigneeId != null) {
+                    final agent = state.filterOptions?.agents.where((a) => a.id == state.selectedAssigneeId).firstOrNull;
+                    activeFilterName = '${isArabic ? "موظف" : "Agent"}: ${agent?.name ?? "#${state.selectedAssigneeId}"}';
+                  } else if (state.selectedInboxId != null) {
+                    final inbox = state.filterOptions?.inboxes.where((i) => i.id == state.selectedInboxId).firstOrNull;
+                    activeFilterName = '${isArabic ? "قناة" : "Channel"}: ${inbox?.name ?? "#${state.selectedInboxId}"}';
+                  } else if (state.selectedTeamId != null) {
+                    final team = state.filterOptions?.teams.where((t) => t.id == state.selectedTeamId).firstOrNull;
+                    activeFilterName = '${isArabic ? "فريق" : "Team"}: ${team?.name ?? "#${state.selectedTeamId}"}';
+                  }
+
+                  if (activeFilterName == null) return const SizedBox.shrink();
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            activeFilterName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => cubit.clearAllFilters(),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(Icons.close_rounded, size: 16, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
 
             // Segmented Primary Filter Tabs: All | Mine | Collaborating | Unassigned
             if (!_isSearching)
@@ -990,6 +1054,59 @@ class _InboxScreenState extends State<InboxScreen> {
         children: [
           Row(
             children: [
+              // Drawer Menu Button with Active Filter Indicator Dot
+              BlocBuilder<ConversationCubit, ConversationState>(
+                builder: (context, state) {
+                  final hasActiveFilter = state.selectedInboxId != null ||
+                      state.selectedTeamId != null ||
+                      state.selectedAssigneeId != null ||
+                      state.selectedAssigneeAgentBotId != null;
+
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      InkWell(
+                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E1F24) : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: hasActiveFilter ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedMenu01,
+                            color: hasActiveFilter ? AppColors.primary : textPrimary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      if (hasActiveFilter)
+                        Positioned(
+                          top: -2,
+                          right: isArabic ? null : -2,
+                          left: isArabic ? -2 : null,
+                          child: Container(
+                            width: 9,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: isDark ? const Color(0xFF131418) : Colors.white, width: 1.5),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
               // Workspace Square Button (matching Image 3 & web navbar exactly)
               BlocBuilder<AuthCubit, AuthState>(
                 builder: (context, authState) {

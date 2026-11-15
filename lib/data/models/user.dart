@@ -169,6 +169,8 @@ class User {
     return activeBreakEndsAt!.isAfter(DateTime.now());
   }
 
+  bool get isAdmin => role.toLowerCase() == 'administrator' || role.toLowerCase() == 'admin';
+
   bool get isBot {
     if (assigneeType == 'AgentBot') return true;
     final t = (type ?? '').toLowerCase();

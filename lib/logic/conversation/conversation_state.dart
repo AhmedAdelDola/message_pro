@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import '../../data/models/conversation.dart';
 import '../../data/models/contact.dart';
 import '../../data/models/user.dart';
+import '../../data/models/conversation_filter_options.dart';
 
 class ConversationState extends Equatable {
   final List<Conversation> conversations;
@@ -13,6 +14,10 @@ class ConversationState extends Equatable {
   final int? selectedTeamId;
   final String? selectedLabel;
   final int? selectedLifecycleStageId;
+  final int? selectedAssigneeId;
+  final int? selectedAssigneeAgentBotId;
+  final ConversationFilterOptions? filterOptions;
+  final bool isLoadingFilters;
   final List<Inbox> inboxes;
   final List<Label> labels;
   final List<Team> teams;
@@ -32,6 +37,10 @@ class ConversationState extends Equatable {
     this.selectedTeamId,
     this.selectedLabel,
     this.selectedLifecycleStageId,
+    this.selectedAssigneeId,
+    this.selectedAssigneeAgentBotId,
+    this.filterOptions,
+    this.isLoadingFilters = false,
     this.inboxes = const [],
     this.labels = const [],
     this.teams = const [],
@@ -52,6 +61,10 @@ class ConversationState extends Equatable {
     int? selectedTeamId,
     String? selectedLabel,
     int? selectedLifecycleStageId,
+    int? selectedAssigneeId,
+    int? selectedAssigneeAgentBotId,
+    ConversationFilterOptions? filterOptions,
+    bool? isLoadingFilters,
     List<Inbox>? inboxes,
     List<Label>? labels,
     List<Team>? teams,
@@ -64,6 +77,8 @@ class ConversationState extends Equatable {
     bool clearTeam = false,
     bool clearLabel = false,
     bool clearStage = false,
+    bool clearAssignee = false,
+    bool clearAgentBot = false,
   }) {
     return ConversationState(
       conversations: conversations ?? this.conversations,
@@ -75,6 +90,10 @@ class ConversationState extends Equatable {
       selectedTeamId: clearTeam ? null : (selectedTeamId ?? this.selectedTeamId),
       selectedLabel: clearLabel ? null : (selectedLabel ?? this.selectedLabel),
       selectedLifecycleStageId: clearStage ? null : (selectedLifecycleStageId ?? this.selectedLifecycleStageId),
+      selectedAssigneeId: clearAssignee ? null : (selectedAssigneeId ?? this.selectedAssigneeId),
+      selectedAssigneeAgentBotId: clearAgentBot ? null : (selectedAssigneeAgentBotId ?? this.selectedAssigneeAgentBotId),
+      filterOptions: filterOptions ?? this.filterOptions,
+      isLoadingFilters: isLoadingFilters ?? this.isLoadingFilters,
       inboxes: inboxes ?? this.inboxes,
       labels: labels ?? this.labels,
       teams: teams ?? this.teams,
@@ -97,6 +116,10 @@ class ConversationState extends Equatable {
         selectedTeamId,
         selectedLabel,
         selectedLifecycleStageId,
+        selectedAssigneeId,
+        selectedAssigneeAgentBotId,
+        filterOptions,
+        isLoadingFilters,
         inboxes,
         labels,
         teams,

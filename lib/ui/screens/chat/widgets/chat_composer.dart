@@ -13,10 +13,11 @@ import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../data/models/message_template_registry.dart';
 import '../../../../data/models/user.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../data/models/message.dart';
 import 'send_template_modal.dart';
 
 class ChatComposer extends StatefulWidget {
-  final Function(String text, bool isPrivate, List<String>? attachments) onSend;
+  final Function(String text, bool isPrivate, List<String>? attachments, [int? inReplyToId]) onSend;
   final VoidCallback onOpenCannedResponses;
   final bool isSending;
   final String channelName;
@@ -25,6 +26,8 @@ class ChatComposer extends StatefulWidget {
   final VoidCallback? onOpenTemplates;
   final List<Map<String, String>> cannedResponses;
   final List<User> agents;
+  final Message? replyingToMessage;
+  final VoidCallback? onCancelReply;
 
   const ChatComposer({
     super.key,
@@ -37,6 +40,8 @@ class ChatComposer extends StatefulWidget {
     this.onOpenTemplates,
     this.cannedResponses = const [],
     this.agents = const [],
+    this.replyingToMessage,
+    this.onCancelReply,
   });
 
   @override
@@ -45,6 +50,7 @@ class ChatComposer extends StatefulWidget {
 
 class ChatComposerState extends State<ChatComposer> {
   final _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   bool _isPrivateNote = false;
   final List<String> _attachedPaths = [];
   final ImagePicker _picker = ImagePicker();
@@ -61,6 +67,19 @@ class ChatComposerState extends State<ChatComposer> {
   String _suggestionQuery = '';
   int _triggerStartPos = -1;
 
+  void focusInput() {
+    _focusNode.requestFocus();
+  }
+
+  @override
+  void didUpdateWidget(ChatComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.replyingToMessage != null &&
+        oldWidget.replyingToMessage?.id != widget.replyingToMessage?.id) {
+      _focusNode.requestFocus();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +91,7 @@ class ChatComposerState extends State<ChatComposer> {
   void dispose() {
     _recordTimer?.cancel();
     _audioRecorder?.dispose();
+    _focusNode.dispose();
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     super.dispose();
@@ -211,6 +231,10 @@ class ChatComposerState extends State<ChatComposer> {
       ));
 
       for (int i = 0; i < fileUrls.length; i++) {
+        if (_attachedPaths.length >= maxAttachmentsLimit) {
+          _showLimitReachedNotice();
+          break;
+        }
         var url = fileUrls[i].trim();
         if (url.isEmpty) continue;
         if (url.startsWith('/')) {
@@ -256,21 +280,139 @@ class ChatComposerState extends State<ChatComposer> {
     }
   }
 
+  static const int maxAttachmentsLimit = 5;
+
+  void _showLimitReachedNotice() {
+    if (!mounted) return;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isArabic
+              ? 'الحد الأقصى للإرسال هو 5 ملفات أو صور في المرة الواحدة'
+              : 'Maximum 5 files or images allowed per message',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showLimitExceededWarning(int selectedCount, int addedCount) {
+    if (!mounted) return;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isArabic
+              ? 'تم إضافة أول $addedCount فقط للوصول للحد الأقصى (5 ملفات)'
+              : 'Only first $addedCount items added to reach limit (5 max)',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _pickMedia() async {
+    final remaining = maxAttachmentsLimit - _attachedPaths.length;
+    if (remaining <= 0) {
+      _showLimitReachedNotice();
+      return;
+    }
+
+    try {
+      final pickedList = await _picker.pickMultipleMedia(
+        imageQuality: 80,
+        limit: remaining,
+      );
+
+      if (pickedList.isNotEmpty) {
+        final toAdd = pickedList.take(remaining).map((f) => f.path).toList();
+        if (pickedList.length > remaining) {
+          _showLimitExceededWarning(pickedList.length, toAdd.length);
+        }
+        setState(() {
+          for (final path in toAdd) {
+            if (!_attachedPaths.contains(path)) {
+              _attachedPaths.add(path);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking multiple media: $e');
+      try {
+        final images = await _picker.pickMultiImage(
+          imageQuality: 80,
+          limit: remaining,
+        );
+        if (images.isNotEmpty) {
+          final toAdd = images.take(remaining).map((f) => f.path).toList();
+          setState(() {
+            for (final path in toAdd) {
+              if (!_attachedPaths.contains(path)) {
+                _attachedPaths.add(path);
+              }
+            }
+          });
+        }
+      } catch (e2) {
+        debugPrint('Fallback pickMultiImage error: $e2');
+      }
+    }
+  }
+
   Future<void> _pickImage(ImageSource source) async {
+    final remaining = maxAttachmentsLimit - _attachedPaths.length;
+    if (remaining <= 0) {
+      _showLimitReachedNotice();
+      return;
+    }
     final picked = await _picker.pickImage(source: source, imageQuality: 80);
     if (picked != null) {
-      setState(() => _attachedPaths.add(picked.path));
+      setState(() {
+        if (!_attachedPaths.contains(picked.path)) {
+          _attachedPaths.add(picked.path);
+        }
+      });
     }
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      setState(() => _attachedPaths.add(result.files.single.path!));
+    final remaining = maxAttachmentsLimit - _attachedPaths.length;
+    if (remaining <= 0) {
+      _showLimitReachedNotice();
+      return;
+    }
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final validPaths = result.files.map((f) => f.path).whereType<String>().toList();
+        final toAdd = validPaths.take(remaining).toList();
+        if (validPaths.length > remaining) {
+          _showLimitExceededWarning(validPaths.length, toAdd.length);
+        }
+        setState(() {
+          for (final path in toAdd) {
+            if (!_attachedPaths.contains(path)) {
+              _attachedPaths.add(path);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking files: $e');
     }
   }
 
   void _showAttachmentMenu() {
+    if (_attachedPaths.length >= maxAttachmentsLimit) {
+      _showLimitReachedNotice();
+      return;
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
@@ -308,12 +450,19 @@ class ChatComposerState extends State<ChatComposer> {
                   ),
                 ),
                 title: Text(
-                  isArabic ? 'معرض الصور' : 'Photo Gallery',
+                  isArabic ? 'الصور والفيديوهات' : 'Photos & Videos',
                   style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isArabic ? 'اختيار من المعرض (حتى 5 عناصر)' : 'Select from gallery (up to 5)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
+                  _pickMedia();
                 },
               ),
               ListTile(
@@ -332,6 +481,13 @@ class ChatComposerState extends State<ChatComposer> {
                 title: Text(
                   isArabic ? 'الكاميرا' : 'Camera',
                   style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isArabic ? 'التقاط صورة مباشرة' : 'Take a photo directly',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -352,14 +508,22 @@ class ChatComposerState extends State<ChatComposer> {
                   ),
                 ),
                 title: Text(
-                  isArabic ? 'ملف / مستند' : 'Document / File',
+                  isArabic ? 'المستندات والملفات' : 'Documents & Files',
                   style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isArabic ? 'PDF، Word، Excel والمستندات الأخرى' : 'PDF, Word, Excel, and other files',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
                   _pickFile();
                 },
               ),
+              const SizedBox(height: 8),
             ],
           ),
         );
@@ -645,7 +809,8 @@ class ChatComposerState extends State<ChatComposer> {
             );
           }
         } else {
-          widget.onSend('', _isPrivateNote, [finalPath]);
+          widget.onSend('', _isPrivateNote, [finalPath], widget.replyingToMessage?.id);
+          widget.onCancelReply?.call();
         }
       }
     } catch (e) {
@@ -739,7 +904,7 @@ class ChatComposerState extends State<ChatComposer> {
       context: context,
       templates: MessageTemplateRegistry.approvedTemplates,
       onSend: (template) {
-        widget.onSend(template.fullText, false, null);
+        widget.onSend(template.fullText, false, null, null);
       },
     );
   }
@@ -836,8 +1001,11 @@ class ChatComposerState extends State<ChatComposer> {
     widget.onSend(
       text,
       _isPrivateNote,
-      _attachedPaths.isNotEmpty ? List.from(_attachedPaths) : null,
+      _attachedPaths.isNotEmpty ? List<String>.from(_attachedPaths.take(maxAttachmentsLimit)) : null,
+      widget.replyingToMessage?.id,
     );
+
+    widget.onCancelReply?.call();
 
     _controller.clear();
     setState(() {
@@ -881,14 +1049,39 @@ class ChatComposerState extends State<ChatComposer> {
             // Autocomplete Popup for '/' (Canned responses) and '@' (Mentions)
             _buildSuggestionsPopup(isDark, isArabic, textPrimary, textSecondary),
 
+            // Quoted Reply Banner
+            if (widget.replyingToMessage != null)
+              _buildReplyBanner(isDark, isArabic),
+
             // Attached files preview bar & loading indicator
             if (_attachedPaths.isNotEmpty || _isAttachingSnippet)
               Container(
-                height: 56,
+                height: 58,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
+                    if (_attachedPaths.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${_attachedPaths.length}/$maxAttachmentsLimit',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontFamily: 'Gontserrat',
+                            ),
+                          ),
+                        ),
+                      ),
                     if (_isAttachingSnippet)
                       Container(
                         margin: const EdgeInsets.only(right: 8),
@@ -921,10 +1114,11 @@ class ChatComposerState extends State<ChatComposer> {
                       ),
                     ...List.generate(_attachedPaths.length, (index) {
                       final path = _attachedPaths[index];
-                      final isImage = path.endsWith('.png') ||
-                          path.endsWith('.jpg') ||
-                          path.endsWith('.jpeg') ||
-                          path.endsWith('.webp');
+                      final name = path.split(Platform.pathSeparator).last.split('/').last;
+                      final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+                      final isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].contains(ext);
+                      final isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].contains(ext);
+                      final isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'aac'].contains(ext);
 
                       return Container(
                         margin: const EdgeInsets.only(right: 8),
@@ -939,14 +1133,52 @@ class ChatComposerState extends State<ChatComposer> {
                             if (isImage)
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
-                                child: Image.file(File(path), width: 36, height: 36, fit: BoxFit.cover),
+                                child: Image.file(File(path), width: 38, height: 38, fit: BoxFit.cover),
+                              )
+                            else if (isVideo)
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 20),
+                              )
+                            else if (isAudio)
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF06B6D4),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Icon(Icons.audiotrack_rounded, color: Colors.white, size: 20),
                               )
                             else
-                              const HugeIcon(
-                                icon: HugeIcons.strokeRoundedFile01,
-                                color: Color(0xFF4162E3),
-                                size: 24,
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Icon(Icons.insert_drive_file_rounded, color: Colors.white, size: 20),
                               ),
+                            const SizedBox(width: 4),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 80),
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.close, size: 16),
                               padding: EdgeInsets.zero,
@@ -1278,6 +1510,7 @@ class ChatComposerState extends State<ChatComposer> {
                 constraints: const BoxConstraints(maxHeight: 110),
                 child: TextField(
                   controller: _controller,
+                  focusNode: _focusNode,
                   maxLines: null,
                   keyboardType: TextInputType.multiline,
                   onChanged: (_) => setState(() {}),
@@ -1430,6 +1663,96 @@ class ChatComposerState extends State<ChatComposer> {
     ),
   );
 }
+
+  Widget _buildReplyBanner(bool isDark, bool isArabic) {
+    final msg = widget.replyingToMessage;
+    if (msg == null) return const SizedBox.shrink();
+
+    final isSenderMe = msg.isOutgoing;
+    final senderName = isSenderMe
+        ? (isArabic ? 'أنت' : 'You')
+        : (msg.senderName ?? (isArabic ? 'العميل' : 'Customer'));
+
+    String contentPreview = '';
+    if (msg.content != null && msg.content!.trim().isNotEmpty) {
+      contentPreview = msg.content!.trim();
+    } else if (msg.attachments.isNotEmpty) {
+      final type = msg.attachments.first.fileType.toLowerCase();
+      if (type == 'image') {
+        contentPreview = isArabic ? '📷 صورة' : '📷 Photo';
+      } else if (type == 'video') {
+        contentPreview = isArabic ? '🎥 فيديو' : '🎥 Video';
+      } else if (type == 'audio') {
+        contentPreview = isArabic ? '🎵 تسجيل صوتي' : '🎵 Audio';
+      } else {
+        contentPreview = isArabic ? '📎 ملف مرفق' : '📎 Attachment';
+      }
+    } else {
+      contentPreview = isArabic ? 'رسالة' : 'Message';
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2128) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          right: isArabic
+              ? const BorderSide(color: Color(0xFF4162E3), width: 3.5)
+              : BorderSide.none,
+          left: !isArabic
+              ? const BorderSide(color: Color(0xFF4162E3), width: 3.5)
+              : BorderSide.none,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.reply_rounded,
+            size: 18,
+            color: Color(0xFF4162E3),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${isArabic ? 'الرد على' : 'Replying to'} $senderName',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4162E3),
+                    fontFamily: 'Gontserrat',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  contentPreview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    fontFamily: 'Gontserrat',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 16),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: isArabic ? 'إلغاء الرد' : 'Cancel reply',
+            onPressed: widget.onCancelReply,
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSuggestionsPopup(bool isDark, bool isArabic, Color textPrimary, Color textSecondary) {
     if (_suggestionTrigger == null) return const SizedBox.shrink();

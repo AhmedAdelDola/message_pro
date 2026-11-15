@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../../../../core/config/app_config.dart';
+import '../../../../core/services/audio_cache_service.dart';
 
 class AudioPlayerBubble extends StatefulWidget {
   final String audioUrl;
@@ -35,30 +38,73 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
   StreamSubscription<Duration>? _durationSub;
   StreamSubscription<Duration>? _positionSub;
 
+  String get _cleanAudioUrl {
+    var u = widget.audioUrl.trim();
+    if (u.isNotEmpty && u.startsWith('/')) {
+      u = '${AppConfig.defaultBaseUrl}$u';
+    }
+    return u;
+  }
+
   @override
   void initState() {
     super.initState();
     _player = AudioPlayer();
 
     if (widget.initialDurationSeconds != null && widget.initialDurationSeconds! > 0) {
-      _duration = Duration(milliseconds: (widget.initialDurationSeconds! * 1000).toInt());
+      _duration = Duration(milliseconds: (widget.initialDurationSeconds! * 1000).round());
     }
 
     _initAudio();
   }
 
+  Future<Source> _resolveSource() async {
+    final url = _cleanAudioUrl;
+    final cached = await AudioCacheService().cacheAudioFile(url);
+    if (cached != null && File(cached).existsSync()) {
+      return DeviceFileSource(cached);
+    }
+    if (url.startsWith('file://')) {
+      return DeviceFileSource(url.replaceFirst('file://', ''));
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      if (File(url).existsSync()) {
+        return DeviceFileSource(url);
+      }
+    }
+    return UrlSource(url);
+  }
+
   void _initAudio() async {
     _initAudioListeners();
 
-    try {
-      if (widget.audioUrl.isNotEmpty) {
-        await _player.setSource(UrlSource(widget.audioUrl));
+    final url = _cleanAudioUrl;
+    if (url.isEmpty) return;
+
+    // Check disk cache first to get duration immediately if already cached
+    final cachedPath = await AudioCacheService().getCachedFilePath(url);
+    if (cachedPath != null && mounted) {
+      try {
+        await _player.setSource(DeviceFileSource(cachedPath));
         final dur = await _player.getDuration();
         if (dur != null && dur > Duration.zero && mounted) {
           setState(() => _duration = dur);
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    } else {
+      // Background preload for instantaneous play & duration resolution
+      AudioCacheService().cacheAudioFile(url).then((path) async {
+        if (path != null && mounted && _playerState == PlayerState.stopped) {
+          try {
+            await _player.setSource(DeviceFileSource(path));
+            final dur = await _player.getDuration();
+            if (dur != null && dur > Duration.zero && mounted) {
+              setState(() => _duration = dur);
+            }
+          } catch (_) {}
+        }
+      });
+    }
   }
 
   void _initAudioListeners() {
@@ -86,6 +132,9 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
       if (mounted && !_isSeeking) {
         setState(() {
           _position = pos;
+          if (pos > _duration) {
+            _duration = pos;
+          }
           if (_isLoading) _isLoading = false;
         });
       }
@@ -98,12 +147,14 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
           _playerState = PlayerState.completed;
           _isLoading = false;
         });
+        AudioCacheService().clearActivePlayer(_player);
       }
     });
   }
 
   @override
   void dispose() {
+    AudioCacheService().clearActivePlayer(_player);
     _stateSub?.cancel();
     _durationSub?.cancel();
     _positionSub?.cancel();
@@ -114,6 +165,7 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
   Future<void> _togglePlayPause() async {
     if (_playerState == PlayerState.playing) {
       await _player.pause();
+      AudioCacheService().clearActivePlayer(_player);
       if (mounted) {
         setState(() {
           _playerState = PlayerState.paused;
@@ -121,6 +173,7 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
         });
       }
     } else {
+      AudioCacheService().setActivePlayer(_player);
       if (mounted) setState(() => _isLoading = true);
       try {
         if (_playerState == PlayerState.completed || (_duration > Duration.zero && _position >= _duration)) {
@@ -130,13 +183,21 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
         } else if (_playerState == PlayerState.paused) {
           await _player.resume();
         } else {
-          await _player.play(UrlSource(widget.audioUrl));
+          final source = await _resolveSource();
+          await _player.play(source);
         }
         await _player.setPlaybackRate(_playbackSpeed);
+
+        // Probe duration after starting
+        final dur = await _player.getDuration();
+        if (dur != null && dur > Duration.zero && mounted) {
+          setState(() => _duration = dur);
+        }
       } catch (e) {
         try {
           await _player.stop();
-          await _player.play(UrlSource(widget.audioUrl));
+          final source = await _resolveSource();
+          await _player.play(source);
         } catch (_) {}
       } finally {
         if (mounted) {
@@ -175,8 +236,19 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
     final sliderActiveColor = isOutgoing ? Colors.white : const Color(0xFF4162E3);
     final sliderInactiveColor = isOutgoing ? Colors.white30 : Colors.black12;
 
-    final maxSeconds = _duration.inSeconds > 0 ? _duration.inSeconds.toDouble() : 1.0;
-    final currentSeconds = _position.inSeconds.toDouble().clamp(0.0, maxSeconds);
+    // Use millisecond precision for silky-smooth progress tracking
+    final totalMs = _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0;
+    final currentMs = _position.inMilliseconds.toDouble().clamp(0.0, totalMs);
+
+    String durationLabel;
+    if (_playerState != PlayerState.playing &&
+        _playerState != PlayerState.paused &&
+        _position == Duration.zero) {
+      durationLabel = _duration > Duration.zero ? _formatDuration(_duration) : '00:00';
+    } else {
+      durationLabel =
+          '${_formatDuration(_position)} / ${_duration > Duration.zero ? _formatDuration(_duration) : "--:--"}';
+    }
 
     return Container(
       constraints: const BoxConstraints(minWidth: 230, maxWidth: 300),
@@ -225,7 +297,7 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
               ),
               const SizedBox(width: 8),
 
-              // Audio progress slider
+              // Audio progress slider (Smooth milliseconds)
               Expanded(
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
@@ -237,21 +309,21 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
                     thumbColor: sliderActiveColor,
                   ),
                   child: Slider(
-                    value: currentSeconds,
+                    value: currentMs,
                     min: 0.0,
-                    max: maxSeconds,
+                    max: totalMs,
                     onChangeStart: (_) {
                       _isSeeking = true;
                     },
                     onChanged: (val) {
                       setState(() {
-                        _position = Duration(seconds: val.toInt());
+                        _position = Duration(milliseconds: val.round());
                       });
                     },
                     onChangeEnd: (val) async {
                       _isSeeking = false;
                       try {
-                        await _player.seek(Duration(seconds: val.toInt()));
+                        await _player.seek(Duration(milliseconds: val.round()));
                       } catch (_) {}
                     },
                   ),
@@ -290,27 +362,34 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.mic_rounded,
-                      size: 13,
-                      color: secondaryColor,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      widget.fileName ?? 'Voice Note',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.mic_rounded,
+                        size: 13,
                         color: secondaryColor,
-                        fontFamily: 'Gontserrat',
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          widget.fileName ?? 'Voice Note',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: secondaryColor,
+                            fontFamily: 'Gontserrat',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 6),
                 Text(
-                  '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
+                  durationLabel,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,

@@ -11,6 +11,7 @@ import '../models/contact.dart';
 import '../models/user.dart';
 import '../models/message_template.dart';
 import '../models/message_template_registry.dart';
+import '../models/conversation_filter_options.dart';
 
 abstract class IConversationRepository {
   Future<Either<Failure, List<Conversation>>> getConversations({
@@ -19,16 +20,34 @@ abstract class IConversationRepository {
     int? inboxId,
     int? teamId,
     String? label,
+    int? assigneeId,
+    int? assigneeAgentBotId,
     int page = 1,
   });
   Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1});
   Future<Either<Failure, Conversation>> getConversation(int conversationId);
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId});
+  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId});
   Future<Either<Failure, Message>> sendMessage({
     required int conversationId,
     required String content,
     bool isPrivate = false,
     List<String>? attachmentPaths,
+    int? inReplyToId,
+  });
+  Future<Either<Failure, Message>> editMessage({
+    required int conversationId,
+    required int messageId,
+    required String content,
+  });
+  Future<Either<Failure, Message>> sendReaction({
+    required int conversationId,
+    required int messageId,
+    required String emoji,
+  });
+  Future<Either<Failure, List<ReactionParticipant>>> getReactions({
+    required int conversationId,
+    required int messageId,
+    Map<String, dynamic>? contentAttributes,
   });
   Future<Either<Failure, Message>> sendTemplateMessage({
     required int conversationId,
@@ -80,6 +99,7 @@ abstract class IConversationRepository {
   Future<Either<Failure, List<User>>> fetchAgents();
   Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds});
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses();
+  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions();
 }
 
 class ConversationRepository implements IConversationRepository {
@@ -95,19 +115,26 @@ class ConversationRepository implements IConversationRepository {
     int? inboxId,
     int? teamId,
     String? label,
+    int? assigneeId,
+    int? assigneeAgentBotId,
     int page = 1,
   }) async {
     try {
       final params = <String, dynamic>{
         'status': status,
-        'assignee_type': assigneeType,
         'page': page,
         'sort_by': 'last_activity_at_desc',
       };
 
+      if (assigneeType.isNotEmpty && assigneeType != 'all') {
+        params['assignee_type'] = assigneeType;
+      }
+
       if (inboxId != null) params['inbox_id'] = inboxId;
       if (teamId != null) params['team_id'] = teamId;
       if (label != null) params['labels[]'] = label;
+      if (assigneeId != null) params['assignee_id'] = assigneeId;
+      if (assigneeAgentBotId != null) params['assignee_agent_bot_id'] = assigneeAgentBotId;
 
       final response = await _api.get('conversations', queryParameters: params);
       final data = response.data;
@@ -216,11 +243,14 @@ class ConversationRepository implements IConversationRepository {
   }
 
   @override
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId}) async {
+  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId}) async {
     try {
       final params = <String, dynamic>{};
       if (beforeId != null) {
         params['before'] = beforeId;
+      }
+      if (afterId != null) {
+        params['after'] = afterId;
       }
 
       final response = await _api.get(
@@ -264,6 +294,7 @@ class ConversationRepository implements IConversationRepository {
     required String content,
     bool isPrivate = false,
     List<String>? attachmentPaths,
+    int? inReplyToId,
   }) async {
     try {
       dynamic postData;
@@ -272,10 +303,15 @@ class ConversationRepository implements IConversationRepository {
         formData.fields.add(MapEntry('content', content));
         formData.fields.add(const MapEntry('message_type', 'outgoing'));
         formData.fields.add(MapEntry('private', isPrivate.toString()));
-        for (final path in attachmentPaths) {
+        if (inReplyToId != null) {
+          formData.fields.add(MapEntry('content_attributes[in_reply_to]', inReplyToId.toString()));
+        }
+        final pathsToSend = attachmentPaths.take(5);
+        for (final path in pathsToSend) {
+          final fileName = path.split(RegExp(r'[\\/]')).last;
           formData.files.add(MapEntry(
             'attachments[]',
-            await MultipartFile.fromFile(path),
+            await MultipartFile.fromFile(path, filename: fileName),
           ));
         }
         postData = formData;
@@ -284,6 +320,10 @@ class ConversationRepository implements IConversationRepository {
           'content': content,
           'message_type': 'outgoing',
           'private': isPrivate,
+          if (inReplyToId != null)
+            'content_attributes': {
+              'in_reply_to': inReplyToId,
+            },
         };
       }
 
@@ -341,6 +381,113 @@ class ConversationRepository implements IConversationRepository {
       return Right(message);
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل في إرسال رسالة القالب'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Message>> editMessage({
+    required int conversationId,
+    required int messageId,
+    required String content,
+  }) async {
+    try {
+      final response = await _api.patch(
+        'conversations/$conversationId/messages/$messageId',
+        data: {'content': content},
+      );
+      final resData = response.data;
+      final msgMap = (resData is Map && resData['data'] is Map)
+          ? resData['data']
+          : (resData is Map ? resData : <String, dynamic>{});
+      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
+      return Right(message);
+    } on DioException catch (e) {
+      final res = e.response?.data;
+      final serverMsg = res is Map
+          ? (res['message'] ?? res['error'])?.toString()
+          : null;
+      return Left(ServerFailure(serverMsg ?? e.message ?? 'فشل في تعديل الرسالة'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Message>> sendReaction({
+    required int conversationId,
+    required int messageId,
+    required String emoji,
+  }) async {
+    try {
+      final response = await _api.put(
+        'conversations/$conversationId/messages/$messageId/reaction',
+        data: {'emoji': emoji},
+      );
+      final resData = response.data;
+      final msgMap = (resData is Map && resData['data'] is Map)
+          ? resData['data']
+          : (resData is Map ? resData : <String, dynamic>{});
+      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
+      return Right(message);
+    } on DioException catch (e) {
+      final res = e.response?.data;
+      final serverMsg = res is Map
+          ? (res['message'] ?? res['error'])?.toString()
+          : null;
+      return Left(ServerFailure(serverMsg ?? e.message ?? 'فشل في إضافة التفاعل'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<ReactionParticipant>>> getReactions({
+    required int conversationId,
+    required int messageId,
+    Map<String, dynamic>? contentAttributes,
+  }) async {
+    try {
+      final response = await _api.get(
+        'conversations/$conversationId/messages/$messageId/reactions',
+      );
+      final data = response.data;
+      final rawParticipants = data is Map ? (data['participants'] ?? data['data']) : data;
+
+      final actorToEmoji = <String, String>{};
+      final rawReactions = contentAttributes?['reactions'] ?? (data is Map ? data['reactions'] : null);
+      if (rawReactions is List) {
+        for (final r in rawReactions) {
+          if (r is Map) {
+            final emoji = r['emoji']?.toString() ?? '';
+            final actor = r['actor']?.toString();
+            if (actor != null && emoji.isNotEmpty) {
+              actorToEmoji[actor] = emoji;
+            }
+          }
+        }
+      }
+
+      final list = <ReactionParticipant>[];
+      if (rawParticipants is List) {
+        for (final p in rawParticipants) {
+          if (p is Map) {
+            final pMap = Map<String, dynamic>.from(p);
+            final actorKey = pMap['actor']?.toString() ??
+                (pMap['type'] != null && pMap['id'] != null ? '${pMap['type']}:${pMap['id']}' : null);
+            final emoji = actorToEmoji[actorKey] ?? pMap['emoji']?.toString();
+            list.add(ReactionParticipant.fromJson(pMap, emoji: emoji));
+          }
+        }
+      }
+      return Right(list);
+    } on DioException catch (e) {
+      final res = e.response?.data;
+      final serverMsg = res is Map
+          ? (res['message'] ?? res['error'])?.toString()
+          : null;
+      return Left(ServerFailure(serverMsg ?? e.message ?? 'فشل في عرض تفاصيل التفاعلات'));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -1384,6 +1531,32 @@ class ConversationRepository implements IConversationRepository {
       }).toList());
     } catch (_) {
       return const Right([]);
+    }
+  }
+
+  @override
+  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions() async {
+    try {
+      final response = await _api.get('conversations/filter_options');
+      final data = response.data;
+      Map<String, dynamic>? jsonMap;
+      if (data is Map) {
+        if (data['payload'] is Map) {
+          jsonMap = Map<String, dynamic>.from(data['payload']);
+        } else if (data['data'] is Map) {
+          jsonMap = Map<String, dynamic>.from(data['data']);
+        } else {
+          jsonMap = Map<String, dynamic>.from(data);
+        }
+      }
+      if (jsonMap != null) {
+        return Right(ConversationFilterOptions.fromJson(jsonMap));
+      }
+      return const Right(ConversationFilterOptions());
+    } on DioException catch (e) {
+      return Left(ServerFailure(e.message ?? 'فشل في تحميل خيارات الفلاتر'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
     }
   }
 }

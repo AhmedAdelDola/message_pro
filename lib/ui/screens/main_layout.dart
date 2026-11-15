@@ -14,15 +14,34 @@ import 'contacts/contacts_screen.dart';
 import 'settings/settings_screen.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final int? initialIndex;
+
+  const MainLayout({super.key, this.initialIndex});
+
+  static void switchTab(BuildContext context, int index) {
+    final state = context.findAncestorStateOfType<MainLayoutState>();
+    state?.setTab(index);
+  }
 
   @override
-  State<MainLayout> createState() => _MainLayoutState();
+  State<MainLayout> createState() => MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
-  // Inbox is initial tab (index 2)
-  int _currentIndex = 2;
+class MainLayoutState extends State<MainLayout> {
+  // Inbox is default initial tab (index 2)
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex ?? 2;
+  }
+
+  void setTab(int index) {
+    if (mounted && index >= 0 && index < _screens.length) {
+      setState(() => _currentIndex = index);
+    }
+  }
 
   final List<Widget> _screens = const [
     CallsScreen(),

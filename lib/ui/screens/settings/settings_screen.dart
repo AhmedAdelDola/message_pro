@@ -11,6 +11,8 @@ import 'language_screen.dart';
 import 'change_password_screen.dart';
 import 'notification_settings_screen.dart';
 import '../../widgets/break_countdown_banner.dart';
+import '../../../logic/settings/settings_cubit.dart';
+import '../../../core/services/haptic_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -20,7 +22,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _hapticEnabled = true;
 
   @override
   Widget build(BuildContext context) {
@@ -283,17 +284,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
 
-                _buildSettingsRow(
-                  icon: Icon(Icons.vibration_rounded, color: textSecondary, size: 20),
-                  iconBg: iconBg,
-                  borderColor: borderColor,
-                  title: isArabic ? 'الاهتزاز والتفاعل اللمسي' : 'Haptic Feedback',
-                  trailing: Switch(
-                    value: _hapticEnabled,
-                    activeThumbColor: const Color(0xFF4162E3),
-                    onChanged: (val) => setState(() => _hapticEnabled = val),
-                  ),
-                  onTap: () => setState(() => _hapticEnabled = !_hapticEnabled),
+                Builder(
+                  builder: (context) {
+                    SettingsCubit? cubit;
+                    try {
+                      cubit = context.watch<SettingsCubit>();
+                    } catch (_) {}
+                    final hapticEnabled = cubit?.state.hapticEnabled ?? HapticService.isEnabled;
+                    return _buildSettingsRow(
+                      icon: Icon(Icons.vibration_rounded, color: textSecondary, size: 20),
+                      iconBg: iconBg,
+                      borderColor: borderColor,
+                      title: isArabic ? 'الاهتزاز والتفاعل اللمسي' : 'Haptic Feedback',
+                      trailing: Switch(
+                        value: hapticEnabled,
+                        activeThumbColor: const Color(0xFF4162E3),
+                        onChanged: (val) {
+                          if (cubit != null) {
+                            cubit.setHapticEnabled(val);
+                          } else {
+                            HapticService.setEnabled(val);
+                            setState(() {});
+                          }
+                        },
+                      ),
+                      onTap: () {
+                        final next = !hapticEnabled;
+                        if (cubit != null) {
+                          cubit.setHapticEnabled(next);
+                        } else {
+                          HapticService.setEnabled(next);
+                          setState(() {});
+                        }
+                      },
+                    );
+                  },
                 ),
 
                 // LOGOUT

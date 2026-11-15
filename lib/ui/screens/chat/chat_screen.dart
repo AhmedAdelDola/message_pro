@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -49,8 +50,13 @@ class _ChatActivityGroupItem extends _ChatListItem {
 
 class ChatScreen extends StatelessWidget {
   final Conversation conversation;
+  final int? initialMessageId;
 
-  const ChatScreen({super.key, required this.conversation});
+  const ChatScreen({
+    super.key,
+    required this.conversation,
+    this.initialMessageId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,15 +65,22 @@ class ChatScreen extends StatelessWidget {
         param1: conversation.id,
         param2: conversation.contactLastSeenAt,
       ),
-      child: _ChatScreenContent(conversation: conversation),
+      child: _ChatScreenContent(
+        conversation: conversation,
+        initialMessageId: initialMessageId,
+      ),
     );
   }
 }
 
 class _ChatScreenContent extends StatefulWidget {
   final Conversation conversation;
+  final int? initialMessageId;
 
-  const _ChatScreenContent({required this.conversation});
+  const _ChatScreenContent({
+    required this.conversation,
+    this.initialMessageId,
+  });
 
   @override
   State<_ChatScreenContent> createState() => _ChatScreenContentState();
@@ -86,6 +99,41 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   double? _maxScrollBeforeLoad;
   double? _pixelsBeforeLoad;
   late Contact _contact;
+  Message? _replyingToMessage;
+  int? _highlightedMessageId;
+  Timer? _highlightTimer;
+  bool _hasAttemptedTargetFetch = false;
+  bool _hasInitialMessageScrolled = false;
+  List<_ChatListItem> _lastListItems = [];
+
+  void _onReplyToMessage(Message msg) {
+    setState(() => _replyingToMessage = msg);
+    _composerKey.currentState?.focusInput();
+  }
+
+  void _scrollToMessageById(int messageId, [List<dynamic>? items]) {
+    final listItems = items ?? _lastListItems;
+    if (!_scrollController.hasClients || listItems.isEmpty) return;
+    for (int i = 0; i < listItems.length; i++) {
+      final item = listItems[i];
+      if (item is _ChatSingleMessageItem && item.message.id == messageId) {
+        final targetOffset = (i / listItems.length) * _scrollController.position.maxScrollExtent;
+        _scrollController.animateTo(
+          targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+        if (mounted) {
+          setState(() => _highlightedMessageId = messageId);
+          _highlightTimer?.cancel();
+          _highlightTimer = Timer(const Duration(milliseconds: 2500), () {
+            if (mounted) setState(() => _highlightedMessageId = null);
+          });
+        }
+        break;
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -94,7 +142,23 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     _isMuted = widget.conversation.muted;
     _currentAssignee = widget.conversation.assignee;
     _contact = widget.conversation.contact;
+    _highlightedMessageId = widget.initialMessageId;
     _scrollController.addListener(_onScroll);
+
+    if (widget.initialMessageId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndLoadTargetMessage();
+      });
+    }
+  }
+
+  void _checkAndLoadTargetMessage() {
+    if (widget.initialMessageId == null || _hasAttemptedTargetFetch) return;
+    _hasAttemptedTargetFetch = true;
+    final cubit = context.read<ChatCubit>();
+    if (!cubit.state.messages.any((m) => m.id == widget.initialMessageId)) {
+      cubit.loadTargetMessage(widget.initialMessageId!);
+    }
   }
 
   void _onScroll() {
@@ -111,6 +175,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -434,6 +499,279 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     }
   }
 
+  void _showEditMessageDialog(BuildContext context, Message message) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textController = TextEditingController(text: message.content ?? '');
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (dlgContext) => StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          final remaining = message.messageActions.remainingEditTime;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF161616) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.edit_rounded, color: Color(0xFF4162E3), size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  isArabic ? 'تعديل الرسالة' : 'Edit Message',
+                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (remaining != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, size: 16, color: Color(0xFFF59E0B)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            isArabic
+                                ? 'متاح للتعديل خلال ${remaining.inMinutes} دقيقة'
+                                : 'Editable for ${remaining.inMinutes} minutes',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFFF59E0B), fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                TextField(
+                  controller: textController,
+                  maxLines: 4,
+                  minLines: 2,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: isArabic ? 'اكتب النص الجديد هنا...' : 'Enter new message text...',
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF262626) : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF383838) : const Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF4162E3), width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dlgContext),
+                child: Text(isArabic ? 'إلغاء' : 'Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final newText = textController.text.trim();
+                        if (newText.isEmpty) return;
+                        setDlgState(() => isSaving = true);
+
+                        final chatCubit = context.read<ChatCubit>();
+                        final error = await chatCubit.editMessage(message.id, newText);
+
+                        if (context.mounted) {
+                          if (error != null) {
+                            setDlgState(() => isSaving = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(error),
+                                backgroundColor: const Color(0xFFEF4444),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } else {
+                            Navigator.pop(dlgContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(isArabic ? 'تم تعديل الرسالة بنجاح' : 'Message edited successfully'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4162E3),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(isArabic ? 'حفظ التعديل' : 'Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _onReactToMessage(Message message, String emoji) async {
+    final chatCubit = context.read<ChatCubit>();
+    final error = await chatCubit.sendReaction(message.id, emoji);
+    if (mounted && error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _showReactionsBottomSheet(BuildContext context, Message message) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final chatCubit = context.read<ChatCubit>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF161616) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF31343A) : const Color(0xFFEAEAEA),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Text(
+                    isArabic ? 'التفاعلات على الرسالة' : 'Message Reactions',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Gontserrat'),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4162E3).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${message.reactions.length}',
+                      style: const TextStyle(color: Color(0xFF4162E3), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: FutureBuilder(
+                future: chatCubit.getReactions(message.id, contentAttributes: message.contentAttributes),
+                builder: (ctx, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final result = snapshot.data;
+                  if (result == null || result.isLeft()) {
+                    if (message.reactions.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: Text(
+                            isArabic ? 'لا توجد تفاعلات' : 'No reactions',
+                            style: const TextStyle(color: Color(0xFF94A3B8)),
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: message.reactions.length,
+                      itemBuilder: (_, i) {
+                        final r = message.reactions[i];
+                        return ListTile(
+                          title: Text(r.userName ?? (isArabic ? 'مشارك' : 'Participant')),
+                          trailing: Text(r.emoji, style: const TextStyle(fontSize: 22)),
+                        );
+                      },
+                    );
+                  }
+
+                  final participants = result.getOrElse(() => []);
+                  if (participants.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: Text(
+                          isArabic ? 'لا توجد تفاعلات' : 'No reactions',
+                          style: const TextStyle(color: Color(0xFF94A3B8)),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: participants.length,
+                    itemBuilder: (_, i) {
+                      final p = participants[i];
+                      return ListTile(
+                        leading: AvatarWidget(
+                          avatarUrl: p.avatarUrl,
+                          name: p.name,
+                          size: 36,
+                        ),
+                        title: Text(
+                          p.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Gontserrat'),
+                        ),
+                        trailing: Text(
+                          p.emoji ?? '👍',
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAssigneeSheet() async {
     final convCubit = context.read<ConversationCubit>();
     var agents = List<User>.from(convCubit.state.agents);
@@ -589,10 +927,24 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         final newLastId = state.messages.last.id;
         final hasNewMessage = _lastMessageId != null && newLastId != _lastMessageId;
 
+        if (widget.initialMessageId != null && !_hasInitialMessageScrolled) {
+          final hasTarget = state.messages.any((m) => m.id == widget.initialMessageId);
+          if (hasTarget) {
+            _hasInitialMessageScrolled = true;
+            _initialScrolled = true;
+            _lastMessageId = newLastId;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _scrollToMessageById(widget.initialMessageId!);
+            });
+          }
+        }
+
         if (!_initialScrolled && !state.isLoading && state.messages.isNotEmpty) {
           _initialScrolled = true;
           _lastMessageId = newLastId;
-          _scrollToBottom(immediate: true);
+          if (widget.initialMessageId == null) {
+            _scrollToBottom(immediate: true);
+          }
         } else if (hasNewMessage) {
           _lastMessageId = newLastId;
           _scrollToBottom();
@@ -1106,6 +1458,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           }
 
                           final totalCount = listItems.length;
+                          _lastListItems = listItems;
 
                           return RefreshIndicator(
                             onRefresh: () async {
@@ -1130,12 +1483,31 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                                   );
                                 } else if (item is _ChatSingleMessageItem) {
                                   final msg = item.message;
+                                  Message? quotedMsg;
+                                  if (msg.inReplyToId != null) {
+                                    for (final other in chatState.messages) {
+                                      if (other.id == msg.inReplyToId) {
+                                        quotedMsg = other;
+                                        break;
+                                      }
+                                    }
+                                  }
+                                  final currentUser = context.read<AuthCubit>().currentUser;
                                   return MessageBubble(
                                     message: msg,
+                                    isHighlighted: msg.id == _highlightedMessageId,
+                                    channel: widget.conversation.channelType,
+                                    currentUser: currentUser,
                                     contactName: msg.senderName ?? widget.conversation.contact.name,
                                     contactThumbnail: msg.senderAvatar ?? widget.conversation.contact.avatarUrl,
                                     showDateHeader: showDateHeader,
                                     onRetry: () => context.read<ChatCubit>().retryMessage(msg),
+                                    repliedMessage: quotedMsg,
+                                    onReply: _onReplyToMessage,
+                                    onScrollToMessage: (id) => _scrollToMessageById(id, listItems),
+                                    onEditMessage: (m) => _showEditMessageDialog(context, m),
+                                    onReact: (m, emoji) => _onReactToMessage(m, emoji),
+                                    onViewReactions: (m) => _showReactionsBottomSheet(context, m),
                                   );
                                 }
                                 return const SizedBox.shrink();
@@ -1239,14 +1611,18 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     canReply: widget.conversation.canReply,
                     cannedResponses: chatState.cannedResponses,
                     agents: workspaceAgents,
+                    replyingToMessage: _replyingToMessage,
+                    onCancelReply: () => setState(() => _replyingToMessage = null),
                     onOpenCannedResponses: _showCannedResponses,
                     onOpenTemplates: _showTemplatesDialog,
-                    onSend: (text, isPrivate, attachments) {
+                    onSend: (text, isPrivate, attachments, [inReplyToId]) {
                       context.read<ChatCubit>().sendMessage(
                         content: text,
                         isPrivate: isPrivate,
                         attachmentPaths: attachments,
+                        inReplyToId: inReplyToId,
                       );
+                      setState(() => _replyingToMessage = null);
                       _scrollToBottom();
                     },
                   );

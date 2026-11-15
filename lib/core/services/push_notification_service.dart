@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -9,7 +10,11 @@ import '../di/injection_container.dart';
 import '../storage/secure_storage_service.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
+import '../../logic/auth/auth_cubit.dart';
+import '../../logic/auth/auth_state.dart';
+import '../../logic/conversation/conversation_cubit.dart';
 import '../../ui/screens/chat/chat_screen.dart';
+import '../../ui/screens/main_layout.dart';
 
 /// Top-level background message handler for Firebase Messaging
 @pragma('vm:entry-point')
@@ -31,6 +36,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class PushNotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  static Map<String, dynamic>? pendingNotificationData;
 
   static const AndroidNotificationChannel _defaultChannel = AndroidNotificationChannel(
     'message_pro_notifications',
@@ -119,17 +125,14 @@ class PushNotificationService {
       // 8. Setup Notification Click when app is running in background
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('[PushNotification] Notification clicked from background: ${message.messageId}, data: ${message.data}');
-        handleNotificationMessage(message);
+        handleNotificationData(message.data);
       });
 
       // 9. Handle notification that launched the app from terminated state
       final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('[PushNotification] App launched from terminated state via message: ${initialMessage.messageId}');
-        // Delay slightly to let Navigator attach to tree
-        Future.delayed(const Duration(milliseconds: 1200), () {
-          handleNotificationMessage(initialMessage);
-        });
+        pendingNotificationData = Map<String, dynamic>.from(initialMessage.data);
       }
 
       // 10. Listen to token refresh
@@ -211,31 +214,106 @@ class PushNotificationService {
     }
   }
 
+  /// Central handler for notification payloads from background, terminated, or foreground clicks
+  static Future<void> handleNotificationData(Map<dynamic, dynamic> rawData) async {
+    final data = Map<String, dynamic>.from(rawData);
+    debugPrint('[PushNotification] handleNotificationData: $data');
+
+    final workspaceStr = data['workspace_id']?.toString() ?? data['account_id']?.toString();
+    final workspaceId = int.tryParse(workspaceStr ?? '');
+    final convId = _extractConversationId(data);
+    final msgIdStr = data['message_id']?.toString();
+    final messageId = int.tryParse(msgIdStr ?? '');
+    final notifType = data['notification_type']?.toString();
+
+    final navState = navigatorKey.currentState;
+    final context = navState?.context ?? navigatorKey.currentContext;
+
+    if (context == null) {
+      debugPrint('[PushNotification] Context not ready, storing pending notification data');
+      pendingNotificationData = data;
+      return;
+    }
+
+    try {
+      final authCubit = context.read<AuthCubit>();
+      if (authCubit.state is! Authenticated) {
+        debugPrint('[PushNotification] User not authenticated yet, storing pending notification data');
+        pendingNotificationData = data;
+        return;
+      }
+
+      final currentUser = (authCubit.state as Authenticated).user;
+
+      // 1. Workspace Switch if payload specifies a different workspace
+      if (workspaceId != null && workspaceId > 0 && workspaceId != currentUser.accountId) {
+        debugPrint('[PushNotification] Switching workspace from ${currentUser.accountId} to $workspaceId');
+        await authCubit.switchAccount(workspaceId);
+        try {
+          final switchCtx = navigatorKey.currentContext;
+          if (switchCtx != null && switchCtx.mounted) {
+            await switchCtx.read<ConversationCubit>().onWorkspaceSwitched(workspaceId);
+          }
+        } catch (e) {
+          debugPrint('[PushNotification] Error notifying ConversationCubit of workspace switch: $e');
+        }
+      }
+
+      // 2. Conversation Navigation
+      if (convId != null && convId > 0) {
+        await navigateToConversation(convId, messageId: messageId, fallbackType: notifType);
+      } else {
+        // Fallback for notifications without a conversation ID
+        _navigateToFallback(notifType);
+      }
+    } catch (e) {
+      debugPrint('[PushNotification] Error processing notification: $e');
+      if (convId != null && convId > 0) {
+        await navigateToConversation(convId, messageId: messageId);
+      }
+    }
+  }
+
+  /// Process pending notification once session is restored and UI is mounted
+  static void processPendingNotification() {
+    if (pendingNotificationData != null) {
+      final data = pendingNotificationData!;
+      pendingNotificationData = null;
+      debugPrint('[PushNotification] Processing pending notification after session restore: $data');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        handleNotificationData(data);
+      });
+    }
+  }
+
+  static void _navigateToFallback(String? notifType) {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    if (notifType != null && (notifType.contains('call') || notifType.contains('missed'))) {
+      MainLayout.switchTab(ctx, 0); // Calls tab
+    } else {
+      MainLayout.switchTab(ctx, 3); // Notifications tab
+    }
+  }
+
   /// Handle notification message navigation
   static void handleNotificationMessage(RemoteMessage message) {
-    final data = message.data;
-    final convId = _extractConversationId(data);
-    if (convId != null) {
-      navigateToConversation(convId);
-    }
+    handleNotificationData(message.data);
   }
 
   /// Handle payload string from local notifications
   static void _handlePayloadString(String payloadStr) {
     try {
       final decoded = jsonDecode(payloadStr);
-      if (decoded is Map<String, dynamic>) {
-        final convId = _extractConversationId(decoded);
-        if (convId != null) {
-          navigateToConversation(convId);
-        }
+      if (decoded is Map) {
+        handleNotificationData(Map<String, dynamic>.from(decoded));
       } else if (decoded is int) {
-        navigateToConversation(decoded);
+        handleNotificationData({'conversation_id': decoded.toString()});
       }
     } catch (_) {
       final parsed = int.tryParse(payloadStr);
       if (parsed != null) {
-        navigateToConversation(parsed);
+        handleNotificationData({'conversation_id': parsed.toString()});
       }
     }
   }
@@ -281,25 +359,33 @@ class PushNotificationService {
   }
 
   /// Fetch conversation and push ChatScreen
-  static Future<void> navigateToConversation(int conversationId) async {
+  static Future<void> navigateToConversation(
+    int conversationId, {
+    int? messageId,
+    String? fallbackType,
+  }) async {
     final nav = navigatorKey.currentState;
     if (nav == null) {
       debugPrint('[PushNotification] Navigator not available yet for conversation #$conversationId');
       return;
     }
 
-    debugPrint('[PushNotification] Navigating to conversation #$conversationId');
+    debugPrint('[PushNotification] Navigating to conversation #$conversationId with messageId: $messageId');
     try {
       final repo = sl<IConversationRepository>();
       final result = await repo.getConversation(conversationId);
       result.fold(
         (failure) {
           debugPrint('[PushNotification] Failed to load conversation #$conversationId: ${failure.message}');
+          _navigateToFallback(fallbackType);
         },
         (conversation) {
           nav.push(
             MaterialPageRoute(
-              builder: (_) => ChatScreen(conversation: conversation),
+              builder: (_) => ChatScreen(
+                conversation: conversation,
+                initialMessageId: messageId,
+              ),
             ),
           );
         },

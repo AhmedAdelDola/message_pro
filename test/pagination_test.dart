@@ -7,6 +7,7 @@ import 'package:message_pro/data/models/conversation.dart';
 import 'package:message_pro/data/models/message.dart';
 import 'package:message_pro/data/models/user.dart';
 import 'package:message_pro/data/models/message_template.dart';
+import 'package:message_pro/data/models/conversation_filter_options.dart';
 import 'package:message_pro/data/repositories/conversation_repository.dart';
 import 'package:message_pro/logic/chat/chat_cubit.dart';
 import 'package:message_pro/logic/conversation/conversation_cubit.dart';
@@ -22,6 +23,8 @@ class FakeConversationRepository implements IConversationRepository {
     int? inboxId,
     int? teamId,
     String? label,
+    int? assigneeId,
+    int? assigneeAgentBotId,
     int page = 1,
   }) async {
     if (getConversationsHandler != null) {
@@ -41,7 +44,7 @@ class FakeConversationRepository implements IConversationRepository {
   }
 
   @override
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId}) async {
+  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId}) async {
     if (getMessagesHandler != null) {
       return Right(getMessagesHandler!(conversationId, beforeId));
     }
@@ -54,6 +57,7 @@ class FakeConversationRepository implements IConversationRepository {
     required String content,
     bool isPrivate = false,
     List<String>? attachmentPaths,
+    int? inReplyToId,
   }) async {
     throw UnimplementedError();
   }
@@ -122,6 +126,9 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses() async => const Right([]);
 
   @override
+  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions() async => const Right(ConversationFilterOptions());
+
+  @override
   Future<Either<Failure, void>> muteConversation(int conversationId) async => const Right(null);
 
   @override
@@ -167,6 +174,9 @@ class FakeConversationRepository implements IConversationRepository {
     required String sourceId,
     String? contactName,
   }) async => throw UnimplementedError();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Conversation makeFakeConversation(int id) {

@@ -6,6 +6,7 @@ import '../../core/services/sound_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../data/models/contact.dart';
 import '../../data/models/conversation.dart';
+import '../../data/models/conversation_filter_options.dart';
 import '../../data/repositories/conversation_repository.dart';
 import 'conversation_state.dart';
 
@@ -23,12 +24,14 @@ class ConversationCubit extends Cubit<ConversationState> {
     _listenToRealtime();
     _listenToReconnect();
     loadAuxiliaryData();
+    loadFilterOptions();
     loadConversations();
   }
 
   void _listenToReconnect() {
     _reconnectSub = ws.onReconnected.listen((_) {
       loadAuxiliaryData();
+      loadFilterOptions();
       loadConversations(refresh: false);
     });
   }
@@ -138,6 +141,8 @@ class ConversationCubit extends Cubit<ConversationState> {
     final agentsRes = await repo.fetchAssignableAgents(inboxIds: inboxes.map((i) => i.id).toList());
     final stagesRes = await repo.fetchLifecycleStages();
 
+    if (isClosed) return;
+
     emit(state.copyWith(
       inboxes: inboxes,
       labels: labelsRes.getOrElse(() => []),
@@ -147,7 +152,31 @@ class ConversationCubit extends Cubit<ConversationState> {
     ));
   }
 
+  Future<void> loadFilterOptions() async {
+    if (isClosed) return;
+    emit(state.copyWith(isLoadingFilters: true));
+    final res = await repo.fetchFilterOptions();
+    if (isClosed) return;
+    res.fold(
+      (_) {
+        if (!isClosed) emit(state.copyWith(isLoadingFilters: false));
+      },
+      (options) {
+        if (!isClosed) {
+          emit(state.copyWith(
+            filterOptions: options,
+            isLoadingFilters: false,
+            inboxes: options.inboxes.isNotEmpty ? options.inboxes : state.inboxes,
+            teams: options.teams.isNotEmpty ? options.teams : state.teams,
+            agents: options.agents.isNotEmpty ? options.agents : state.agents,
+          ));
+        }
+      },
+    );
+  }
+
   Future<void> loadConversations({bool refresh = true}) async {
+    if (isClosed) return;
     if (refresh) {
       emit(state.copyWith(conversations: [], isLoading: true, page: 1, hasMore: true, errorMessage: null));
     } else {
@@ -160,23 +189,33 @@ class ConversationCubit extends Cubit<ConversationState> {
       inboxId: state.selectedInboxId,
       teamId: state.selectedTeamId,
       label: state.selectedLabel,
+      assigneeId: state.selectedAssigneeId,
+      assigneeAgentBotId: state.selectedAssigneeAgentBotId,
       page: 1,
     );
 
+    if (isClosed) return;
+
     result.fold(
-      (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
-      (list) => emit(state.copyWith(
-        conversations: list,
-        isLoading: false,
-        errorMessage: null,
-        page: 1,
-        hasMore: list.isNotEmpty,
-      )),
+      (failure) {
+        if (!isClosed) emit(state.copyWith(isLoading: false, errorMessage: failure.message));
+      },
+      (list) {
+        if (!isClosed) {
+          emit(state.copyWith(
+            conversations: list,
+            isLoading: false,
+            errorMessage: null,
+            page: 1,
+            hasMore: list.isNotEmpty,
+          ));
+        }
+      },
     );
   }
 
   Future<void> loadMoreConversations() async {
-    if (!state.hasMore || state.isLoadingMore || state.isLoading) return;
+    if (!state.hasMore || state.isLoadingMore || state.isLoading || isClosed) return;
 
     emit(state.copyWith(isLoadingMore: true));
     final nextPage = state.page + 1;
@@ -187,8 +226,12 @@ class ConversationCubit extends Cubit<ConversationState> {
       inboxId: state.selectedInboxId,
       teamId: state.selectedTeamId,
       label: state.selectedLabel,
+      assigneeId: state.selectedAssigneeId,
+      assigneeAgentBotId: state.selectedAssigneeAgentBotId,
       page: nextPage,
     );
+
+    if (isClosed) return;
 
     result.fold(
       (failure) => emit(state.copyWith(isLoadingMore: false)),
@@ -242,10 +285,16 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearTeam: true,
       clearLabel: true,
       clearStage: true,
+      clearAssignee: true,
+      clearAgentBot: true,
+      filterOptions: const ConversationFilterOptions(),
     ));
 
-    // Re-fetch auxiliary data (inboxes, labels, teams, agents, lifecycle stages)
-    await loadAuxiliaryData();
+    // Re-fetch auxiliary data & filter options for the new workspace
+    await Future.wait([
+      loadAuxiliaryData(),
+      loadFilterOptions(),
+    ]);
 
     // Re-fetch conversations for the new workspace
     await loadConversations(refresh: true);
@@ -265,19 +314,55 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearLabel: label == null,
       selectedLifecycleStageId: stageId,
       clearStage: stageId == null,
+      clearAssignee: true,
+      clearAgentBot: true,
+      page: 1,
     ));
     loadConversations();
   }
 
   void setStatus(String status) {
     if (state.status == status) return;
-    emit(state.copyWith(status: status));
+    emit(state.copyWith(status: status, page: 1));
     loadConversations();
   }
 
   void setAssigneeType(String type) {
-    if (state.assigneeType == type) return;
-    emit(state.copyWith(assigneeType: type));
+    if (state.assigneeType == type && state.selectedAssigneeId == null && state.selectedAssigneeAgentBotId == null) return;
+    emit(state.copyWith(
+      assigneeType: type,
+      clearAssignee: true,
+      clearAgentBot: true,
+      page: 1,
+    ));
+    loadConversations();
+  }
+
+  void setAssigneeFilter(int? agentId) {
+    if (state.selectedAssigneeId == agentId) return;
+    emit(state.copyWith(
+      selectedAssigneeId: agentId,
+      clearAssignee: agentId == null,
+      clearAgentBot: true,
+      clearInbox: true,
+      clearTeam: true,
+      assigneeType: 'all',
+      page: 1,
+    ));
+    loadConversations();
+  }
+
+  void setAiAgentFilter(int? agentBotId) {
+    if (state.selectedAssigneeAgentBotId == agentBotId) return;
+    emit(state.copyWith(
+      selectedAssigneeAgentBotId: agentBotId,
+      clearAgentBot: agentBotId == null,
+      clearAssignee: true,
+      clearInbox: true,
+      clearTeam: true,
+      assigneeType: 'all',
+      page: 1,
+    ));
     loadConversations();
   }
 
@@ -286,6 +371,11 @@ class ConversationCubit extends Cubit<ConversationState> {
     emit(state.copyWith(
       selectedInboxId: inboxId,
       clearInbox: inboxId == null,
+      clearAssignee: true,
+      clearAgentBot: true,
+      clearTeam: true,
+      assigneeType: 'all',
+      page: 1,
     ));
     loadConversations();
   }
@@ -295,6 +385,25 @@ class ConversationCubit extends Cubit<ConversationState> {
     emit(state.copyWith(
       selectedTeamId: teamId,
       clearTeam: teamId == null,
+      clearAssignee: true,
+      clearAgentBot: true,
+      clearInbox: true,
+      assigneeType: 'all',
+      page: 1,
+    ));
+    loadConversations();
+  }
+
+  void clearAllFilters() {
+    emit(state.copyWith(
+      clearInbox: true,
+      clearTeam: true,
+      clearLabel: true,
+      clearStage: true,
+      clearAssignee: true,
+      clearAgentBot: true,
+      assigneeType: 'all',
+      page: 1,
     ));
     loadConversations();
   }
