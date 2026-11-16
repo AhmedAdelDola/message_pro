@@ -153,7 +153,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
             color: isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary,
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            fontFamily: 'Gontserrat',
           ),
         ),
         content: TextField(
@@ -207,7 +206,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
             color: textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.bold,
-            fontFamily: 'Gontserrat',
           ),
         ),
         actions: [
@@ -238,7 +236,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   Container(
@@ -268,7 +265,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -348,7 +344,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.bold,
                                 color: textPrimary,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -361,7 +356,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                       child: TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        style: TextStyle(color: textPrimary, fontSize: 14, fontFamily: 'Gontserrat'),
+                        style: TextStyle(color: textPrimary, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: 'Add Phone Number (or +966...)',
                           hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
@@ -450,7 +445,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                               color: AppColors.primary,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ],
@@ -484,7 +478,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -535,7 +528,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: textSecondary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ),
@@ -562,7 +554,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                     ),
@@ -586,7 +577,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: textSecondary,
-            fontFamily: 'Gontserrat',
           ),
         ),
         if (isRequired) ...[
@@ -611,7 +601,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
-      style: TextStyle(color: textPrimary, fontSize: 14, fontFamily: 'Gontserrat'),
+      style: TextStyle(color: textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
@@ -657,11 +647,11 @@ class _AddContactScreenState extends State<AddContactScreen> {
           value: value,
           hint: Text(
             hintText,
-            style: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14, fontFamily: 'Gontserrat'),
+            style: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
           ),
           isExpanded: true,
           icon: Icon(Icons.keyboard_arrow_down_rounded, color: textSecondary),
-          style: TextStyle(color: textPrimary, fontSize: 14, fontFamily: 'Gontserrat'),
+          style: TextStyle(color: textPrimary, fontSize: 14),
           items: items.map((it) => DropdownMenuItem(value: it, child: Text(it))).toList(),
           onChanged: onChanged,
         ),

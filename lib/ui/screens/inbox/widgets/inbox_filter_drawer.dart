@@ -289,7 +289,6 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
                 Text(
@@ -297,7 +296,6 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                   style: TextStyle(
                     fontSize: 11.5,
                     color: textSecondary,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ],
@@ -340,7 +338,6 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
             style: TextStyle(
               fontSize: 13,
               color: textSecondary,
-              fontFamily: 'Gontserrat',
             ),
           ),
         ],
@@ -388,7 +385,6 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
                           color: hasActiveFilter ? AppColors.primary : textPrimary,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -490,7 +486,6 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected ? AppColors.primary : textPrimary,
-            fontFamily: 'Gontserrat',
           ),
         ),
         subtitle: subtitle != null && subtitle.isNotEmpty
@@ -501,7 +496,6 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                 style: TextStyle(
                   fontSize: 10.5,
                   color: textSecondary,
-                  fontFamily: 'Gontserrat',
                 ),
               )
             : null,

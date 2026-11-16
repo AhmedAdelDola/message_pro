@@ -75,7 +75,6 @@ class AiAgentTakeoverBanner extends StatelessWidget {
                     fontSize: 12.5.sp,
                     fontWeight: FontWeight.bold,
                     color: titleColor,
-                    fontFamily: 'Gontserrat',
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -89,7 +88,6 @@ class AiAgentTakeoverBanner extends StatelessWidget {
                     fontSize: 10.5.sp,
                     color: subtitleColor,
                     height: 1.3,
-                    fontFamily: 'Gontserrat',
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -126,7 +124,6 @@ class AiAgentTakeoverBanner extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12.sp,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
           ),

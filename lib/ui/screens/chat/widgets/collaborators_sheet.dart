@@ -208,7 +208,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                             fontSize: 16.sp,
                             fontWeight: FontWeight.bold,
                             color: textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         Text(
@@ -218,7 +217,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                           style: TextStyle(
                             fontSize: 11.5.sp,
                             color: textSecondary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ],
@@ -235,7 +233,7 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                         elevation: 0,
                         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                        textStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, fontFamily: 'Gontserrat'),
+                        textStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold),
                       ),
                     ),
                   IconButton(
@@ -295,7 +293,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
                 color: textPrimary,
-                fontFamily: 'Gontserrat',
               ),
             ),
             SizedBox(height: 6.h),
@@ -307,7 +304,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
               style: TextStyle(
                 fontSize: 12.sp,
                 color: textSecondary,
-                fontFamily: 'Gontserrat',
               ),
             ),
             if (_canManageCollaborators) ...[
@@ -349,7 +345,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
               fontSize: 14.sp,
               fontWeight: FontWeight.bold,
               color: textPrimary,
-              fontFamily: 'Gontserrat',
             ),
           ),
           subtitle: Text(
@@ -357,7 +352,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
             style: TextStyle(
               fontSize: 11.5.sp,
               color: textSecondary,
-              fontFamily: 'Gontserrat',
             ),
           ),
           trailing: _canManageCollaborators
@@ -390,10 +384,10 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
           child: TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
-            style: TextStyle(fontSize: 13.5.sp, color: textPrimary, fontFamily: 'Gontserrat'),
+            style: TextStyle(fontSize: 13.5.sp, color: textPrimary),
             decoration: InputDecoration(
               hintText: isArabic ? 'بحث بالاسم أو البريد...' : 'Search agent...',
-              hintStyle: TextStyle(fontSize: 12.5.sp, color: textSecondary, fontFamily: 'Gontserrat'),
+              hintStyle: TextStyle(fontSize: 12.5.sp, color: textSecondary),
               prefixIcon: Icon(Icons.search_rounded, size: 20.r, color: textSecondary),
               filled: true,
               fillColor: surfaceColor,
@@ -427,7 +421,7 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                   ? Center(
                       child: Text(
                         isArabic ? 'لا يوجد أعضاء متاحين للإضافة' : 'No available agents to add',
-                        style: TextStyle(fontSize: 13.sp, color: textSecondary, fontFamily: 'Gontserrat'),
+                        style: TextStyle(fontSize: 13.sp, color: textSecondary),
                       ),
                     )
                   : ListView.separated(
@@ -449,7 +443,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                               fontSize: 13.5.sp,
                               fontWeight: FontWeight.w600,
                               color: textPrimary,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           subtitle: Text(
@@ -457,7 +450,6 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
                             style: TextStyle(
                               fontSize: 11.sp,
                               color: textSecondary,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           trailing: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF4162E3), size: 22),

@@ -110,7 +110,6 @@ class MessageBubble extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F),
-                fontFamily: 'Gontserrat',
               ),
             ),
           ),
@@ -166,7 +165,6 @@ class MessageBubble extends StatelessWidget {
             fontWeight: FontWeight.normal,
             height: 1.25,
             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            fontFamily: 'Gontserrat',
           ),
         ),
       ),
@@ -528,7 +526,6 @@ class MessageBubble extends StatelessWidget {
                               fontSize: 14.5,
                               height: 1.35,
                               color: Colors.white,
-                              fontFamily: 'Gontserrat',
                             ),
                             linkStyle: const TextStyle(
                               fontSize: 14.5,
@@ -537,7 +534,6 @@ class MessageBubble extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               decoration: TextDecoration.underline,
                               decorationColor: Color(0xFFBAE6FD),
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         );
@@ -564,7 +560,6 @@ class MessageBubble extends StatelessWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ],
@@ -583,7 +578,6 @@ class MessageBubble extends StatelessWidget {
                             fontSize: 9.5,
                             fontStyle: FontStyle.italic,
                             color: Color(0x99FFFFFF),
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         const SizedBox(width: 2),
@@ -594,8 +588,7 @@ class MessageBubble extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xBFFFFFFF), // rgba(255,255,255,0.75)
-                          fontFamily: 'Gontserrat',
-                        ),
+                          ),
                       ),
                       const SizedBox(width: 4),
                       _buildDeliveryStatus(message.status, isTemplate: false, isDark: isDark),
@@ -712,7 +705,6 @@ class MessageBubble extends StatelessWidget {
                               fontSize: 14.5,
                               height: 1.35,
                               color: textColor,
-                              fontFamily: 'Gontserrat',
                             ),
                             linkStyle: TextStyle(
                               fontSize: 14.5,
@@ -721,7 +713,6 @@ class MessageBubble extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               decoration: TextDecoration.underline,
                               decorationColor: isDark ? const Color(0xFF38BDF8) : const Color(0xFF2563EB),
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         );
@@ -740,7 +731,6 @@ class MessageBubble extends StatelessWidget {
                             fontSize: 9.5,
                             fontStyle: FontStyle.italic,
                             color: Color(0xFF80838D),
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         const SizedBox(width: 2),
@@ -751,7 +741,6 @@ class MessageBubble extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xFF80838D),
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                     ],
@@ -803,7 +792,6 @@ class MessageBubble extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: accent,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ],
@@ -834,7 +822,6 @@ class MessageBubble extends StatelessWidget {
                         fontSize: 14,
                         height: 1.35,
                         color: text,
-                        fontFamily: 'Gontserrat',
                       ),
                       linkStyle: const TextStyle(
                         fontSize: 14,
@@ -842,7 +829,6 @@ class MessageBubble extends StatelessWidget {
                         color: Color(0xFF2563EB),
                         fontWeight: FontWeight.w600,
                         decoration: TextDecoration.underline,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   );
@@ -858,7 +844,6 @@ class MessageBubble extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   color: accent.withValues(alpha: 0.8),
-                  fontFamily: 'Gontserrat',
                 ),
               ),
             ),
@@ -1043,7 +1028,6 @@ class MessageBubble extends StatelessWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               color: headerBadgeColor,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ),
@@ -1057,7 +1041,6 @@ class MessageBubble extends StatelessWidget {
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: headerBadgeColor,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ),
@@ -1088,7 +1071,6 @@ class MessageBubble extends StatelessWidget {
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.bold,
                                     color: titleColor,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                               );
@@ -1105,7 +1087,6 @@ class MessageBubble extends StatelessWidget {
                               fontSize: 13.5,
                               height: 1.45,
                               color: textColor,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
 
@@ -1119,7 +1100,6 @@ class MessageBubble extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               color: footerColor,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ],
@@ -1185,7 +1165,6 @@ class MessageBubble extends StatelessWidget {
                                               fontSize: 13,
                                               fontWeight: FontWeight.w600,
                                               color: Color(0xFF2563EB),
-                                              fontFamily: 'Gontserrat',
                                             ),
                                           ),
                                         ),
@@ -1221,7 +1200,6 @@ class MessageBubble extends StatelessWidget {
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       color: Color(0xFFDC2626),
-                                      fontFamily: 'Gontserrat',
                                     ),
                                   ),
                                 ),
@@ -1333,7 +1311,6 @@ class MessageBubble extends StatelessWidget {
                       color: Color(0xFF1877F2),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const Spacer(),
@@ -1353,7 +1330,6 @@ class MessageBubble extends StatelessWidget {
                               color: Color(0xFF2563EB),
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           const SizedBox(width: 2),
@@ -1377,7 +1353,6 @@ class MessageBubble extends StatelessWidget {
                         fontSize: 12.5,
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   );
@@ -1400,7 +1375,6 @@ class MessageBubble extends StatelessWidget {
                           fontSize: 11,
                           height: 1.3,
                           color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          fontFamily: 'Gontserrat',
                         )),
                       );
                     },
@@ -1814,7 +1788,6 @@ class MessageBubble extends StatelessWidget {
               fontSize: 9.5,
               fontWeight: FontWeight.bold,
               color: Color(0xFFDC2626),
-              fontFamily: 'Gontserrat',
             ),
           ),
         ],
@@ -1910,7 +1883,6 @@ class MessageBubble extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: titleColor,
-                fontFamily: 'Gontserrat',
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1921,7 +1893,6 @@ class MessageBubble extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10.5,
                 color: textColor,
-                fontFamily: 'Gontserrat',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -2019,7 +1990,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 title: Text(
                   isArabic ? 'تعديل الرسالة' : 'Edit Message',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: message.messageActions.remainingEditTime != null
                     ? Text(
@@ -2046,7 +2017,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 title: Text(
                   isArabic ? 'رد على الرسالة' : 'Reply',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -2065,7 +2036,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 title: Text(
                   isArabic ? 'نسخ نص الرسالة' : 'Copy Message Text',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -2094,7 +2065,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 title: Text(
                   isArabic ? 'نسخ رابط المرفق' : 'Copy Attachment Link',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -2124,7 +2095,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 title: Text(
                   isArabic ? 'إعادة الإرسال' : 'Retry Sending',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);

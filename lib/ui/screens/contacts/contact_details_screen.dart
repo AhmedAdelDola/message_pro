@@ -402,7 +402,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ),
@@ -475,11 +474,11 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                       ),
                       title: Text(
                         name,
-                        style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 14, fontFamily: 'Gontserrat'),
+                        style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
                       ),
                       subtitle: Text(
                         inb['channel_type']?.toString() ?? '',
-                        style: TextStyle(color: textSecondary, fontSize: 12, fontFamily: 'Gontserrat'),
+                        style: TextStyle(color: textSecondary, fontSize: 12),
                       ),
                       onTap: () {
                         Navigator.of(ctx).pop();
@@ -526,7 +525,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(
                   isArabic ? 'تحديد مرحلة العميل' : 'Select Lifecycle Stage',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Gontserrat'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
               const Divider(),
@@ -563,7 +562,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                               style: TextStyle(
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                                 color: isSelected ? AppColors.primary : null,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                             trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
@@ -616,7 +614,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                       children: [
                         Text(
                           isArabic ? 'إدارة التصنيفات والوسوم' : 'Manage Labels & Tags',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary, fontFamily: 'Gontserrat'),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
                         ),
                         IconButton(
                           icon: Icon(Icons.close_rounded, size: 20, color: textSecondary),
@@ -659,7 +657,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                               style: TextStyle(
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 color: textPrimary,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                             trailing: isSelected
@@ -731,7 +728,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
             color: textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            fontFamily: 'Gontserrat',
           ),
         ),
         centerTitle: false,
@@ -786,7 +782,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: textPrimary,
-                                  fontFamily: 'Gontserrat',
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -797,7 +792,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                     style: TextStyle(
                                       fontSize: 12.5,
                                       color: textSecondary,
-                                      fontFamily: 'Gontserrat',
                                     ),
                                   ),
                                   if (contact.identifier != null && contact.identifier!.isNotEmpty) ...[
@@ -809,7 +803,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                         style: TextStyle(
                                           fontSize: 12.5,
                                           color: textSecondary,
-                                          fontFamily: 'Gontserrat',
                                         ),
                                       ),
                                     ),
@@ -851,7 +844,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                               color: textPrimary,
-                                              fontFamily: 'Gontserrat',
                                             ),
                                           ),
                                         ],
@@ -880,7 +872,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                             color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
-                                            fontFamily: 'Gontserrat',
                                           ),
                                         ),
                                       ],
@@ -939,8 +930,8 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                       indicatorWeight: 2.5,
                       labelColor: AppColors.primary,
                       unselectedLabelColor: textSecondary,
-                      labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Gontserrat'),
-                      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13, fontFamily: 'Gontserrat'),
+                      labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
                       tabAlignment: TabAlignment.start,
                       tabs: [
                         Tab(
@@ -1007,7 +998,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: color,
-                fontFamily: 'Gontserrat',
               ),
             ),
           ],
@@ -1045,7 +1035,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: textPrimary,
-                  fontFamily: 'Gontserrat',
                 ),
               ),
               InkWell(
@@ -1067,7 +1056,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: textPrimary,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1101,7 +1089,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                           color: textPrimary,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                     ],
@@ -1126,7 +1113,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                               color: AppColors.primaryLight,
                               fontSize: 11.5,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ],
@@ -1169,7 +1155,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
                               color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -1250,7 +1235,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: textPrimary,
-                  fontFamily: 'Gontserrat',
                 ),
               ),
               const SizedBox(height: 6),
@@ -1262,7 +1246,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                 style: TextStyle(
                   fontSize: 13,
                   color: textSecondary,
-                  fontFamily: 'Gontserrat',
                 ),
               ),
             ],
@@ -1316,10 +1299,10 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                   controller: _noteController,
                   maxLines: 3,
                   minLines: 1,
-                  style: TextStyle(fontSize: 13.5, color: textPrimary, fontFamily: 'Gontserrat'),
+                  style: TextStyle(fontSize: 13.5, color: textPrimary),
                   decoration: InputDecoration(
                     hintText: isArabic ? 'أضف ملاحظة خاصة حول هذا العميل...' : 'Add a private note about this contact...',
-                    hintStyle: TextStyle(fontSize: 13, color: textSecondary, fontFamily: 'Gontserrat'),
+                    hintStyle: TextStyle(fontSize: 13, color: textSecondary),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: borderColor),
@@ -1352,7 +1335,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
               ? Center(
                   child: Text(
                     isArabic ? 'لا توجد ملاحظات بعد' : 'No notes yet',
-                    style: TextStyle(color: textSecondary, fontFamily: 'Gontserrat'),
+                    style: TextStyle(color: textSecondary),
                   ),
                 )
               : ListView.builder(
@@ -1381,7 +1364,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                   color: AppColors.primary,
-                                  fontFamily: 'Gontserrat',
                                 ),
                               ),
                               Text(
@@ -1389,7 +1371,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: textSecondary,
-                                  fontFamily: 'Gontserrat',
                                 ),
                               ),
                             ],
@@ -1401,7 +1382,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                               fontSize: 13.5,
                               color: textPrimary,
                               height: 1.35,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ],
@@ -1446,7 +1426,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -1458,7 +1437,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                     style: TextStyle(
                       fontSize: 13,
                       color: textSecondary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -1520,7 +1498,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                         color: textPrimary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1536,7 +1513,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           color: isOpen ? Colors.green : Colors.grey,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                     ),
@@ -1549,7 +1525,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                           conv.lastMessage!.content!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: textSecondary, fontFamily: 'Gontserrat'),
+                          style: TextStyle(fontSize: 12.5, color: textSecondary),
                         ),
                       )
                     : null,
@@ -1589,7 +1565,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: textSecondary,
-              fontFamily: 'Gontserrat',
             ),
           ),
           const SizedBox(height: 4),
@@ -1603,7 +1578,6 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
                     fontSize: 14,
                     fontWeight: isPlaceholder ? FontWeight.normal : FontWeight.w500,
                     color: isPlaceholder ? textSecondary.withValues(alpha: 0.7) : textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ),

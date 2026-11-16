@@ -111,7 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SnackBar(
           content: Text(
             errorMessage!,
-            style: const TextStyle(fontFamily: 'Gontserrat', color: Colors.white),
+            style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: AppColors.danger,
           duration: const Duration(seconds: 3),
@@ -126,7 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(width: 10),
               Text(
                 isArabic ? 'تم حفظ التغييرات بنجاح' : 'Profile updated successfully',
-                style: const TextStyle(fontFamily: 'Gontserrat', color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),
@@ -161,7 +161,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             fontSize: 18.sp,
             fontWeight: FontWeight.bold,
             color: textPrimary,
-            fontFamily: 'Gontserrat',
           ),
         ),
         centerTitle: true,
@@ -235,7 +234,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontSize: 18.sp,
                             fontWeight: FontWeight.bold,
                             color: textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         SizedBox(height: 2.h),
@@ -244,7 +242,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 13.sp,
                             color: textSecondary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ],
@@ -279,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         SizedBox(height: 6.h),
                         TextFormField(
                           controller: _nameController,
-                          style: TextStyle(fontSize: 14.sp, color: textPrimary, fontFamily: 'Gontserrat'),
+                          style: TextStyle(fontSize: 14.sp, color: textPrimary),
                           decoration: _inputDecoration(
                             hint: isArabic ? 'أدخل اسمك الكامل' : 'Enter full name',
                             icon: Icons.person_outline_rounded,
@@ -305,7 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
-                          style: TextStyle(fontSize: 14.sp, color: textPrimary, fontFamily: 'Gontserrat'),
+                          style: TextStyle(fontSize: 14.sp, color: textPrimary),
                           decoration: _inputDecoration(
                             hint: isArabic ? 'أدخل البريد الإلكتروني' : 'Enter email address',
                             icon: Icons.email_outlined,
@@ -399,7 +396,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           fontWeight: FontWeight.w600,
           color: const Color(0xFF80838D),
           letterSpacing: 1.0,
-          fontFamily: 'Gontserrat',
         ),
       ),
     );
@@ -412,7 +408,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         fontSize: 13.5.sp,
         fontWeight: FontWeight.w600,
         color: textPrimary,
-        fontFamily: 'Gontserrat',
       ),
     );
   }
@@ -429,7 +424,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       hintStyle: TextStyle(
         fontSize: 13.5.sp,
         color: textSecondary.withValues(alpha: 0.7),
-        fontFamily: 'Gontserrat',
       ),
       prefixIcon: Icon(icon, size: 20.sp, color: textSecondary),
       filled: true,
@@ -545,7 +539,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           fontSize: 11.5.sp,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                           color: isSelected ? color : textSecondary,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                     ),
@@ -577,7 +570,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: TextStyle(
               color: textSecondary,
               fontSize: 13.sp,
-              fontFamily: 'Gontserrat',
             ),
           ),
           const Spacer(),
@@ -587,7 +579,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontWeight: FontWeight.w600,
               fontSize: 13.sp,
               color: textPrimary,
-              fontFamily: 'Gontserrat',
             ),
           ),
         ],

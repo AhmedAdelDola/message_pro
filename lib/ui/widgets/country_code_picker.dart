@@ -144,7 +144,6 @@ Future<CountryInfo?> showCountryPickerModal(BuildContext context) {
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         IconButton(
@@ -208,7 +207,6 @@ Future<CountryInfo?> showCountryPickerModal(BuildContext context) {
                               color: textPrimary,
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           trailing: Container(

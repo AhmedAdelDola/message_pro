@@ -148,7 +148,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           color: textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                     ],
@@ -204,14 +203,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         style: TextStyle(
                           color: textPrimary,
                           fontSize: 13.5,
-                          fontFamily: 'Gontserrat',
                         ),
                         decoration: InputDecoration(
                           hintText: isArabic ? 'بحث بالاسم، البريد أو الهاتف...' : 'Search by name, email, or phone...',
                           hintStyle: TextStyle(
                             color: textSecondary,
                             fontSize: 13,
-                            fontFamily: 'Gontserrat',
                           ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -257,7 +254,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                   color: textSecondary,
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w500,
-                                  fontFamily: 'Gontserrat',
                                 ),
                               ),
                             ],
@@ -317,7 +313,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w600,
                                                 color: textPrimary,
-                                                fontFamily: 'Gontserrat',
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
@@ -328,7 +323,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: textSecondary,
-                                                fontFamily: 'Gontserrat',
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,

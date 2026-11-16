@@ -150,7 +150,6 @@ class DocumentAttachmentTile extends StatelessWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: titleColor,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -163,7 +162,6 @@ class DocumentAttachmentTile extends StatelessWidget {
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                             color: isOutgoing ? Colors.white.withValues(alpha: 0.9) : _getIconBgColor(),
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         if (sizeText.isNotEmpty)
@@ -178,7 +176,6 @@ class DocumentAttachmentTile extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10.5,
                             color: subtitleColor,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                     ],

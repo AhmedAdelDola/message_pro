@@ -207,7 +207,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                     Text(
                                       isArabic ? 'English' : 'العربية',
                                       style: TextStyle(
-                                        fontFamily: 'Gontserrat',
                                         fontSize: 11.sp,
                                         fontWeight: FontWeight.w600,
                                         color: textPrimary,
@@ -226,7 +225,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           isArabic ? 'تسجيل الدخول إلى Message Pro' : 'Sign in to Message Pro',
                           textAlign: isArabic ? TextAlign.right : TextAlign.left,
                           style: TextStyle(
-                            fontFamily: 'Gontserrat',
                             color: textPrimary,
                             fontSize: 17.sp,
                             fontWeight: FontWeight.w700,
@@ -252,7 +250,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Text(
                                     errorMessage,
                                     style: TextStyle(
-                                      fontFamily: 'Gontserrat',
                                       color: const Color(0xFFFF382E),
                                       fontSize: 12.sp,
                                       fontWeight: FontWeight.w500,
@@ -269,7 +266,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           isArabic ? 'البريد الإلكتروني' : 'Email',
                           textAlign: isArabic ? TextAlign.right : TextAlign.left,
                           style: TextStyle(
-                            fontFamily: 'Gontserrat',
                             color: textSecondary,
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w500,
@@ -285,7 +281,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           textDirection: TextDirection.ltr,
                           textAlign: isArabic ? TextAlign.right : TextAlign.left,
                           style: TextStyle(
-                            fontFamily: 'Gontserrat',
                             fontSize: 13.sp,
                             color: textPrimary,
                           ),
@@ -293,7 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             hintText: isArabic ? 'name@company.com' : 'Email',
                             hintTextDirection: TextDirection.ltr,
                             hintStyle: TextStyle(
-                              fontFamily: 'Gontserrat',
                               color: textTertiary,
                               fontSize: 13.sp,
                             ),
@@ -343,7 +337,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           isArabic ? 'كلمة المرور' : 'Password',
                           textAlign: isArabic ? TextAlign.right : TextAlign.left,
                           style: TextStyle(
-                            fontFamily: 'Gontserrat',
                             color: textSecondary,
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w500,
@@ -360,7 +353,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: isArabic ? TextAlign.right : TextAlign.left,
                           onFieldSubmitted: (_) => _handleLogin(),
                           style: TextStyle(
-                            fontFamily: 'Gontserrat',
                             fontSize: 13.sp,
                             color: textPrimary,
                           ),
@@ -368,7 +360,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             hintText: '••••••••',
                             hintTextDirection: TextDirection.ltr,
                             hintStyle: TextStyle(
-                              fontFamily: 'Gontserrat',
                               color: textTertiary,
                               fontSize: 13.sp,
                             ),
@@ -436,7 +427,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Text(
                                   isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?',
                                   style: TextStyle(
-                                    fontFamily: 'Gontserrat',
                                     color: accentColor,
                                     fontSize: 12.sp,
                                     fontWeight: FontWeight.w600,
@@ -475,7 +465,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Text(
                                     isArabic ? 'تسجيل الدخول' : 'Login',
                                     style: TextStyle(
-                                      fontFamily: 'Gontserrat',
                                       color: Colors.white,
                                       fontSize: 13.sp,
                                       fontWeight: FontWeight.w800,
@@ -495,7 +484,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Text(
                                   isArabic ? 'أو' : 'or',
                                   style: TextStyle(
-                                    fontFamily: 'Gontserrat',
                                     color: textTertiary,
                                     fontSize: 12.sp,
                                   ),
@@ -535,7 +523,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       Text(
                                         isArabic ? 'المتابعة باستخدام Google' : 'Continue with Google',
                                         style: TextStyle(
-                                          fontFamily: 'Gontserrat',
                                           color: textPrimary,
                                           fontSize: 13.sp,
                                           fontWeight: FontWeight.w600,
@@ -555,7 +542,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               : 'No account? Sign up on your desktop.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontFamily: 'Gontserrat',
                             color: textTertiary,
                             fontSize: 12.sp,
                           ),

@@ -325,7 +325,6 @@ class _SplashScreenState extends State<SplashScreen>
                         statusText,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontFamily: 'Gontserrat',
                           fontSize: 13.sp,
                           color: mutedColor,
                           fontWeight: FontWeight.w400,

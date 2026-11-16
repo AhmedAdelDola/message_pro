@@ -98,7 +98,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -109,7 +108,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ],
@@ -169,13 +167,12 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                     Expanded(
                       child: TextField(
                         onChanged: (val) => setState(() => _searchQuery = val),
-                        style: const TextStyle(fontSize: 13, fontFamily: 'Gontserrat'),
+                        style: const TextStyle(fontSize: 13),
                         decoration: InputDecoration(
                           hintText: isArabic ? 'بحث في القوالب...' : 'Search',
                           hintStyle: TextStyle(
                             fontSize: 13,
                             color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                            fontFamily: 'Gontserrat',
                           ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -229,7 +226,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                 )
@@ -270,7 +266,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.bold,
                                       color: isSelected ? const Color(0xFF4162E3) : null,
-                                      fontFamily: 'Gontserrat',
                                     ),
                                   ),
                                 ),
@@ -279,7 +274,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                               ],
@@ -293,7 +287,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                                 fontSize: 12.5,
                                 height: 1.35,
                                 color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF374151),
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                             if (tpl.buttons.isNotEmpty) ...[
@@ -323,7 +316,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                                             fontSize: 10.5,
                                             fontWeight: FontWeight.w600,
                                             color: Color(0xFF4162E3),
-                                            fontFamily: 'Gontserrat',
                                           ),
                                         ),
                                       ],
@@ -362,7 +354,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                     style: const TextStyle(
                       fontSize: 12.5,
                       color: Color(0xFF4162E3),
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                 ),
@@ -374,7 +365,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                 ),
@@ -397,7 +387,7 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                   ),
                   child: Text(
                     isArabic ? 'إرسال' : 'Send',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Gontserrat'),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -438,7 +428,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
             color: isSelected
                 ? const Color(0xFF4338CA)
                 : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563)),
-            fontFamily: 'Gontserrat',
           ),
         ),
       ),
@@ -470,7 +459,6 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
             style: TextStyle(
               fontSize: 12,
               color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-              fontFamily: 'Gontserrat',
             ),
           ),
           isExpanded: true,
@@ -480,7 +468,7 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
               value: null,
               child: Text(
                 'الكل ($hint)',
-                style: const TextStyle(fontSize: 12, fontFamily: 'Gontserrat'),
+                style: const TextStyle(fontSize: 12),
               ),
             ),
             ...items.map(
@@ -488,7 +476,7 @@ class _SendTemplateModalState extends State<SendTemplateModal> {
                 value: item,
                 child: Text(
                   item,
-                  style: const TextStyle(fontSize: 12, fontFamily: 'Gontserrat'),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
             ),

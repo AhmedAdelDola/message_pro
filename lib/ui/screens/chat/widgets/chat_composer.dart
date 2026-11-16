@@ -451,7 +451,7 @@ class ChatComposerState extends State<ChatComposer> {
                 ),
                 title: Text(
                   isArabic ? 'الصور والفيديوهات' : 'Photos & Videos',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
                   isArabic ? 'اختيار من المعرض (حتى 5 عناصر)' : 'Select from gallery (up to 5)',
@@ -480,7 +480,7 @@ class ChatComposerState extends State<ChatComposer> {
                 ),
                 title: Text(
                   isArabic ? 'الكاميرا' : 'Camera',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
                   isArabic ? 'التقاط صورة مباشرة' : 'Take a photo directly',
@@ -509,7 +509,7 @@ class ChatComposerState extends State<ChatComposer> {
                 ),
                 title: Text(
                   isArabic ? 'المستندات والملفات' : 'Documents & Files',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
                   isArabic ? 'PDF، Word، Excel والمستندات الأخرى' : 'PDF, Word, Excel, and other files',
@@ -858,7 +858,6 @@ class ChatComposerState extends State<ChatComposer> {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              fontFamily: 'Gontserrat',
               color: Color(0xFFEF4444),
             ),
           ),
@@ -869,7 +868,6 @@ class ChatComposerState extends State<ChatComposer> {
               style: TextStyle(
                 fontSize: 12.5,
                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                fontFamily: 'Gontserrat',
               ),
             ),
           ),
@@ -936,7 +934,7 @@ class ChatComposerState extends State<ChatComposer> {
                     const SizedBox(width: 8),
                     Text(
                       isArabic ? 'ملخص المحادثة بالذكاء الاصطناعي' : 'AI Conversation Summary',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Gontserrat'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -952,7 +950,7 @@ class ChatComposerState extends State<ChatComposer> {
                     isArabic
                         ? 'العميل مهتم بمعرفة أسعار وباقات Message Pro وميزات الربط مع واتساب وكول سنتر السحابي. تم إرسال العرض المبدئي ومطلوب متابعة للتأكيد.'
                         : 'Customer inquired about Message Pro pricing plans and integrations with WhatsApp & Cloud Call Center. Initial proposal shared; awaiting confirmation follow-up.',
-                    style: const TextStyle(fontSize: 13, height: 1.45, fontFamily: 'Gontserrat'),
+                    style: const TextStyle(fontSize: 13, height: 1.45),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1077,7 +1075,6 @@ class ChatComposerState extends State<ChatComposer> {
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                         ),
@@ -1106,7 +1103,6 @@ class ChatComposerState extends State<ChatComposer> {
                                 fontSize: 11,
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w600,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                           ],
@@ -1225,7 +1221,6 @@ class ChatComposerState extends State<ChatComposer> {
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: _isPrivateNote ? const Color(0xFFD97706) : textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ],
@@ -1253,7 +1248,6 @@ class ChatComposerState extends State<ChatComposer> {
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF7C3AED),
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ],
@@ -1302,7 +1296,6 @@ class ChatComposerState extends State<ChatComposer> {
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                     color: textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
                 const SizedBox(width: 3),
@@ -1335,7 +1328,6 @@ class ChatComposerState extends State<ChatComposer> {
                           fontSize: 12.5,
                           height: 1.45,
                           color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFBE123C),
-                          fontFamily: 'Gontserrat',
                         ),
                         children: [
                           TextSpan(
@@ -1387,7 +1379,6 @@ class ChatComposerState extends State<ChatComposer> {
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isDark ? const Color(0xFF22C55E) : const Color(0xFF15803D),
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ),
@@ -1467,7 +1458,6 @@ class ChatComposerState extends State<ChatComposer> {
                       fontSize: 11.5,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFD97706),
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                 ],
@@ -1487,7 +1477,6 @@ class ChatComposerState extends State<ChatComposer> {
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const SizedBox(width: 3),
@@ -1517,7 +1506,6 @@ class ChatComposerState extends State<ChatComposer> {
                   style: TextStyle(
                     fontSize: 14,
                     color: textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                   decoration: InputDecoration(
                     hintText: _isPrivateNote
@@ -1526,7 +1514,6 @@ class ChatComposerState extends State<ChatComposer> {
                     hintStyle: TextStyle(
                       fontSize: 13,
                       color: textSecondary.withValues(alpha: 0.75),
-                      fontFamily: 'Gontserrat',
                     ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -1725,7 +1712,6 @@ class ChatComposerState extends State<ChatComposer> {
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF4162E3),
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1736,7 +1722,6 @@ class ChatComposerState extends State<ChatComposer> {
                   style: TextStyle(
                     fontSize: 11.5,
                     color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ],
@@ -1805,13 +1790,12 @@ class ChatComposerState extends State<ChatComposer> {
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const Spacer(),
                   Text(
                     isArabic ? 'اضغط للإدراج' : 'Tap to insert',
-                    style: TextStyle(fontSize: 10.5, color: textSecondary, fontFamily: 'Gontserrat'),
+                    style: TextStyle(fontSize: 10.5, color: textSecondary),
                   ),
                 ],
               ),
@@ -1851,7 +1835,6 @@ class ChatComposerState extends State<ChatComposer> {
                                 color: Color(0xFF4162E3),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 11.5,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                           ),
@@ -1864,7 +1847,6 @@ class ChatComposerState extends State<ChatComposer> {
                               style: TextStyle(
                                 fontSize: 13,
                                 color: textPrimary,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                           ),
@@ -1929,7 +1911,6 @@ class ChatComposerState extends State<ChatComposer> {
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                 ],
@@ -1976,7 +1957,6 @@ class ChatComposerState extends State<ChatComposer> {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: textPrimary,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                                 if (agent.email.isNotEmpty)

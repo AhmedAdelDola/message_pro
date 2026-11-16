@@ -118,7 +118,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   const Spacer(),
@@ -148,7 +147,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                   style: TextStyle(
                     fontSize: 13,
                     color: textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                   decoration: InputDecoration(
                     prefixIcon: Icon(Icons.search_rounded, size: 18, color: textSecondary),
@@ -165,7 +163,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                     hintStyle: TextStyle(
                       fontSize: 13,
                       color: textSecondary,
-                      fontFamily: 'Gontserrat',
                     ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -198,7 +195,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: textSecondary,
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -214,7 +210,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF5850EC),
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                           ),
@@ -262,7 +257,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                             color: textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         subtitle: Text(
@@ -270,7 +264,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           style: TextStyle(
                             fontSize: 11,
                             color: textSecondary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         trailing: isSelected
@@ -309,7 +302,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                         color: textPrimary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                     subtitle: Text(
@@ -317,7 +309,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       style: TextStyle(
                         fontSize: 11,
                         color: textSecondary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                     trailing: (widget.currentAssignee == null && !widget.isStatusBot)
@@ -342,7 +333,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: textSecondary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ),
@@ -353,7 +343,7 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                       child: Center(
                         child: Text(
                           isArabic ? 'لا يوجد أعضاء مطابقين' : 'No team members match your search',
-                          style: TextStyle(fontSize: 12, color: textSecondary, fontFamily: 'Gontserrat'),
+                          style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
                       ),
                     )
@@ -378,7 +368,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                             color: textPrimary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         subtitle: Text(
@@ -386,7 +375,6 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
                           style: TextStyle(
                             fontSize: 11,
                             color: textSecondary,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                         trailing: isSelected

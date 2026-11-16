@@ -57,7 +57,6 @@ class _WorkflowStepsGroupWidgetState extends State<WorkflowStepsGroupWidget> {
             fontWeight: FontWeight.normal,
             height: 1.25,
             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            fontFamily: 'Gontserrat',
           ),
         ),
       ),
@@ -90,7 +89,6 @@ class _WorkflowStepsGroupWidgetState extends State<WorkflowStepsGroupWidget> {
                 fontSize: 11.sp,
                 fontWeight: FontWeight.w600,
                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF626F7F),
-                fontFamily: 'Gontserrat',
               ),
             ),
           ),
@@ -125,7 +123,6 @@ class _WorkflowStepsGroupWidgetState extends State<WorkflowStepsGroupWidget> {
                   style: TextStyle(
                     fontSize: 10.5.sp,
                     fontWeight: FontWeight.normal,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ),
@@ -156,7 +153,6 @@ class _WorkflowStepsGroupWidgetState extends State<WorkflowStepsGroupWidget> {
                   isArabic ? 'إخفاء الخطوات' : 'Hide steps',
                   style: TextStyle(
                     fontSize: 11.sp,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ),

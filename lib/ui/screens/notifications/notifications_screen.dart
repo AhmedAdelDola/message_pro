@@ -58,7 +58,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: textPrimary,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                       Row(
@@ -77,7 +76,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 color: state.unreadCount > 0 ? AppColors.primary : textSecondary.withValues(alpha: 0.5),
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                           ),
@@ -131,7 +129,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         color: textPrimary,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 15,
-                                        fontFamily: 'Gontserrat',
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -140,7 +137,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                       style: TextStyle(
                                         color: textSecondary,
                                         fontSize: 13,
-                                        fontFamily: 'Gontserrat',
                                       ),
                                     ),
                                   ],
@@ -199,7 +195,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                     fontWeight: notif.isRead ? FontWeight.w500 : FontWeight.w700,
                                                     fontSize: 14,
                                                     color: textPrimary,
-                                                    fontFamily: 'Gontserrat',
                                                   ),
                                                 ),
                                                 const SizedBox(height: 3),
@@ -208,7 +203,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                   style: const TextStyle(
                                                     fontSize: 12,
                                                     color: Color(0xFF80838D),
-                                                    fontFamily: 'Gontserrat',
                                                   ),
                                                 ),
                                                 if (notif.message != null && notif.message!.isNotEmpty) ...[
@@ -220,7 +214,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                     style: TextStyle(
                                                       fontSize: 13,
                                                       color: textSecondary,
-                                                      fontFamily: 'Gontserrat',
                                                     ),
                                                   ),
                                                 ],
@@ -272,7 +265,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: active ? FontWeight.bold : FontWeight.w500,
-            fontFamily: 'Gontserrat',
             color: active
                 ? AppColors.primary
                 : (isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary),

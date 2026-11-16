@@ -360,7 +360,6 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   style: TextStyle(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.bold,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
               ),
@@ -519,7 +518,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 const SizedBox(width: 8),
                 Text(
                   isArabic ? 'تعديل الرسالة' : 'Edit Message',
-                  style: const TextStyle(fontFamily: 'Gontserrat', fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ],
             ),
@@ -674,7 +673,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 children: [
                   Text(
                     isArabic ? 'التفاعلات على الرسالة' : 'Message Reactions',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Gontserrat'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const Spacer(),
                   Container(
@@ -754,7 +753,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         ),
                         title: Text(
                           p.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Gontserrat'),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         trailing: Text(
                           p.emoji ?? '👍',
@@ -1154,7 +1153,6 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                               fontSize: 10.5.sp,
                               fontWeight: FontWeight.w600,
                               color: isDark ? Colors.grey[300] : const Color(0xFF4B5563),
-                              fontFamily: 'Gontserrat',
                             ),
                           ),
                           SizedBox(width: 2.w),
@@ -1245,7 +1243,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                             isResolved
                                 ? (isArabic ? 'إعادة فتح المحادثة' : 'Reopen conversation')
                                 : (isArabic ? 'إغلاق المحادثة (Resolve)' : 'Resolve conversation'),
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1264,7 +1262,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                             _status == 'snoozed'
                                 ? (isArabic ? 'إلغاء التأجيل' : 'Unsnooze')
                                 : (isArabic ? 'تأجيل المحادثة (Snooze)' : 'Snooze conversation'),
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1283,7 +1281,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                             _isMuted
                                 ? (isArabic ? 'إلغاء كتم المحادثة' : 'Unmute conversation')
                                 : (isArabic ? 'كتم المحادثة (Mute)' : 'Mute conversation'),
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1297,7 +1295,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           SizedBox(width: 10.w),
                           Text(
                             isArabic ? 'عرض بيانات العميل' : 'View contact details',
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1310,7 +1308,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           SizedBox(width: 10.w),
                           Text(
                             isArabic ? 'تعيين مسؤول (Assign)' : 'Assign agent',
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1327,7 +1325,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           SizedBox(width: 10.w),
                           Text(
                             isArabic ? 'المتعاونين (Collaborators)' : 'Collaborators',
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1340,7 +1338,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           SizedBox(width: 10.w),
                           Text(
                             isArabic ? 'نسخ رابط المحادثة' : 'Copy conversation link',
-                            style: TextStyle(fontSize: 13.sp, fontFamily: 'Gontserrat'),
+                            style: TextStyle(fontSize: 13.sp),
                           ),
                         ],
                       ),
@@ -1380,7 +1378,6 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           style: TextStyle(
                             fontSize: 12.5.sp,
                             color: const Color(0xFF80838D),
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ),
@@ -1397,7 +1394,6 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13.sp,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ),
@@ -1571,7 +1567,6 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                                       color: Theme.of(context).brightness == Brightness.dark
                                           ? Colors.white
                                           : const Color(0xFF1F2937),
-                                      fontFamily: 'Gontserrat',
                                     ),
                                   ),
                                   SizedBox(width: 4.w),

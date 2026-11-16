@@ -235,7 +235,6 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                         fontSize: 16.5,
                         fontWeight: FontWeight.bold,
                         color: textPrimary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                     Text(
@@ -245,7 +244,6 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                       style: TextStyle(
                         fontSize: 12,
                         color: textSecondary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ],
@@ -263,7 +261,6 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: textPrimary,
-              fontFamily: 'Gontserrat',
             ),
           ),
           const SizedBox(height: 6),
@@ -286,7 +283,6 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                     decoration: InputDecoration(
                       hintText: isArabic ? '+201000000000 أو 010...' : '+201000000000',
@@ -315,7 +311,6 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: textPrimary,
-              fontFamily: 'Gontserrat',
             ),
           ),
           const SizedBox(height: 6),
@@ -331,7 +326,6 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
               style: TextStyle(
                 fontSize: 14,
                 color: textPrimary,
-                fontFamily: 'Gontserrat',
               ),
               decoration: InputDecoration(
                 hintText: isArabic ? 'مثال: أحمد محمد' : 'e.g. John Doe',
@@ -354,13 +348,12 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: textPrimary,
-                  fontFamily: 'Gontserrat',
                 ),
               ),
               if (_destinations.isNotEmpty)
                 Text(
                   '${_destinations.length} ${isArabic ? 'قنوات' : 'channels'}',
-                  style: TextStyle(fontSize: 12, color: textSecondary, fontFamily: 'Gontserrat'),
+                  style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
             ],
           ),
@@ -378,7 +371,7 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                 isArabic
                     ? 'لم يتم العثور على قنوات هاتفية متاحة لهذا الرقم. تأكد من إدخال كود الدولة.'
                     : 'No phone channels available. Ensure valid international format with country code.',
-                style: TextStyle(fontSize: 12.5, color: textSecondary, fontFamily: 'Gontserrat'),
+                style: TextStyle(fontSize: 12.5, color: textSecondary),
                 textAlign: TextAlign.center,
               ),
             )
@@ -444,12 +437,11 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                                     fontSize: 13.5,
                                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                                     color: textPrimary,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                                 Text(
                                   dest['source_id']?.toString() ?? (isWhatsApp ? 'WhatsApp' : 'SMS'),
-                                  style: TextStyle(fontSize: 11.5, color: textSecondary, fontFamily: 'Gontserrat'),
+                                  style: TextStyle(fontSize: 11.5, color: textSecondary),
                                 ),
                               ],
                             ),
@@ -481,7 +473,7 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                   Expanded(
                     child: Text(
                       _errorMessage!,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontFamily: 'Gontserrat'),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
                     ),
                   ),
                 ],
@@ -515,7 +507,7 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
                         const SizedBox(width: 8),
                         Text(
                           isArabic ? 'بدء المحادثة الآن' : 'Start Conversation Now',
-                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, fontFamily: 'Gontserrat'),
+                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),

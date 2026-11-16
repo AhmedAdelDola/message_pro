@@ -111,7 +111,6 @@ class _EditContactScreenState extends State<EditContactScreen> {
             color: textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.bold,
-            fontFamily: 'Gontserrat',
           ),
         ),
         actions: [
@@ -138,7 +137,6 @@ class _EditContactScreenState extends State<EditContactScreen> {
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: textPrimary,
-                  fontFamily: 'Gontserrat',
                 ),
               ),
               const SizedBox(height: 18),
@@ -196,7 +194,6 @@ class _EditContactScreenState extends State<EditContactScreen> {
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.bold,
                                 color: textPrimary,
-                                fontFamily: 'Gontserrat',
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -209,7 +206,7 @@ class _EditContactScreenState extends State<EditContactScreen> {
                       child: TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        style: TextStyle(color: textPrimary, fontSize: 14, fontFamily: 'Gontserrat'),
+                        style: TextStyle(color: textPrimary, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: isArabic ? 'رقم الهاتف (أو +966...)' : 'Phone number (or +966...)',
                           hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
@@ -263,7 +260,6 @@ class _EditContactScreenState extends State<EditContactScreen> {
                             color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                 ),
@@ -283,7 +279,6 @@ class _EditContactScreenState extends State<EditContactScreen> {
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: textSecondary,
-          fontFamily: 'Gontserrat',
         ),
         children: [
           if (isRequired)
@@ -310,7 +305,7 @@ class _EditContactScreenState extends State<EditContactScreen> {
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
-      style: TextStyle(color: textPrimary, fontSize: 14, fontFamily: 'Gontserrat'),
+      style: TextStyle(color: textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),

@@ -84,7 +84,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: textPrimary,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                 ),
@@ -136,7 +135,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: textPrimary,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -145,7 +143,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: textSecondary,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                               ],
@@ -187,7 +184,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: statusColor,
-                          fontFamily: 'Gontserrat',
                         ),
                       ),
                     ],
@@ -349,7 +345,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: Color(0xFFFF382E),
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
-                            fontFamily: 'Gontserrat',
                           ),
                         ),
                       ],
@@ -366,7 +361,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         color: textSecondary,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ),
@@ -389,7 +383,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w600,
           color: Color(0xFF80838D),
           letterSpacing: 1.0,
-          fontFamily: 'Gontserrat',
         ),
       ),
     );
@@ -438,7 +431,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      fontFamily: 'Gontserrat',
                     ),
                   ),
                   if (subtitle != null) ...[
@@ -448,7 +440,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: 13,
-                        fontFamily: 'Gontserrat',
                       ),
                     ),
                   ],
@@ -527,7 +518,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
                     color: textPrimary,
-                    fontFamily: 'Gontserrat',
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -544,7 +534,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             SnackBar(
                               content: Text(
                                 isArabic ? 'بدأت الاستراحة لمدة $duration دقيقة' : 'Break started for $duration minutes',
-                                style: const TextStyle(fontFamily: 'Gontserrat'),
+                                style: const TextStyle(),
                               ),
                               duration: const Duration(seconds: 2),
                               backgroundColor: const Color(0xFF6B5DE8),
@@ -559,7 +549,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               isArabic
                                   ? 'تم تغيير الحالة إلى: ${item['label']}'
                                   : 'Status updated to: ${item['label']}',
-                              style: const TextStyle(fontFamily: 'Gontserrat'),
+                              style: const TextStyle(),
                             ),
                             duration: const Duration(seconds: 2),
                             backgroundColor: const Color(0xFF1E2024),
@@ -604,7 +594,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                     color: textPrimary,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -613,7 +602,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: textSecondary,
-                                    fontFamily: 'Gontserrat',
                                   ),
                                 ),
                               ],
@@ -638,10 +626,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isArabic ? 'تسجيل الخروج' : 'Log Out', style: const TextStyle(fontFamily: 'Gontserrat')),
+        title: Text(isArabic ? 'تسجيل الخروج' : 'Log Out', style: const TextStyle()),
         content: Text(
           isArabic ? 'هل أنت متأكد أنك تريد تسجيل الخروج؟' : 'Are you sure you want to log out?',
-          style: const TextStyle(fontFamily: 'Gontserrat'),
+          style: const TextStyle(),
         ),
         actions: [
           TextButton(

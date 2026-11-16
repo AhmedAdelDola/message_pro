@@ -202,7 +202,6 @@ class MainLayoutState extends State<MainLayout> {
                             color: Colors.white,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'Gontserrat',
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -215,7 +214,6 @@ class MainLayoutState extends State<MainLayout> {
                 label,
                 style: TextStyle(
                   fontSize: 10,
-                  fontFamily: 'Gontserrat',
                   color: itemColor,
                   fontWeight: isFocused ? FontWeight.w600 : FontWeight.w400,
                 ),
