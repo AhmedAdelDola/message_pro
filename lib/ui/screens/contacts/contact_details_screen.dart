@@ -168,9 +168,10 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label copied to clipboard'),
+        content: Text(isArabic ? 'تم نسخ $label بنجاح' : '$label copied to clipboard'),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
@@ -1186,6 +1187,7 @@ class _ContactDetailsScreenState extends State<ContactDetailsScreen>
           label: isArabic ? 'رقم الهاتف' : 'Phone Number',
           value: phone != null && phone.isNotEmpty ? phone : (isArabic ? 'غير متوفر' : 'Not available'),
           isPlaceholder: phone == null || phone.isEmpty,
+          onCopy: phone != null && phone.isNotEmpty ? () => _copyToClipboard(phone, isArabic ? 'رقم الهاتف' : 'Phone Number') : null,
         ),
         _buildFieldTile(
           label: isArabic ? 'البريد الإلكتروني' : 'Email Address',

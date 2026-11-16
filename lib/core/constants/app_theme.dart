@@ -3,7 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  static String? get fontFamily => GoogleFonts.ibmPlexSansArabic().fontFamily;
+  static const String englishFontFamily = 'Inter';
+  static List<String> get arabicFontFallback => [
+        GoogleFonts.ibmPlexSansArabic().fontFamily ?? 'IBMPlexSansArabic',
+        'IBMPlexSansArabic',
+      ];
+
+  static String get fontFamily => englishFontFamily;
 
   static TextStyle font({
     TextStyle? textStyle,
@@ -22,46 +28,66 @@ class AppTheme {
     Color? decorationColor,
     TextDecorationStyle? decorationStyle,
     double? decorationThickness,
-  }) =>
-      GoogleFonts.ibmPlexSansArabic(
-        textStyle: textStyle,
-        color: color,
-        fontSize: fontSize,
-        fontWeight: fontWeight,
-        fontStyle: fontStyle,
-        letterSpacing: letterSpacing,
-        wordSpacing: wordSpacing,
-        textBaseline: textBaseline,
-        height: height,
-        foreground: foreground,
-        background: background,
-        shadows: shadows,
-        decoration: decoration,
-        decorationColor: decorationColor,
-        decorationStyle: decorationStyle,
-        decorationThickness: decorationThickness,
-      );
+  }) {
+    final base = TextStyle(
+      fontFamily: englishFontFamily,
+      fontFamilyFallback: arabicFontFallback,
+      color: color,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      fontStyle: fontStyle,
+      letterSpacing: letterSpacing,
+      wordSpacing: wordSpacing,
+      textBaseline: textBaseline,
+      height: height,
+      foreground: foreground,
+      background: background,
+      shadows: shadows,
+      decoration: decoration,
+      decorationColor: decorationColor,
+      decorationStyle: decorationStyle,
+      decorationThickness: decorationThickness,
+    );
+    return textStyle != null ? base.merge(textStyle) : base;
+  }
 
   static ThemeData lightTheme() {
-    final baseTextTheme = TextTheme(
-      headlineLarge: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary),
-      headlineMedium: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary),
-      headlineSmall: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
-      titleLarge: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary),
-      titleMedium: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
-      titleSmall: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
-      bodyLarge: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textDarkPrimary),
-      bodyMedium: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textDarkPrimary),
-      bodySmall: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textDarkSecondary),
-      labelLarge: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
-      labelMedium: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.textDarkSecondary),
-      labelSmall: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.textDarkMuted),
+    final fallback = arabicFontFallback;
+
+    TextStyle style({
+      required FontWeight fontWeight,
+      required Color color,
+      double? fontSize,
+    }) {
+      return TextStyle(
+        fontFamily: englishFontFamily,
+        fontFamilyFallback: fallback,
+        fontWeight: fontWeight,
+        color: color,
+        fontSize: fontSize,
+      );
+    }
+
+    final textTheme = TextTheme(
+      headlineLarge: style(fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary, fontSize: 32),
+      headlineMedium: style(fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary, fontSize: 28),
+      headlineSmall: style(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary, fontSize: 24),
+      titleLarge: style(fontWeight: FontWeight.w700, color: AppColors.textDarkPrimary, fontSize: 20),
+      titleMedium: style(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary, fontSize: 16),
+      titleSmall: style(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary, fontSize: 14),
+      bodyLarge: style(fontWeight: FontWeight.w400, color: AppColors.textDarkPrimary, fontSize: 16),
+      bodyMedium: style(fontWeight: FontWeight.w400, color: AppColors.textDarkPrimary, fontSize: 14),
+      bodySmall: style(fontWeight: FontWeight.w400, color: AppColors.textDarkSecondary, fontSize: 12),
+      labelLarge: style(fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary, fontSize: 14),
+      labelMedium: style(fontWeight: FontWeight.w500, color: AppColors.textDarkSecondary, fontSize: 12),
+      labelSmall: style(fontWeight: FontWeight.w500, color: AppColors.textDarkMuted, fontSize: 11),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      fontFamily: GoogleFonts.ibmPlexSansArabic().fontFamily,
+      fontFamily: englishFontFamily,
+      fontFamilyFallback: fallback,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.lightBackground,
       colorScheme: const ColorScheme.light(
@@ -78,11 +104,10 @@ class AppTheme {
         centerTitle: false,
         scrolledUnderElevation: 0.5,
         iconTheme: const IconThemeData(color: AppColors.textDarkPrimary),
-        titleTextStyle: GoogleFonts.ibmPlexSansArabic(
+        titleTextStyle: style(
           color: AppColors.textDarkPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
         ),
       ),
       cardTheme: CardThemeData(
@@ -93,7 +118,7 @@ class AppTheme {
           side: const BorderSide(color: AppColors.lightBorder, width: 1),
         ),
       ),
-      textTheme: GoogleFonts.ibmPlexSansArabicTextTheme(baseTextTheme),
+      textTheme: textTheme,
       dividerTheme: const DividerThemeData(
         color: AppColors.lightBorder,
         thickness: 1,
@@ -123,31 +148,48 @@ class AppTheme {
           borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: Color(0xFFFB7185), width: 1.5),
         ),
-        hintStyle: GoogleFonts.ibmPlexSansArabic(color: AppColors.textDarkMuted, fontSize: 13),
+        hintStyle: style(color: AppColors.textDarkMuted, fontSize: 13, fontWeight: FontWeight.w400),
       ),
     );
   }
 
   static ThemeData darkTheme() {
-    final baseTextTheme = TextTheme(
-      headlineLarge: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textLightPrimary),
-      headlineMedium: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textLightPrimary),
-      headlineSmall: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
-      titleLarge: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textLightPrimary),
-      titleMedium: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
-      titleSmall: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
-      bodyLarge: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textLightPrimary),
-      bodyMedium: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textLightPrimary),
-      bodySmall: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textLightSecondary),
-      labelLarge: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary),
-      labelMedium: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.textLightSecondary),
-      labelSmall: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.textLightMuted),
+    final fallback = arabicFontFallback;
+
+    TextStyle style({
+      required FontWeight fontWeight,
+      required Color color,
+      double? fontSize,
+    }) {
+      return TextStyle(
+        fontFamily: englishFontFamily,
+        fontFamilyFallback: fallback,
+        fontWeight: fontWeight,
+        color: color,
+        fontSize: fontSize,
+      );
+    }
+
+    final textTheme = TextTheme(
+      headlineLarge: style(fontWeight: FontWeight.w700, color: AppColors.textLightPrimary, fontSize: 32),
+      headlineMedium: style(fontWeight: FontWeight.w700, color: AppColors.textLightPrimary, fontSize: 28),
+      headlineSmall: style(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary, fontSize: 24),
+      titleLarge: style(fontWeight: FontWeight.w700, color: AppColors.textLightPrimary, fontSize: 20),
+      titleMedium: style(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary, fontSize: 16),
+      titleSmall: style(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary, fontSize: 14),
+      bodyLarge: style(fontWeight: FontWeight.w400, color: AppColors.textLightPrimary, fontSize: 16),
+      bodyMedium: style(fontWeight: FontWeight.w400, color: AppColors.textLightPrimary, fontSize: 14),
+      bodySmall: style(fontWeight: FontWeight.w400, color: AppColors.textLightSecondary, fontSize: 12),
+      labelLarge: style(fontWeight: FontWeight.w600, color: AppColors.textLightPrimary, fontSize: 14),
+      labelMedium: style(fontWeight: FontWeight.w500, color: AppColors.textLightSecondary, fontSize: 12),
+      labelSmall: style(fontWeight: FontWeight.w500, color: AppColors.textLightMuted, fontSize: 11),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      fontFamily: GoogleFonts.ibmPlexSansArabic().fontFamily,
+      fontFamily: englishFontFamily,
+      fontFamilyFallback: fallback,
       primaryColor: AppColors.primaryLight,
       scaffoldBackgroundColor: AppColors.darkBackground,
       colorScheme: const ColorScheme.dark(
@@ -164,11 +206,10 @@ class AppTheme {
         centerTitle: false,
         scrolledUnderElevation: 0.5,
         iconTheme: const IconThemeData(color: AppColors.textLightPrimary),
-        titleTextStyle: GoogleFonts.ibmPlexSansArabic(
+        titleTextStyle: style(
           color: AppColors.textLightPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
         ),
       ),
       cardTheme: CardThemeData(
@@ -179,7 +220,7 @@ class AppTheme {
           side: const BorderSide(color: AppColors.darkBorder, width: 1),
         ),
       ),
-      textTheme: GoogleFonts.ibmPlexSansArabicTextTheme(baseTextTheme),
+      textTheme: textTheme,
       dividerTheme: const DividerThemeData(
         color: AppColors.darkBorder,
         thickness: 1,
@@ -209,7 +250,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: Color(0xFFFB7185), width: 1.5),
         ),
-        hintStyle: GoogleFonts.ibmPlexSansArabic(color: AppColors.textLightMuted, fontSize: 13),
+        hintStyle: style(color: AppColors.textLightMuted, fontSize: 13, fontWeight: FontWeight.w400),
       ),
     );
   }
