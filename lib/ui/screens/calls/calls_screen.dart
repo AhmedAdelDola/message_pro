@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:lottie/lottie.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/app_lottie.dart';
 import '../../../core/constants/app_colors.dart';

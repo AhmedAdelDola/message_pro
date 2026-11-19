@@ -35,6 +35,14 @@ class MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex ?? 2;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final authState = context.read<AuthCubit>().state;
+      if (authState is Authenticated) {
+        context.read<ConversationCubit>().onWorkspaceSwitched(authState.user.accountId);
+        context.read<NotificationCubit>().loadNotifications();
+      }
+    });
   }
 
   void setTab(int index) {
@@ -73,8 +81,11 @@ class MainLayoutState extends State<MainLayout> {
 
             return BlocListener<AuthCubit, AuthState>(
               listenWhen: (prev, curr) {
-                if (prev is Authenticated && curr is Authenticated) {
+                if (curr is Authenticated) {
+                  if (prev is! Authenticated) return true;
                   return prev.user.accountId != curr.user.accountId;
+                } else if (curr is Unauthenticated) {
+                  return prev is Authenticated;
                 }
                 return false;
               },
@@ -82,74 +93,79 @@ class MainLayoutState extends State<MainLayout> {
                 if (authState is Authenticated) {
                   context.read<ConversationCubit>().onWorkspaceSwitched(authState.user.accountId);
                   context.read<NotificationCubit>().loadNotifications();
+                } else if (authState is Unauthenticated) {
+                  context.read<ConversationCubit>().reset();
+                  context.read<NotificationCubit>().reset();
                 }
               },
               child: Scaffold(
                 backgroundColor: bgColor,
                 body: IndexedStack(
+                  key: ValueKey(context.watch<AuthCubit>().currentUser?.accountId ?? 0),
                   index: _currentIndex,
                   children: _screens,
                 ),
                 bottomNavigationBar: Container(
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  border: Border(
-                    top: BorderSide(color: borderColor, width: 1),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    border: Border(
+                      top: BorderSide(color: borderColor, width: 1),
+                    ),
                   ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildTabItem(
-                          index: 0,
-                          label: isRTL ? 'المكالمات' : 'Calls',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedCall, color: color, size: 22),
-                          badgeCount: 0,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                        _buildTabItem(
-                          index: 1,
-                          label: isRTL ? 'جهات الاتصال' : 'Contact',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedUserGroup, color: color, size: 22),
-                          badgeCount: 0,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                        _buildTabItem(
-                          index: 2,
-                          label: isRTL ? 'المحادثات' : 'Inbox',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedBubbleChat, color: color, size: 22),
-                          badgeCount: unreadConvs,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                        _buildTabItem(
-                          index: 3,
-                          label: isRTL ? 'الإشعارات' : 'Notification',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: color, size: 22),
-                          badgeCount: unreadNotifs,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                        _buildTabItem(
-                          index: 4,
-                          label: isRTL ? 'الإعدادات' : 'Setting',
-                          iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedSettings01, color: color, size: 22),
-                          badgeCount: 0,
-                          activeColor: activeColor,
-                          inactiveColor: inactiveColor,
-                        ),
-                      ],
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildTabItem(
+                            index: 0,
+                            label: isRTL ? 'المكالمات' : 'Calls',
+                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedCall, color: color, size: 22),
+                            badgeCount: 0,
+                            activeColor: activeColor,
+                            inactiveColor: inactiveColor,
+                          ),
+                          _buildTabItem(
+                            index: 1,
+                            label: isRTL ? 'جهات الاتصال' : 'Contact',
+                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedUserGroup, color: color, size: 22),
+                            badgeCount: 0,
+                            activeColor: activeColor,
+                            inactiveColor: inactiveColor,
+                          ),
+                          _buildTabItem(
+                            index: 2,
+                            label: isRTL ? 'المحادثات' : 'Inbox',
+                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedBubbleChat, color: color, size: 22),
+                            badgeCount: unreadConvs,
+                            activeColor: activeColor,
+                            inactiveColor: inactiveColor,
+                          ),
+                          _buildTabItem(
+                            index: 3,
+                            label: isRTL ? 'الإشعارات' : 'Notification',
+                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: color, size: 22),
+                            badgeCount: unreadNotifs,
+                            activeColor: activeColor,
+                            inactiveColor: inactiveColor,
+                          ),
+                          _buildTabItem(
+                            index: 4,
+                            label: isRTL ? 'الإعدادات' : 'Setting',
+                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedSettings01, color: color, size: 22),
+                            badgeCount: 0,
+                            activeColor: activeColor,
+                            inactiveColor: inactiveColor,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ));
+            );
           },
         );
       },

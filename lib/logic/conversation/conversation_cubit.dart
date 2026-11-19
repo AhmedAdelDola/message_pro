@@ -294,8 +294,16 @@ class ConversationCubit extends Cubit<ConversationState> {
     );
   }
 
+  void reset() {
+    repo.clearCache();
+    emit(const ConversationState());
+  }
+
   Future<void> onWorkspaceSwitched(int newAccountId) async {
-    // Reset filters because inbox/team/label/stage IDs from previous workspace do not exist in the new workspace.
+    // 1. Immediately wipe any in-memory cached inboxes, teams, labels, and filters from the previous workspace
+    repo.clearCache();
+
+    // 2. Reset filters because inbox/team/label/stage IDs from previous workspace do not exist in the new workspace.
     // Clear previous conversations list and pagination immediately to prevent stale cross-workspace data bleed.
     emit(state.copyWith(
       conversations: const [],
@@ -307,6 +315,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       page: 1,
       hasMore: true,
       isLoading: true,
+      isLoadingFilters: true,
       errorMessage: null,
       status: 'all',
       assigneeType: 'all',
@@ -319,13 +328,13 @@ class ConversationCubit extends Cubit<ConversationState> {
       filterOptions: const ConversationFilterOptions(),
     ));
 
-    // Re-fetch auxiliary data & filter options for the new workspace
+    // 3. Re-fetch fresh auxiliary data & filter options for the new workspace
     await Future.wait([
       loadAuxiliaryData(),
       loadFilterOptions(),
     ]);
 
-    // Re-fetch conversations for the new workspace
+    // 4. Re-fetch conversations for the new workspace
     await loadConversations(refresh: true);
   }
 

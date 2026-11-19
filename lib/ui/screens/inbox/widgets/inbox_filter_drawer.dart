@@ -40,16 +40,19 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
           builder: (context, state) {
             final cubit = context.read<ConversationCubit>();
             final options = state.filterOptions ?? const ConversationFilterOptions();
+            final inboxes = options.inboxes.isNotEmpty ? options.inboxes : state.inboxes;
+            final teams = options.teams.isNotEmpty ? options.teams : state.teams;
+            final agents = options.agents.isNotEmpty ? options.agents : state.agents;
 
             final hasActiveFilter = state.selectedInboxId != null ||
                 state.selectedTeamId != null ||
                 state.selectedAssigneeId != null ||
                 state.selectedAssigneeAgentBotId != null;
 
-            final hasNoData = options.inboxes.isEmpty &&
+            final hasNoData = inboxes.isEmpty &&
                 options.aiAgents.isEmpty &&
-                (!options.canFilterAgents || options.agents.isEmpty) &&
-                options.teams.isEmpty;
+                (!options.canFilterAgents || agents.isEmpty) &&
+                teams.isEmpty;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,12 +72,12 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                               children: [
                                 // 1. Channels / Inboxes (Collapsible)
-                                if (options.inboxes.isNotEmpty) ...[
+                                if (inboxes.isNotEmpty) ...[
                                   _buildCollapsibleSection(
                                     context: context,
                                     title: isArabic ? 'القنوات' : 'Channels',
                                     sectionIcon: Icons.hub_rounded,
-                                    count: options.inboxes.length,
+                                    count: inboxes.length,
                                     isExpanded: _inboxesExpanded,
                                     hasActiveFilter: state.selectedInboxId != null,
                                     onToggle: () => setState(() => _inboxesExpanded = !_inboxesExpanded),
@@ -82,7 +85,7 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                                     textPrimary: textPrimary,
                                     textSecondary: textSecondary,
                                     borderColor: borderColor,
-                                    children: options.inboxes.map((inbox) {
+                                    children: inboxes.map((inbox) {
                                       final isSelected = state.selectedInboxId == inbox.id;
                                       return _buildFilterItemTile(
                                         context: context,
@@ -140,12 +143,12 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                                 ],
 
                                 // 3. Employees / Agents (Collapsible)
-                                if (options.canFilterAgents && options.agents.isNotEmpty) ...[
+                                if (options.canFilterAgents && agents.isNotEmpty) ...[
                                   _buildCollapsibleSection(
                                     context: context,
                                     title: isArabic ? 'الموظفين' : 'Employees',
                                     sectionIcon: Icons.badge_rounded,
-                                    count: options.agents.length,
+                                    count: agents.length,
                                     isExpanded: _agentsExpanded,
                                     hasActiveFilter: state.selectedAssigneeId != null,
                                     onToggle: () => setState(() => _agentsExpanded = !_agentsExpanded),
@@ -153,7 +156,7 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                                     textPrimary: textPrimary,
                                     textSecondary: textSecondary,
                                     borderColor: borderColor,
-                                    children: options.agents.map((agent) {
+                                    children: agents.map((agent) {
                                       final isSelected = state.selectedAssigneeId == agent.id;
                                       return _buildFilterItemTile(
                                         context: context,
@@ -181,12 +184,12 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                                 ],
 
                                 // 4. Teams (Collapsible)
-                                if (options.teams.isNotEmpty) ...[
+                                if (teams.isNotEmpty) ...[
                                   _buildCollapsibleSection(
                                     context: context,
                                     title: isArabic ? 'فرق العمل' : 'Teams',
                                     sectionIcon: Icons.groups_rounded,
-                                    count: options.teams.length,
+                                    count: teams.length,
                                     isExpanded: _teamsExpanded,
                                     hasActiveFilter: state.selectedTeamId != null,
                                     onToggle: () => setState(() => _teamsExpanded = !_teamsExpanded),
@@ -194,7 +197,7 @@ class _InboxFilterDrawerState extends State<InboxFilterDrawer> {
                                     textPrimary: textPrimary,
                                     textSecondary: textSecondary,
                                     borderColor: borderColor,
-                                    children: options.teams.map((team) {
+                                    children: teams.map((team) {
                                       final isSelected = state.selectedTeamId == team.id;
                                       return _buildFilterItemTile(
                                         context: context,

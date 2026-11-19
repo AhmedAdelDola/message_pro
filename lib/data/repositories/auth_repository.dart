@@ -199,6 +199,13 @@ class AuthRepository implements IAuthRepository {
       final data = response.data;
       final userData = data is Map ? Map<String, dynamic>.from(data['data'] ?? data) : <String, dynamic>{};
 
+      // Preserve active account ID if user switched workspaces
+      final activeAccId = await _storage.getActiveAccountId();
+      if (activeAccId != null && activeAccId > 0) {
+        userData['account_id'] = activeAccId;
+        userData['current_account_id'] = activeAccId;
+      }
+
       // Preserve existing accounts list if profile endpoint doesn't return accounts
       final savedUserMap = await _storage.getUserData();
       if ((userData['accounts'] == null || (userData['accounts'] is List && (userData['accounts'] as List).isEmpty)) &&

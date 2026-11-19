@@ -10,6 +10,10 @@ class NotificationCubit extends Cubit<NotificationState> {
     loadNotifications();
   }
 
+  void reset() {
+    emit(const NotificationState());
+  }
+
   Future<void> loadNotifications() async {
     emit(state.copyWith(isLoading: true));
     final result = await repo.getNotifications();

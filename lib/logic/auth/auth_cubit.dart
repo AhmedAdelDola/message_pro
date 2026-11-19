@@ -1,11 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dartz/dartz.dart';
 import '../../core/error/failures.dart';
+import '../../core/di/injection_container.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/services/push_notification_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/repositories/conversation_repository.dart';
 import 'auth_state.dart';
 
 class AuthCubit extends Cubit<AuthState> {
@@ -81,6 +83,10 @@ class AuthCubit extends Cubit<AuthState> {
         return false;
       },
       (user) async {
+        if (sl.isRegistered<IConversationRepository>()) {
+          sl<IConversationRepository>().clearCache();
+        }
+        await storage.saveActiveAccountId(user.accountId);
         emit(Authenticated(user));
 
         final pubSubToken = user.pubsubToken ?? await storage.getPubSubToken();
@@ -110,6 +116,10 @@ class AuthCubit extends Cubit<AuthState> {
         return false;
       },
       (user) async {
+        if (sl.isRegistered<IConversationRepository>()) {
+          sl<IConversationRepository>().clearCache();
+        }
+        await storage.saveActiveAccountId(user.accountId);
         emit(Authenticated(user));
 
         final pubSubToken = user.pubsubToken ?? await storage.getPubSubToken();
@@ -132,22 +142,29 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> switchAccount(int accountId) async {
     final currentAccounts = currentUser?.accounts ?? [];
     await storage.saveActiveAccountId(accountId);
-
-    if (currentUser != null) {
-      emit(Authenticated(currentUser!.copyWith(accountId: accountId)));
+    if (sl.isRegistered<IConversationRepository>()) {
+      sl<IConversationRepository>().clearCache();
     }
 
     final result = await authRepo.setActiveAccount(accountId);
     await result.fold(
-      (failure) async {},
+      (failure) async {
+        if (currentUser != null) {
+          emit(Authenticated(currentUser!.copyWith(accountId: accountId)));
+        }
+      },
       (_) async {
         final profileResult = await authRepo.getProfile();
         await profileResult.fold(
-          (_) async {},
+          (_) async {
+            if (currentUser != null) {
+              emit(Authenticated(currentUser!.copyWith(accountId: accountId)));
+            }
+          },
           (refreshed) async {
-            final finalUser = refreshed.accounts.isEmpty && currentAccounts.isNotEmpty
+            final finalUser = (refreshed.accounts.isEmpty && currentAccounts.isNotEmpty
                 ? refreshed.copyWith(accounts: currentAccounts)
-                : refreshed;
+                : refreshed).copyWith(accountId: accountId);
             emit(Authenticated(finalUser));
 
             final pubSubToken = finalUser.pubsubToken ?? await storage.getPubSubToken();
@@ -273,6 +290,9 @@ class AuthCubit extends Cubit<AuthState> {
     ws.disconnect();
     await PushNotificationService.unregisterDeviceToken();
     await authRepo.signOut();
+    if (sl.isRegistered<IConversationRepository>()) {
+      sl<IConversationRepository>().clearCache();
+    }
     emit(const Unauthenticated());
   }
 }
