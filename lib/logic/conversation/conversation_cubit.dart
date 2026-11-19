@@ -134,27 +134,42 @@ class ConversationCubit extends Cubit<ConversationState> {
   }
 
   Future<void> loadAuxiliaryData() async {
-    final inboxesRes = await repo.fetchInboxes();
+    // Run independent network/cache calls concurrently for optimal speed
+    final inboxesFuture = repo.fetchInboxes();
+    final labelsFuture = repo.fetchLabels();
+    final teamsFuture = repo.fetchTeams();
+    final stagesFuture = repo.fetchLifecycleStages();
+
+    final inboxesRes = await inboxesFuture;
+    final labelsRes = await labelsFuture;
+    final teamsRes = await teamsFuture;
+    final stagesRes = await stagesFuture;
+
+    if (isClosed) return;
+
     final inboxes = inboxesRes.getOrElse(() => []);
-    final labelsRes = await repo.fetchLabels();
-    final teamsRes = await repo.fetchTeams();
+    final labels = labelsRes.getOrElse(() => []);
+    final teams = teamsRes.getOrElse(() => []);
+    final stages = stagesRes.getOrElse(() => []);
+
     final agentsRes = await repo.fetchAssignableAgents(inboxIds: inboxes.map((i) => i.id).toList());
-    final stagesRes = await repo.fetchLifecycleStages();
 
     if (isClosed) return;
 
     emit(state.copyWith(
       inboxes: inboxes,
-      labels: labelsRes.getOrElse(() => []),
-      teams: teamsRes.getOrElse(() => []),
+      labels: labels,
+      teams: teams,
       agents: agentsRes.getOrElse(() => []),
-      lifecycleStages: stagesRes.getOrElse(() => []),
+      lifecycleStages: stages,
     ));
   }
 
   Future<void> loadFilterOptions() async {
     if (isClosed) return;
-    emit(state.copyWith(isLoadingFilters: true));
+    if (state.inboxes.isEmpty) {
+      emit(state.copyWith(isLoadingFilters: true));
+    }
     final res = await repo.fetchFilterOptions();
     if (isClosed) return;
     res.fold(
@@ -177,10 +192,13 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   Future<void> loadConversations({bool refresh = true}) async {
     if (isClosed) return;
-    if (refresh) {
+    final hasExistingData = state.conversations.isNotEmpty;
+    if (refresh && !hasExistingData) {
+      // Only show empty loading state if we have no existing conversations
       emit(state.copyWith(conversations: [], isLoading: true, page: 1, hasMore: true, errorMessage: null));
     } else {
-      emit(state.copyWith(isLoading: true));
+      // Keep existing conversations displayed to give 0 perceived latency
+      emit(state.copyWith(isLoading: !hasExistingData));
     }
 
     final result = await repo.getConversations(
@@ -209,9 +227,20 @@ class ConversationCubit extends Cubit<ConversationState> {
             page: 1,
             hasMore: list.isNotEmpty,
           ));
+          // Preload messages for top 3 active conversations in background
+          _prefetchTopConversations(list);
         }
       },
     );
+  }
+
+  void _prefetchTopConversations(List<Conversation> list) {
+    if (repo is! ConversationRepository) return;
+    for (final c in list.take(3)) {
+      if (repo.getCachedMessages(c.id) == null) {
+        repo.getMessages(c.id);
+      }
+    }
   }
 
   Future<void> loadMoreConversations() async {

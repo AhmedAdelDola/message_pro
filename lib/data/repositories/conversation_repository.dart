@@ -100,13 +100,49 @@ abstract class IConversationRepository {
   Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds});
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses();
   Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions();
+  List<Message>? getCachedMessages(int conversationId) => null;
+  void clearCache() {}
 }
 
 class ConversationRepository implements IConversationRepository {
   final ApiClient _api;
   final SecureStorageService _storage = SecureStorageService();
 
+  // In-memory performance cache for instant UI rendering (Zero Perceived Latency)
+  final Map<int, List<Message>> _cachedMessages = {};
+  List<Inbox>? _cachedInboxes;
+  DateTime? _cachedInboxesTime;
+
+  List<Label>? _cachedLabels;
+  DateTime? _cachedLabelsTime;
+
+  List<Team>? _cachedTeams;
+  DateTime? _cachedTeamsTime;
+
+  List<LifecycleStage>? _cachedStages;
+  DateTime? _cachedStagesTime;
+
+  ConversationFilterOptions? _cachedFilterOptions;
+  DateTime? _cachedFilterOptionsTime;
+
+  List<Map<String, String>>? _cachedCannedResponses;
+  DateTime? _cachedCannedResponsesTime;
+
   ConversationRepository({ApiClient? api}) : _api = api ?? ApiClient();
+
+  @override
+  List<Message>? getCachedMessages(int conversationId) => _cachedMessages[conversationId];
+
+  @override
+  void clearCache() {
+    _cachedMessages.clear();
+    _cachedInboxes = null;
+    _cachedLabels = null;
+    _cachedTeams = null;
+    _cachedStages = null;
+    _cachedFilterOptions = null;
+    _cachedCannedResponses = null;
+  }
 
   @override
   Future<Either<Failure, List<Conversation>>> getConversations({
@@ -280,6 +316,11 @@ class ConversationRepository implements IConversationRepository {
           }
         }
       }
+
+      if (beforeId == null && afterId == null && messages.isNotEmpty) {
+        _cachedMessages[conversationId] = List.from(messages);
+      }
+
       return Right(messages);
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل في تحميل الرسائل'));
@@ -1237,6 +1278,11 @@ class ConversationRepository implements IConversationRepository {
 
   @override
   Future<Either<Failure, List<Inbox>>> fetchInboxes() async {
+    if (_cachedInboxes != null && _cachedInboxesTime != null) {
+      if (DateTime.now().difference(_cachedInboxesTime!).inMinutes < 5) {
+        return Right(_cachedInboxes!);
+      }
+    }
     try {
       final response = await _api.get('inboxes');
       final data = response.data;
@@ -1247,17 +1293,26 @@ class ConversationRepository implements IConversationRepository {
               : (data is Map && data['data'] is List
                   ? data['data']
                   : (data is List ? data : [])));
-      return Right(list
+      final parsed = list
           .whereType<Map>()
           .map((i) => Inbox.fromJson(Map<String, dynamic>.from(i)))
-          .toList());
+          .toList();
+      _cachedInboxes = parsed;
+      _cachedInboxesTime = DateTime.now();
+      return Right(parsed);
     } catch (_) {
+      if (_cachedInboxes != null) return Right(_cachedInboxes!);
       return const Right([]);
     }
   }
 
   @override
   Future<Either<Failure, List<Label>>> fetchLabels() async {
+    if (_cachedLabels != null && _cachedLabelsTime != null) {
+      if (DateTime.now().difference(_cachedLabelsTime!).inMinutes < 5) {
+        return Right(_cachedLabels!);
+      }
+    }
     try {
       final response = await _api.get('labels');
       final data = response.data;
@@ -1268,17 +1323,26 @@ class ConversationRepository implements IConversationRepository {
               : (data is Map && data['data'] is List
                   ? data['data']
                   : (data is List ? data : [])));
-      return Right(list
+      final parsed = list
           .whereType<Map>()
           .map((l) => Label.fromJson(Map<String, dynamic>.from(l)))
-          .toList());
+          .toList();
+      _cachedLabels = parsed;
+      _cachedLabelsTime = DateTime.now();
+      return Right(parsed);
     } catch (_) {
+      if (_cachedLabels != null) return Right(_cachedLabels!);
       return const Right([]);
     }
   }
 
   @override
   Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages() async {
+    if (_cachedStages != null && _cachedStagesTime != null) {
+      if (DateTime.now().difference(_cachedStagesTime!).inMinutes < 5) {
+        return Right(_cachedStages!);
+      }
+    }
     // 1. Try dedicated lifecycle_stages endpoint
     try {
       final response = await _api.get('lifecycle_stages');
@@ -1291,10 +1355,13 @@ class ConversationRepository implements IConversationRepository {
                   ? data['data']
                   : (data is List ? data : [])));
       if (list.isNotEmpty) {
-        return Right(list
+        final parsed = list
             .whereType<Map>()
             .map((s) => LifecycleStage.fromJson(Map<String, dynamic>.from(s)))
-            .toList());
+            .toList();
+        _cachedStages = parsed;
+        _cachedStagesTime = DateTime.now();
+        return Right(parsed);
       }
     } catch (_) {}
 
@@ -1332,6 +1399,8 @@ class ConversationRepository implements IConversationRepository {
                 }
               }
               if (stages.isNotEmpty) {
+                _cachedStages = stages;
+                _cachedStagesTime = DateTime.now();
                 return Right(stages);
               }
             }
@@ -1340,11 +1409,17 @@ class ConversationRepository implements IConversationRepository {
       }
     } catch (_) {}
 
+    if (_cachedStages != null) return Right(_cachedStages!);
     return const Right([]);
   }
 
   @override
   Future<Either<Failure, List<Team>>> fetchTeams() async {
+    if (_cachedTeams != null && _cachedTeamsTime != null) {
+      if (DateTime.now().difference(_cachedTeamsTime!).inMinutes < 5) {
+        return Right(_cachedTeams!);
+      }
+    }
     try {
       final response = await _api.get('teams');
       final data = response.data;
@@ -1355,11 +1430,15 @@ class ConversationRepository implements IConversationRepository {
               : (data is Map && data['data'] is List
                   ? data['data']
                   : (data is List ? data : [])));
-      return Right(list
+      final parsed = list
           .whereType<Map>()
           .map((t) => Team.fromJson(Map<String, dynamic>.from(t)))
-          .toList());
+          .toList();
+      _cachedTeams = parsed;
+      _cachedTeamsTime = DateTime.now();
+      return Right(parsed);
     } catch (_) {
+      if (_cachedTeams != null) return Right(_cachedTeams!);
       return const Right([]);
     }
   }
@@ -1429,6 +1508,11 @@ class ConversationRepository implements IConversationRepository {
 
   @override
   Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses() async {
+    if (_cachedCannedResponses != null && _cachedCannedResponsesTime != null) {
+      if (DateTime.now().difference(_cachedCannedResponsesTime!).inMinutes < 10) {
+        return Right(_cachedCannedResponses!);
+      }
+    }
     try {
       final response = await _api.get('canned_responses');
       final data = response.data;
@@ -1439,7 +1523,7 @@ class ConversationRepository implements IConversationRepository {
       final uri = Uri.tryParse(base.isNotEmpty ? base : AppConfig.defaultBaseUrl);
       final domainRoot = uri != null ? '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}' : AppConfig.defaultBaseUrl;
 
-      return Right(list.whereType<Map>().map<Map<String, String>>((c) {
+      final result = list.whereType<Map>().map<Map<String, String>>((c) {
         final List<String> extractedUrls = [];
 
         void addUrl(dynamic u) {
@@ -1528,14 +1612,23 @@ class ConversationRepository implements IConversationRepository {
           'files': extractedUrls.join('|||'),
           'file_count': extractedUrls.length.toString(),
         };
-      }).toList());
+      }).toList();
+      _cachedCannedResponses = result;
+      _cachedCannedResponsesTime = DateTime.now();
+      return Right(result);
     } catch (_) {
+      if (_cachedCannedResponses != null) return Right(_cachedCannedResponses!);
       return const Right([]);
     }
   }
 
   @override
   Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions() async {
+    if (_cachedFilterOptions != null && _cachedFilterOptionsTime != null) {
+      if (DateTime.now().difference(_cachedFilterOptionsTime!).inMinutes < 5) {
+        return Right(_cachedFilterOptions!);
+      }
+    }
     try {
       final response = await _api.get('conversations/filter_options');
       final data = response.data;
@@ -1550,12 +1643,17 @@ class ConversationRepository implements IConversationRepository {
         }
       }
       if (jsonMap != null) {
-        return Right(ConversationFilterOptions.fromJson(jsonMap));
+        final parsed = ConversationFilterOptions.fromJson(jsonMap);
+        _cachedFilterOptions = parsed;
+        _cachedFilterOptionsTime = DateTime.now();
+        return Right(parsed);
       }
       return const Right(ConversationFilterOptions());
     } on DioException catch (e) {
+      if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
       return Left(ServerFailure(e.message ?? 'فشل في تحميل خيارات الفلاتر'));
     } catch (e) {
+      if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
       return Left(ServerFailure(e.toString()));
     }
   }

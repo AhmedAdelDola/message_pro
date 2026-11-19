@@ -9,12 +9,9 @@ import 'package:message_pro/core/services/push_notification_service.dart';
 import 'package:message_pro/data/models/contact.dart';
 import 'package:message_pro/data/models/conversation.dart';
 import 'package:message_pro/data/models/message.dart';
-import 'package:message_pro/data/models/user.dart';
 import 'package:message_pro/data/repositories/conversation_repository.dart';
 import 'package:message_pro/logic/chat/chat_cubit.dart';
-import 'package:message_pro/ui/screens/chat/chat_screen.dart';
 import 'package:message_pro/ui/screens/chat/widgets/message_bubble.dart';
-import 'package:message_pro/ui/screens/main_layout.dart';
 
 class MockConversationRepository implements IConversationRepository {
   List<Message> messagesToReturn = [];

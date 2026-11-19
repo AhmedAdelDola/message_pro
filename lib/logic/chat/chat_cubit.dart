@@ -19,12 +19,26 @@ class ChatCubit extends Cubit<ChatState> {
   StreamSubscription<RealtimeEvent>? _eventSub;
   StreamSubscription<void>? _reconnectSub;
 
+  static List<Message> _initCachedMessages(IConversationRepository repo, int id) {
+    if (repo is ConversationRepository) {
+      return repo.getCachedMessages(id) ?? const [];
+    }
+    return const [];
+  }
+
   ChatCubit({
     required this.conversationId,
     required this.repo,
     required this.ws,
     this.contactLastSeenAt,
-  }) : super(ChatState(conversationId: conversationId)) {
+  }) : super(() {
+          final cached = _initCachedMessages(repo, conversationId);
+          return ChatState(
+            conversationId: conversationId,
+            messages: cached,
+            isLoading: cached.isEmpty,
+          );
+        }()) {
     loadMessages();
     loadCannedResponses();
     _listenToRealtime();
@@ -116,7 +130,10 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   Future<void> loadMessages() async {
-    emit(state.copyWith(isLoading: true, hasMoreMessages: true, errorMessage: null));
+    final hasCached = state.messages.isNotEmpty;
+    if (!hasCached) {
+      emit(state.copyWith(isLoading: true, hasMoreMessages: true, errorMessage: null));
+    }
     final result = await repo.getMessages(conversationId);
     result.fold(
       (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
