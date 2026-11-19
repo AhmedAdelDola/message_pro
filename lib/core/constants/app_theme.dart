@@ -5,6 +5,7 @@ import 'app_colors.dart';
 class AppTheme {
   static const String englishFontFamily = 'Inter';
   static List<String> get arabicFontFallback => [
+        GoogleFonts.almarai().fontFamily ?? 'Almarai',
         GoogleFonts.ibmPlexSansArabic().fontFamily ?? 'IBMPlexSansArabic',
         'IBMPlexSansArabic',
       ];

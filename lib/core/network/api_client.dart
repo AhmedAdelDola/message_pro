@@ -24,6 +24,30 @@ class ApiClient {
         },
       ),
     );
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          options.extra['request_start_time'] = DateTime.now().millisecondsSinceEpoch;
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          final start = response.requestOptions.extra['request_start_time'] as int?;
+          if (start != null) {
+            final duration = DateTime.now().millisecondsSinceEpoch - start;
+            debugPrint('⏱️ [PERF] ${response.requestOptions.method} ${response.requestOptions.path} | Status: ${response.statusCode} | Time: ${duration}ms');
+          }
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          final start = error.requestOptions.extra['request_start_time'] as int?;
+          if (start != null) {
+            final duration = DateTime.now().millisecondsSinceEpoch - start;
+            debugPrint('⏱️ [PERF-ERROR] ${error.requestOptions.method} ${error.requestOptions.path} | Status: ${error.response?.statusCode} | Time: ${duration}ms');
+          }
+          handler.next(error);
+        },
+      ),
+    );
     _dio.interceptors.add(AuthInterceptor());
     _dio.interceptors.add(
       PrettyDioLogger(
