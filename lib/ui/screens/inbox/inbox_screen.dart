@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/constants/app_lottie.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/conversation.dart';
 import '../../../data/models/user.dart';
@@ -900,19 +901,9 @@ class _InboxScreenState extends State<InboxScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            SizedBox(
+                            AppLottie.emptyInbox(
                               width: 140,
                               height: 140,
-                              child: Lottie.asset(
-                                'assets/animations/empty_inbox.json',
-                                repeat: true,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  size: 52,
-                                  color: isDark ? const Color(0xFF80838D) : const Color(0xFFB0B4BA),
-                                ),
-                              ),
                             ),
                             const SizedBox(height: 14),
                             Text(

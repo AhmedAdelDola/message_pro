@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:lottie/lottie.dart';
+import '../../../../core/constants/app_lottie.dart';
 
 class AiAgentTakeoverBanner extends StatelessWidget {
   final String agentName;
@@ -66,14 +66,9 @@ class AiAgentTakeoverBanner extends StatelessWidget {
               Positioned(
                 top: -6.r,
                 right: -6.r,
-                child: SizedBox(
+                child: AppLottie.aiSparkle(
                   width: 18.r,
                   height: 18.r,
-                  child: Lottie.asset(
-                    'assets/animations/ai_sparkle.json',
-                    repeat: true,
-                    fit: BoxFit.contain,
-                  ),
                 ),
               ),
             ],

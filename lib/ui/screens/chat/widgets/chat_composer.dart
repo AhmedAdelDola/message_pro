@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import '../../../../core/constants/app_lottie.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -845,22 +846,9 @@ class ChatComposerState extends State<ChatComposer> {
       ),
       child: Row(
         children: [
-          SizedBox(
+          AppLottie.voiceRecording(
             width: 26,
             height: 26,
-            child: Lottie.asset(
-              'assets/animations/voice_recording.json',
-              repeat: true,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
           ),
           const SizedBox(width: 8),
           Text(

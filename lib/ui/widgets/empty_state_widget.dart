@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../core/constants/app_lottie.dart';
 import 'custom_button.dart';
 
 class EmptyStateWidget extends StatelessWidget {
@@ -35,24 +36,11 @@ class EmptyStateWidget extends StatelessWidget {
               SizedBox(
                 width: 140.r,
                 height: 140.r,
-                child: Lottie.asset(
+                child: AppLottie.fromAsset(
                   lottieAsset!,
+                  width: 140.r,
+                  height: 140.r,
                   repeat: true,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      padding: EdgeInsets.all(20.r),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF1F5F9),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon ?? Icons.inbox_rounded,
-                        size: 44.r,
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      ),
-                    );
-                  },
                 ),
               )
             else if (icon != null)

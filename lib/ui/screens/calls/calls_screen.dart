@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/constants/app_lottie.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../logic/calls/calls_cubit.dart';
 import '../../../logic/calls/calls_state.dart';
@@ -102,19 +103,9 @@ class _CallsScreenState extends State<CallsScreen> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      SizedBox(
+                                      AppLottie.emptyCalls(
                                         width: 140,
                                         height: 140,
-                                        child: Lottie.asset(
-                                          'assets/animations/calls_empty.json',
-                                          repeat: true,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) => Icon(
-                                            Icons.phone_outlined,
-                                            size: 52,
-                                            color: textSecondary.withValues(alpha: 0.8),
-                                          ),
-                                        ),
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
