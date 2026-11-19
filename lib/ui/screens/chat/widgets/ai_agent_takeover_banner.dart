@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:lottie/lottie.dart';
 
 class AiAgentTakeoverBanner extends StatelessWidget {
   final String agentName;
@@ -47,17 +48,35 @@ class AiAgentTakeoverBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Emoji or Bot Icon
-          Container(
-            padding: EdgeInsets.all(7.r),
-            decoration: BoxDecoration(
-              color: purplePrimary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Text(
-              iconEmoji,
-              style: TextStyle(fontSize: 18.sp),
-            ),
+          // Emoji or Bot Icon with AI Sparkle Lottie
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: EdgeInsets.all(7.r),
+                decoration: BoxDecoration(
+                  color: purplePrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text(
+                  iconEmoji,
+                  style: TextStyle(fontSize: 18.sp),
+                ),
+              ),
+              Positioned(
+                top: -6.r,
+                right: -6.r,
+                child: SizedBox(
+                  width: 18.r,
+                  height: 18.r,
+                  child: Lottie.asset(
+                    'assets/animations/ai_sparkle.json',
+                    repeat: true,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ],
           ),
           SizedBox(width: 10.w),
 

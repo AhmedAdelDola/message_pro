@@ -1776,7 +1776,15 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildDeliveryStatus(String status, {required bool isTemplate, required bool isDark}) {
-    if (status == 'failed') {
+    if (status == 'sending' || message.isSending) {
+      return Icon(
+        Icons.access_time_rounded,
+        size: 13,
+        color: isTemplate
+            ? (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280))
+            : Colors.white70,
+      );
+    } else if (status == 'failed') {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [

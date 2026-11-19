@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/audio_cache_service.dart';
+import 'voice_waveform_widget.dart';
 
 class AudioPlayerBubble extends StatefulWidget {
   final String audioUrl;
@@ -297,34 +298,26 @@ class _AudioPlayerBubbleState extends State<AudioPlayerBubble> {
               ),
               const SizedBox(width: 8),
 
-              // Audio progress slider (Smooth milliseconds)
+              // Interactive Voice Waveform (Replaces standard Slider)
               Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    trackHeight: 3,
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                    activeTrackColor: sliderActiveColor,
-                    inactiveTrackColor: sliderInactiveColor,
-                    thumbColor: sliderActiveColor,
-                  ),
-                  child: Slider(
-                    value: currentMs,
-                    min: 0.0,
-                    max: totalMs,
-                    onChangeStart: (_) {
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: VoiceWaveformWidget(
+                    progress: totalMs > 0 ? (currentMs / totalMs).clamp(0.0, 1.0) : 0.0,
+                    seedKey: widget.audioUrl,
+                    activeColor: sliderActiveColor,
+                    inactiveColor: sliderInactiveColor,
+                    height: 28,
+                    onSeek: (ratio) async {
                       _isSeeking = true;
-                    },
-                    onChanged: (val) {
+                      final targetMs = (ratio * totalMs).round();
                       setState(() {
-                        _position = Duration(milliseconds: val.round());
+                        _position = Duration(milliseconds: targetMs);
                       });
-                    },
-                    onChangeEnd: (val) async {
-                      _isSeeking = false;
                       try {
-                        await _player.seek(Duration(milliseconds: val.round()));
+                        await _player.seek(Duration(milliseconds: targetMs));
                       } catch (_) {}
+                      _isSeeking = false;
                     },
                   ),
                 ),

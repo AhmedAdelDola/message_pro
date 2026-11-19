@@ -274,7 +274,25 @@ class ChatCubit extends Cubit<ChatState> {
     List<String>? attachmentPaths,
     int? inReplyToId,
   }) async {
-    emit(state.copyWith(isSending: true));
+    final tempId = -DateTime.now().millisecondsSinceEpoch;
+    final optimisticMsg = Message(
+      id: tempId,
+      content: content,
+      conversationId: conversationId,
+      messageType: 1, // outgoing
+      private: isPrivate,
+      status: 'sending',
+      createdAt: DateTime.now(),
+      contentAttributes: inReplyToId != null ? {'in_reply_to': inReplyToId} : const {},
+    );
+
+    // Optimistically insert message into UI instantly for zero-latency feedback
+    emit(state.copyWith(
+      messages: [...state.messages, optimisticMsg],
+      isSending: true,
+      errorMessage: null,
+    ));
+
     final result = await repo.sendMessage(
       conversationId: conversationId,
       content: content,
@@ -285,22 +303,18 @@ class ChatCubit extends Cubit<ChatState> {
 
     return result.fold(
       (failure) {
-        // Prominently add failed message so user sees exactly what failed and can retry
-        final failedMsg = Message(
-          id: -DateTime.now().millisecondsSinceEpoch,
-          content: content,
-          conversationId: conversationId,
-          messageType: 1, // outgoing
-          private: isPrivate,
+        // Mark the optimistic message as failed with retry action
+        final failedMsg = optimisticMsg.copyWith(
           status: 'failed',
-          createdAt: DateTime.now(),
           contentAttributes: {
             'external_error': failure.message,
             'delivery_status': 'failed',
+            if (inReplyToId != null) 'in_reply_to': inReplyToId,
           },
         );
+        final updatedList = state.messages.map((m) => m.id == tempId ? failedMsg : m).toList();
         emit(state.copyWith(
-          messages: [...state.messages, failedMsg],
+          messages: updatedList,
           isSending: false,
           errorMessage: failure.message,
         ));
@@ -308,14 +322,15 @@ class ChatCubit extends Cubit<ChatState> {
       },
       (sent) {
         SoundService().playOutgoingSound();
-        if (!state.messages.any((m) => m.id == sent.id)) {
-          emit(state.copyWith(
-            messages: [...state.messages, sent],
-            isSending: false,
-          ));
-        } else {
-          emit(state.copyWith(isSending: false));
+        // Replace optimistic placeholder with real server-confirmed message
+        final updatedList = state.messages.map((m) => m.id == tempId ? sent : m).toList();
+        if (!updatedList.any((m) => m.id == sent.id)) {
+          updatedList.add(sent);
         }
+        emit(state.copyWith(
+          messages: updatedList,
+          isSending: false,
+        ));
         return true;
       },
     );

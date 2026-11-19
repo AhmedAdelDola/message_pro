@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:lottie/lottie.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/conversation.dart';
 import '../../../data/models/user.dart';
@@ -898,12 +900,21 @@ class _InboxScreenState extends State<InboxScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 52,
-                              color: isDark ? const Color(0xFF80838D) : const Color(0xFFB0B4BA),
+                            SizedBox(
+                              width: 140,
+                              height: 140,
+                              child: Lottie.asset(
+                                'assets/animations/empty_inbox.json',
+                                repeat: true,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 52,
+                                  color: isDark ? const Color(0xFF80838D) : const Color(0xFFB0B4BA),
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 14),
                             Text(
                               isArabic ? 'لا توجد محادثات لعرضها' : 'No conversations to show',
                               textAlign: TextAlign.center,
@@ -914,7 +925,10 @@ class _InboxScreenState extends State<InboxScreen> {
                               ),
                             ),
                           ],
-                        ),
+                        )
+                            .animate()
+                            .fadeIn(duration: 350.ms, curve: Curves.easeOut)
+                            .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
                       ),
                     );
                   }
@@ -1019,7 +1033,10 @@ class _InboxScreenState extends State<InboxScreen> {
                             );
                           },
                           onLongPress: () => _showActionSheet(conv),
-                        );
+                        )
+                            .animate()
+                            .fadeIn(duration: 250.ms, curve: Curves.easeOut)
+                            .slideY(begin: 0.05, end: 0, duration: 250.ms, curve: Curves.easeOut);
                       },
                     ),
                   );

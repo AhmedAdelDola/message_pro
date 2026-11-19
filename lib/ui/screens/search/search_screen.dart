@@ -12,6 +12,7 @@ import '../chat/chat_screen.dart';
 import '../contacts/contact_details_screen.dart';
 import '../inbox/widgets/conversation_tile.dart';
 import '../../widgets/avatar_widget.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -93,11 +94,10 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
           body: query.isEmpty
-              ? Center(
-                  child: Text(
-                    'اكتب للبحث في الرسائل وجهات الاتصال...',
-                    style: TextStyle(color: Colors.grey, fontSize: 14.sp),
-                  ),
+              ? const EmptyStateWidget(
+                  lottieAsset: 'assets/animations/empty_search.json',
+                  title: 'البحث الموحد',
+                  description: 'اكتب للبحث السريع في المحادثات وجهات الاتصال',
                 )
               : ListView(
                   children: [
@@ -144,10 +144,12 @@ class _SearchScreenState extends State<SearchScreen> {
                     ],
 
                     if (matchingConvs.isEmpty && _contacts.isEmpty && !_isSearching)
-                      Padding(
-                        padding: EdgeInsets.all(32.r),
-                        child: Center(
-                          child: Text('لا توجد نتائج مطابقة لبحثك', style: TextStyle(color: Colors.grey, fontSize: 14.sp)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: EmptyStateWidget(
+                          lottieAsset: 'assets/animations/empty_search.json',
+                          title: 'لا توجد نتائج مطابقة',
+                          description: 'تأكد من كتابة الاسم أو رقم الهاتف بدقة',
                         ),
                       ),
                   ],

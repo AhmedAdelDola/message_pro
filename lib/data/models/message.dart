@@ -363,6 +363,7 @@ class Message {
   bool get isDelivered => status == 'delivered';
   bool get isRead => status == 'read' || status == 'seen';
   bool get isFailed => status == 'failed';
+  bool get isSending => status == 'sending' || (id < 0 && status != 'failed');
 
   bool get isBot {
     final st = senderType?.toLowerCase();

@@ -6,6 +6,7 @@ import 'package:message_pro/core/config/app_config.dart';
 import 'package:message_pro/core/services/audio_cache_service.dart';
 import 'package:message_pro/data/models/message.dart';
 import 'package:message_pro/ui/widgets/media_viewers/audio_player_bubble.dart';
+import 'package:message_pro/ui/widgets/media_viewers/voice_waveform_widget.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -109,7 +110,7 @@ void main() {
       // Should display 00:14 as total duration instead of 00:00 / 00:00
       expect(find.text('00:14'), findsOneWidget);
       expect(find.text('WhatsApp Voice Note'), findsOneWidget);
-      expect(find.byType(Slider), findsOneWidget);
+      expect(find.byType(VoiceWaveformWidget), findsOneWidget);
     });
 
     testWidgets('handles missing initial duration gracefully without crash', (tester) async {
@@ -126,7 +127,7 @@ void main() {
       );
 
       expect(find.text('00:00'), findsOneWidget);
-      expect(find.byType(Slider), findsOneWidget);
+      expect(find.byType(VoiceWaveformWidget), findsOneWidget);
     });
   });
 }

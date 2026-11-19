@@ -9,6 +9,7 @@ import '../../widgets/avatar_widget.dart';
 import 'add_contact_screen.dart';
 import 'contact_details_screen.dart';
 import '../../widgets/app_bar_progress_bar.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -238,26 +239,18 @@ class _ContactsScreenState extends State<ContactsScreen> {
               child: (_isLoading && _contacts.isEmpty)
                   ? const SizedBox.shrink()
                   : _contacts.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              HugeIcon(
-                                icon: HugeIcons.strokeRoundedUserGroup,
-                                color: textSecondary.withValues(alpha: 0.5),
-                                size: 52,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                isArabic ? 'لا توجد جهات اتصال' : 'No contacts found',
-                                style: TextStyle(
-                                  color: textSecondary,
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                      ? EmptyStateWidget(
+                          lottieAsset: 'assets/animations/empty_search.json',
+                          title: isArabic ? 'لا توجد جهات اتصال' : 'No contacts found',
+                          description: isArabic ? 'يمكنك إضافة جهات اتصال جديدة أو تحديث القائمة' : 'Add new contacts or pull to refresh',
+                          buttonText: isArabic ? 'إضافة جهة اتصال' : 'Add Contact',
+                          onButtonPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const AddContactScreen()),
+                            ).then((added) {
+                              if (added == true) _fetchContacts(refresh: true);
+                            });
+                          },
                         )
                       : RefreshIndicator(
                           color: const Color(0xFF4162E3),

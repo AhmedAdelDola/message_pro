@@ -8,6 +8,7 @@ import '../../../logic/notification/notification_cubit.dart';
 import '../../../logic/notification/notification_state.dart';
 import '../chat/chat_screen.dart';
 import '../../widgets/app_bar_progress_bar.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -113,34 +114,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: state.isLoading && items.isEmpty
                         ? const SizedBox.shrink()
                         : items.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.notifications_none_rounded,
-                                      size: 52,
-                                      color: isDark ? const Color(0xFF80838D) : const Color(0xFFB0B4BA),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      isArabic ? 'أنت على اطلاع دائم!' : 'You are up to date!',
-                                      style: TextStyle(
-                                        color: textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      isArabic ? 'لا توجد إشعارات حالياً' : 'There are no notifications here.',
-                                      style: TextStyle(
-                                        color: textSecondary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            ? EmptyStateWidget(
+                                lottieAsset: 'assets/animations/empty_notifications.json',
+                                title: isArabic ? 'أنت على اطلاع دائم!' : 'You are up to date!',
+                                description: isArabic ? 'لا توجد إشعارات حالياً' : 'There are no notifications here.',
                               )
                             : ListView.builder(
                                 physics: const AlwaysScrollableScrollPhysics(),
