@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:lottie/lottie.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../logic/calls/calls_cubit.dart';
 import '../../../logic/calls/calls_state.dart';
@@ -93,21 +95,30 @@ class _CallsScreenState extends State<CallsScreen> {
                     child: callsState.isLoading && calls.isEmpty
                         ? const SizedBox.shrink()
                         : calls.isEmpty
-                            // Exact Coming Soon view from browser Tab 2
+                            // Coming Soon / Empty Calls view with Lottie animation
                             ? Center(
                                 child: Padding(
                                   padding: const EdgeInsets.all(32),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(
-                                        Icons.phone_outlined,
-                                        size: 40,
-                                        color: textSecondary.withValues(alpha: 0.8),
+                                      SizedBox(
+                                        width: 140,
+                                        height: 140,
+                                        child: Lottie.asset(
+                                          'assets/animations/calls_empty.json',
+                                          repeat: true,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => Icon(
+                                            Icons.phone_outlined,
+                                            size: 52,
+                                            color: textSecondary.withValues(alpha: 0.8),
+                                          ),
+                                        ),
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
-                                        isArabic ? 'قريبًا' : 'Coming soon',
+                                        isArabic ? 'سجل المكالمات' : 'Calls log',
                                         style: TextStyle(
                                           color: textPrimary,
                                           fontWeight: FontWeight.bold,
@@ -117,8 +128,8 @@ class _CallsScreenState extends State<CallsScreen> {
                                       const SizedBox(height: 8),
                                       Text(
                                         isArabic
-                                            ? 'ستكون المكالمات متاحة هنا في تحديث مستقبلي.'
-                                            : 'Calls will be available here in a future update.',
+                                            ? 'ستكون المكالمات وسجل الاتصالات مع العملاء متاحة هنا قريبًا.'
+                                            : 'Calls and communication logs will be available here soon.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: textSecondary,
@@ -127,7 +138,10 @@ class _CallsScreenState extends State<CallsScreen> {
                                         ),
                                       ),
                                     ],
-                                  ),
+                                  )
+                                      .animate()
+                                      .fadeIn(duration: 350.ms, curve: Curves.easeOut)
+                                      .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
                                 ),
                               )
                             : ListView.builder(
@@ -196,7 +210,10 @@ class _CallsScreenState extends State<CallsScreen> {
                                           ),
                                       ],
                                     ),
-                                  );
+                                  )
+                                      .animate()
+                                      .fadeIn(duration: 250.ms, curve: Curves.easeOut)
+                                      .slideY(begin: 0.05, end: 0, duration: 250.ms, curve: Curves.easeOut);
                                 },
                               ),
                   ),
