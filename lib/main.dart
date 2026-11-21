@@ -11,6 +11,7 @@ import 'core/constants/app_theme.dart';
 import 'core/di/injection_container.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/sound_service.dart';
+import 'core/services/performance_service.dart';
 import 'logic/auth/auth_cubit.dart';
 import 'logic/conversation/conversation_cubit.dart';
 import 'logic/notification/notification_cubit.dart';
@@ -44,6 +45,8 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await PerformanceService.initialize();
+    PerformanceService.startTrace('app_startup');
   } catch (e) {
     debugPrint('[Firebase] Init error: $e');
   }
@@ -76,6 +79,9 @@ class MessageProApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PerformanceService.stopTrace('app_startup');
+    });
     return MultiBlocProvider(
       providers: [
         BlocProvider<SettingsCubit>(create: (_) => sl<SettingsCubit>()),

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:message_pro/data/models/message.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/services/sound_service.dart';
+import '../../core/services/performance_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../data/models/contact.dart';
 import '../../data/models/conversation.dart';
@@ -300,42 +301,44 @@ class ConversationCubit extends Cubit<ConversationState> {
   }
 
   Future<void> onWorkspaceSwitched(int newAccountId) async {
-    // 1. Immediately wipe any in-memory cached inboxes, teams, labels, and filters from the previous workspace
-    repo.clearCache();
+    await PerformanceService.traceAsync('workspace_switch', () async {
+      // 1. Immediately wipe any in-memory cached inboxes, teams, labels, and filters from the previous workspace
+      repo.clearCache();
 
-    // 2. Reset filters because inbox/team/label/stage IDs from previous workspace do not exist in the new workspace.
-    // Clear previous conversations list and pagination immediately to prevent stale cross-workspace data bleed.
-    emit(state.copyWith(
-      conversations: const [],
-      inboxes: const [],
-      labels: const [],
-      teams: const [],
-      agents: const [],
-      lifecycleStages: const [],
-      page: 1,
-      hasMore: true,
-      isLoading: true,
-      isLoadingFilters: true,
-      errorMessage: null,
-      status: 'all',
-      assigneeType: 'all',
-      clearInbox: true,
-      clearTeam: true,
-      clearLabel: true,
-      clearStage: true,
-      clearAssignee: true,
-      clearAgentBot: true,
-      filterOptions: const ConversationFilterOptions(),
-    ));
+      // 2. Reset filters because inbox/team/label/stage IDs from previous workspace do not exist in the new workspace.
+      // Clear previous conversations list and pagination immediately to prevent stale cross-workspace data bleed.
+      emit(state.copyWith(
+        conversations: const [],
+        inboxes: const [],
+        labels: const [],
+        teams: const [],
+        agents: const [],
+        lifecycleStages: const [],
+        page: 1,
+        hasMore: true,
+        isLoading: true,
+        isLoadingFilters: true,
+        errorMessage: null,
+        status: 'all',
+        assigneeType: 'all',
+        clearInbox: true,
+        clearTeam: true,
+        clearLabel: true,
+        clearStage: true,
+        clearAssignee: true,
+        clearAgentBot: true,
+        filterOptions: const ConversationFilterOptions(),
+      ));
 
-    // 3. Re-fetch fresh auxiliary data & filter options for the new workspace
-    await Future.wait([
-      loadAuxiliaryData(),
-      loadFilterOptions(),
-    ]);
+      // 3. Re-fetch fresh auxiliary data & filter options for the new workspace
+      await Future.wait([
+        loadAuxiliaryData(),
+        loadFilterOptions(),
+      ]);
 
-    // 4. Re-fetch conversations for the new workspace
-    await loadConversations(refresh: true);
+      // 4. Re-fetch conversations for the new workspace
+      await loadConversations(refresh: true);
+    }, attributes: {'account_id': newAccountId.toString()});
   }
 
   void selectDrawerFilter({

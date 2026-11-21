@@ -53,6 +53,7 @@ class ChatComposerState extends State<ChatComposer> {
   final _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool _isPrivateNote = false;
+  bool _isSubmitting = false;
   final List<String> _attachedPaths = [];
   final ImagePicker _picker = ImagePicker();
 
@@ -981,6 +982,8 @@ class ChatComposerState extends State<ChatComposer> {
   }
 
   void _handleSend() {
+    if (_isSubmitting) return;
+
     final text = _controller.text.trim();
     if (text.isEmpty && _attachedPaths.isEmpty) {
       if (!widget.canReply && !_isPrivateNote) {
@@ -993,19 +996,31 @@ class ChatComposerState extends State<ChatComposer> {
       return;
     }
 
-    widget.onSend(
-      text,
-      _isPrivateNote,
-      _attachedPaths.isNotEmpty ? List<String>.from(_attachedPaths.take(maxAttachmentsLimit)) : null,
-      widget.replyingToMessage?.id,
-    );
-
-    widget.onCancelReply?.call();
+    _isSubmitting = true;
+    final pathsToSend = _attachedPaths.isNotEmpty ? List<String>.from(_attachedPaths.take(maxAttachmentsLimit)) : null;
+    final inReplyTo = widget.replyingToMessage?.id;
+    final isPrivate = _isPrivateNote;
 
     _controller.clear();
     setState(() {
       _attachedPaths.clear();
       _isPrivateNote = false;
+    });
+
+    widget.onSend(
+      text,
+      isPrivate,
+      pathsToSend,
+      inReplyTo,
+    );
+
+    widget.onCancelReply?.call();
+
+    // Reset submitting lock after brief debounce window
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _isSubmitting = false;
+      }
     });
   }
 

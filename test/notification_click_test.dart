@@ -57,6 +57,9 @@ class MockConversationRepository implements IConversationRepository {
   Future<Either<Failure, void>> markAsRead(int conversationId) async => const Right(null);
 
   @override
+  void clearCache() {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

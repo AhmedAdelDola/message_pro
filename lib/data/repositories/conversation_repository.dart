@@ -33,6 +33,7 @@ abstract class IConversationRepository {
     bool isPrivate = false,
     List<String>? attachmentPaths,
     int? inReplyToId,
+    String? echoId,
   });
   Future<Either<Failure, Message>> editMessage({
     required int conversationId,
@@ -336,6 +337,7 @@ class ConversationRepository implements IConversationRepository {
     bool isPrivate = false,
     List<String>? attachmentPaths,
     int? inReplyToId,
+    String? echoId,
   }) async {
     try {
       dynamic postData;
@@ -344,6 +346,9 @@ class ConversationRepository implements IConversationRepository {
         formData.fields.add(MapEntry('content', content));
         formData.fields.add(const MapEntry('message_type', 'outgoing'));
         formData.fields.add(MapEntry('private', isPrivate.toString()));
+        if (echoId != null) {
+          formData.fields.add(MapEntry('echo_id', echoId));
+        }
         if (inReplyToId != null) {
           formData.fields.add(MapEntry('content_attributes[in_reply_to]', inReplyToId.toString()));
         }
@@ -361,6 +366,7 @@ class ConversationRepository implements IConversationRepository {
           'content': content,
           'message_type': 'outgoing',
           'private': isPrivate,
+          if (echoId != null) 'echo_id': echoId,
           if (inReplyToId != null)
             'content_attributes': {
               'in_reply_to': inReplyToId,

@@ -5,6 +5,7 @@ import 'package:message_pro/data/models/contact.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/websocket_client.dart';
 import '../../core/services/sound_service.dart';
+import '../../core/services/performance_service.dart';
 import '../../data/models/message.dart';
 import '../../data/models/message_template.dart';
 import '../../data/models/message_template_registry.dart';
@@ -61,22 +62,53 @@ class ChatCubit extends Cubit<ChatState> {
         final convId = payload['conversation_id'];
         if (convId != null && convId == conversationId) {
           final msg = Message.fromJson(payload);
-          if (!state.messages.any((m) => m.id == msg.id)) {
-            var currentMessages = [...state.messages, msg];
-            // If the contact sends a message, all prior outgoing messages have been seen
-            if (!msg.isOutgoing && !msg.isPrivateNote && !msg.isActivity) {
-              SoundService().playIncomingSound();
-              contactLastSeenAt = msg.createdAt;
-              currentMessages = currentMessages.map((m) {
-                if (m.isOutgoing && !m.isFailed && !m.isPrivateNote && m.status != 'read') {
-                  return m.copyWith(status: 'read');
-                }
-                return m;
-              }).toList();
-            }
-            emit(state.copyWith(messages: currentMessages));
-            repo.markAsRead(conversationId);
+
+          // If message is already present by exact positive ID, do not add duplicate
+          if (state.messages.any((m) => m.id == msg.id)) {
+            return;
           }
+
+          var currentMessages = List<Message>.from(state.messages);
+
+          // Check if this real message replaces an in-flight optimistic message
+          final echoId = payload['echo_id'] ?? payload['content_attributes']?['echo_id'];
+          final optimisticIndex = currentMessages.indexWhere((m) {
+            if (m.id >= 0) return false;
+            if (echoId != null && m.id.toString() == echoId.toString()) return true;
+            if (m.isOutgoing == msg.isOutgoing &&
+                m.isPrivateNote == msg.isPrivateNote &&
+                (m.content?.trim() ?? '') == (msg.content?.trim() ?? '')) {
+              return true;
+            }
+            return false;
+          });
+
+          if (optimisticIndex != -1) {
+            currentMessages[optimisticIndex] = msg;
+          } else {
+            currentMessages.add(msg);
+          }
+
+          // Strict deduplication by positive ID to guarantee no duplicate bubbles
+          final seenIds = <int>{};
+          currentMessages = currentMessages.where((m) {
+            if (m.id < 0) return true;
+            return seenIds.add(m.id);
+          }).toList();
+
+          // If the contact sends a message, all prior outgoing messages have been seen
+          if (!msg.isOutgoing && !msg.isPrivateNote && !msg.isActivity) {
+            SoundService().playIncomingSound();
+            contactLastSeenAt = msg.createdAt;
+            currentMessages = currentMessages.map((m) {
+              if (m.isOutgoing && !m.isFailed && !m.isPrivateNote && m.status != 'read') {
+                return m.copyWith(status: 'read');
+              }
+              return m;
+            }).toList();
+          }
+          emit(state.copyWith(messages: currentMessages));
+          repo.markAsRead(conversationId);
         }
       } else if (name == 'message.updated' || name == 'message.reactions_updated') {
         final convId = payload['conversation_id'];
@@ -293,13 +325,17 @@ class ChatCubit extends Cubit<ChatState> {
       errorMessage: null,
     ));
 
-    final result = await repo.sendMessage(
+    final result = await PerformanceService.traceAsync('send_message', () => repo.sendMessage(
       conversationId: conversationId,
       content: content,
       isPrivate: isPrivate,
       attachmentPaths: attachmentPaths,
       inReplyToId: inReplyToId,
-    );
+      echoId: tempId.toString(),
+    ), attributes: {
+      'has_attachments': (attachmentPaths?.isNotEmpty == true).toString(),
+      'is_private': isPrivate.toString(),
+    });
 
     return result.fold(
       (failure) {
@@ -310,6 +346,7 @@ class ChatCubit extends Cubit<ChatState> {
             'external_error': failure.message,
             'delivery_status': 'failed',
             if (inReplyToId != null) 'in_reply_to': inReplyToId,
+            'echo_id': tempId.toString(),
           },
         );
         final updatedList = state.messages.map((m) => m.id == tempId ? failedMsg : m).toList();
@@ -323,10 +360,33 @@ class ChatCubit extends Cubit<ChatState> {
       (sent) {
         SoundService().playOutgoingSound();
         // Replace optimistic placeholder with real server-confirmed message
-        final updatedList = state.messages.map((m) => m.id == tempId ? sent : m).toList();
-        if (!updatedList.any((m) => m.id == sent.id)) {
+        // and eliminate any duplicate instances (e.g. if websocket already inserted it)
+        final seenIds = <int>{};
+        final updatedList = <Message>[];
+        bool sentPlaced = false;
+
+        for (final m in state.messages) {
+          if (m.id == tempId) {
+            if (!sentPlaced && seenIds.add(sent.id)) {
+              updatedList.add(sent);
+              sentPlaced = true;
+            }
+          } else if (m.id == sent.id) {
+            if (!sentPlaced && seenIds.add(sent.id)) {
+              updatedList.add(sent);
+              sentPlaced = true;
+            }
+          } else {
+            if (m.id < 0 || seenIds.add(m.id)) {
+              updatedList.add(m);
+            }
+          }
+        }
+
+        if (!sentPlaced && seenIds.add(sent.id)) {
           updatedList.add(sent);
         }
+
         emit(state.copyWith(
           messages: updatedList,
           isSending: false,

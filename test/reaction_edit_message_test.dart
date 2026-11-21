@@ -92,6 +92,9 @@ class MockConversationRepository implements IConversationRepository {
   }
 
   @override
+  void clearCache() {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

@@ -133,6 +133,7 @@ class FakeConversationRepository implements IConversationRepository {
     bool isPrivate = false,
     List<String>? attachmentPaths,
     int? inReplyToId,
+    String? echoId,
   }) async => throw UnimplementedError();
 
   @override
@@ -218,6 +219,9 @@ class FakeConversationRepository implements IConversationRepository {
     required String sourceId,
     String? contactName,
   }) async => throw UnimplementedError();
+
+  @override
+  void clearCache() {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

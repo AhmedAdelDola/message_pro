@@ -69,7 +69,7 @@ class FakeConversationRepository implements IConversationRepository {
   @override
   Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1}) async => const Right([]);
   @override
-  Future<Either<Failure, Message>> sendMessage({required int conversationId, required String content, bool isPrivate = false, List<String>? attachmentPaths, int? inReplyToId}) async => throw UnimplementedError();
+  Future<Either<Failure, Message>> sendMessage({required int conversationId, required String content, bool isPrivate = false, List<String>? attachmentPaths, int? inReplyToId, String? echoId}) async => throw UnimplementedError();
   @override
   Future<Either<Failure, Message>> sendTemplateMessage({required int conversationId, required String templateName, required String category, required String language, required String content, Map<String, dynamic>? processedParams}) async => throw UnimplementedError();
   @override
@@ -114,6 +114,9 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, void>> unmuteConversation(int conversationId) async => const Right(null);
   @override
   Future<Either<Failure, void>> markAsRead(int conversationId) async => const Right(null);
+
+  @override
+  void clearCache() {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
