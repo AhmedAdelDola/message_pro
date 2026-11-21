@@ -168,25 +168,30 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   Future<void> loadFilterOptions() async {
     if (isClosed) return;
-    if (state.inboxes.isEmpty) {
-      emit(state.copyWith(isLoadingFilters: true));
-    }
-    final res = await repo.fetchFilterOptions();
-    if (isClosed) return;
-    res.fold(
-      (_) {
-        if (!isClosed) emit(state.copyWith(isLoadingFilters: false));
-      },
-      (options) {
-        if (!isClosed) {
-          emit(state.copyWith(
-            filterOptions: options,
-            isLoadingFilters: false,
-            inboxes: options.inboxes.isNotEmpty ? options.inboxes : state.inboxes,
-            teams: options.teams.isNotEmpty ? options.teams : state.teams,
-            agents: options.agents.isNotEmpty ? options.agents : state.agents,
-          ));
+    await PerformanceService.traceAsync(
+      'load_filter_options',
+      () async {
+        if (state.inboxes.isEmpty) {
+          emit(state.copyWith(isLoadingFilters: true));
         }
+        final res = await repo.fetchFilterOptions();
+        if (isClosed) return;
+        res.fold(
+          (_) {
+            if (!isClosed) emit(state.copyWith(isLoadingFilters: false));
+          },
+          (options) {
+            if (!isClosed) {
+              emit(state.copyWith(
+                filterOptions: options,
+                isLoadingFilters: false,
+                inboxes: options.inboxes.isNotEmpty ? options.inboxes : state.inboxes,
+                teams: options.teams.isNotEmpty ? options.teams : state.teams,
+                agents: options.agents.isNotEmpty ? options.agents : state.agents,
+              ));
+            }
+          },
+        );
       },
     );
   }
@@ -202,35 +207,48 @@ class ConversationCubit extends Cubit<ConversationState> {
       emit(state.copyWith(isLoading: !hasExistingData));
     }
 
-    final result = await repo.getConversations(
-      status: state.status,
-      assigneeType: state.assigneeType,
-      inboxId: state.selectedInboxId,
-      teamId: state.selectedTeamId,
-      label: state.selectedLabel,
-      assigneeId: state.selectedAssigneeId,
-      assigneeAgentBotId: state.selectedAssigneeAgentBotId,
-      page: 1,
-    );
+    await PerformanceService.traceAsync(
+      'load_conversations',
+      () async {
+        final result = await repo.getConversations(
+          status: state.status,
+          assigneeType: state.assigneeType,
+          inboxId: state.selectedInboxId,
+          teamId: state.selectedTeamId,
+          label: state.selectedLabel,
+          assigneeId: state.selectedAssigneeId,
+          assigneeAgentBotId: state.selectedAssigneeAgentBotId,
+          page: 1,
+        );
 
-    if (isClosed) return;
+        if (isClosed) return;
 
-    result.fold(
-      (failure) {
-        if (!isClosed) emit(state.copyWith(isLoading: false, errorMessage: failure.message));
+        result.fold(
+          (failure) {
+            if (!isClosed) emit(state.copyWith(isLoading: false, errorMessage: failure.message));
+          },
+          (list) {
+            if (!isClosed) {
+              emit(state.copyWith(
+                conversations: list,
+                isLoading: false,
+                errorMessage: null,
+                page: 1,
+                hasMore: list.isNotEmpty,
+              ));
+              // Preload messages for top 3 active conversations in background
+              _prefetchTopConversations(list);
+            }
+          },
+        );
       },
-      (list) {
-        if (!isClosed) {
-          emit(state.copyWith(
-            conversations: list,
-            isLoading: false,
-            errorMessage: null,
-            page: 1,
-            hasMore: list.isNotEmpty,
-          ));
-          // Preload messages for top 3 active conversations in background
-          _prefetchTopConversations(list);
-        }
+      attributes: {
+        'status': state.status,
+        'assignee_type': state.assigneeType,
+        'refresh': refresh.toString(),
+      },
+      onResult: (trace, _) {
+        trace.setMetric('conversation_count', state.conversations.length);
       },
     );
   }
@@ -250,47 +268,58 @@ class ConversationCubit extends Cubit<ConversationState> {
     emit(state.copyWith(isLoadingMore: true));
     final nextPage = state.page + 1;
 
-    final result = await repo.getConversations(
-      status: state.status,
-      assigneeType: state.assigneeType,
-      inboxId: state.selectedInboxId,
-      teamId: state.selectedTeamId,
-      label: state.selectedLabel,
-      assigneeId: state.selectedAssigneeId,
-      assigneeAgentBotId: state.selectedAssigneeAgentBotId,
-      page: nextPage,
-    );
-
-    if (isClosed) return;
-
-    result.fold(
-      (failure) => emit(state.copyWith(isLoadingMore: false)),
-      (list) {
-        if (list.isEmpty) {
-          emit(state.copyWith(
-            isLoadingMore: false,
-            hasMore: false,
-          ));
-          return;
-        }
-
-        final existingIds = state.conversations.map((c) => c.id).toSet();
-        final newItems = list.where((c) => !existingIds.contains(c.id)).toList();
-
-        if (newItems.isEmpty) {
-          emit(state.copyWith(
-            isLoadingMore: false,
-            hasMore: false,
-          ));
-          return;
-        }
-
-        emit(state.copyWith(
-          conversations: [...state.conversations, ...newItems],
-          isLoadingMore: false,
+    await PerformanceService.traceAsync(
+      'load_more_conversations',
+      () async {
+        final result = await repo.getConversations(
+          status: state.status,
+          assigneeType: state.assigneeType,
+          inboxId: state.selectedInboxId,
+          teamId: state.selectedTeamId,
+          label: state.selectedLabel,
+          assigneeId: state.selectedAssigneeId,
+          assigneeAgentBotId: state.selectedAssigneeAgentBotId,
           page: nextPage,
-          hasMore: list.length >= 15,
-        ));
+        );
+
+        if (isClosed) return;
+
+        result.fold(
+          (failure) => emit(state.copyWith(isLoadingMore: false)),
+          (list) {
+            if (list.isEmpty) {
+              emit(state.copyWith(
+                isLoadingMore: false,
+                hasMore: false,
+              ));
+              return;
+            }
+
+            final existingIds = state.conversations.map((c) => c.id).toSet();
+            final newItems = list.where((c) => !existingIds.contains(c.id)).toList();
+
+            if (newItems.isEmpty) {
+              emit(state.copyWith(
+                isLoadingMore: false,
+                hasMore: false,
+              ));
+              return;
+            }
+
+            emit(state.copyWith(
+              conversations: [...state.conversations, ...newItems],
+              isLoadingMore: false,
+              page: nextPage,
+              hasMore: list.length >= 15,
+            ));
+          },
+        );
+      },
+      attributes: {
+        'page': nextPage.toString(),
+      },
+      onResult: (trace, _) {
+        trace.setMetric('loaded_count', state.conversations.length);
       },
     );
   }

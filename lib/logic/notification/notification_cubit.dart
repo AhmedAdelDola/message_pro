@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/services/performance_service.dart';
 import '../../data/repositories/notification_repository.dart';
 import 'notification_state.dart';
 
@@ -16,10 +17,18 @@ class NotificationCubit extends Cubit<NotificationState> {
 
   Future<void> loadNotifications() async {
     emit(state.copyWith(isLoading: true));
-    final result = await repo.getNotifications();
-    result.fold(
-      (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
-      (list) => emit(state.copyWith(notifications: list, isLoading: false, errorMessage: null)),
+    await PerformanceService.traceAsync(
+      'load_notifications',
+      () async {
+        final result = await repo.getNotifications();
+        result.fold(
+          (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
+          (list) => emit(state.copyWith(notifications: list, isLoading: false, errorMessage: null)),
+        );
+      },
+      onResult: (trace, _) {
+        trace.setMetric('notifications_count', state.notifications.length);
+      },
     );
   }
 

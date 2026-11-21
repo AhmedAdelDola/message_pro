@@ -326,7 +326,7 @@ void main() {
     });
   });
 
-Widget _wrap(Widget child) {
+Widget testWrap(Widget child) {
   return ScreenUtilInit(
     designSize: const Size(390, 844),
     minTextAdapt: true,
@@ -354,7 +354,7 @@ Widget _wrap(Widget child) {
       bool didTapReactions = false;
 
       await tester.pumpWidget(
-        _wrap(
+        testWrap(
           MessageBubble(
             message: msg,
             onViewReactions: (_) => didTapReactions = true,
@@ -385,7 +385,7 @@ Widget _wrap(Widget child) {
       );
 
       await tester.pumpWidget(
-        _wrap(
+        testWrap(
           MessageBubble(
             message: msg,
           ),
@@ -408,7 +408,7 @@ Widget _wrap(Widget child) {
       String? selectedEmoji;
 
       await tester.pumpWidget(
-        _wrap(
+        testWrap(
           MessageBubble(
             message: msg,
             onReact: (_, emoji) => selectedEmoji = emoji,
@@ -460,7 +460,7 @@ Widget _wrap(Widget child) {
       bool editTriggered = false;
 
       await tester.pumpWidget(
-        _wrap(
+        testWrap(
           MessageBubble(
             message: msg,
             currentUser: user,

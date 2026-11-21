@@ -81,21 +81,109 @@ class PerformanceService {
     Future<T> Function() block, {
     Map<String, String>? attributes,
     Map<String, int>? metrics,
+    void Function(Trace trace, T result)? onResult,
   }) async {
-    final trace = await startTrace(traceName, attributes: attributes);
+    if (Firebase.apps.isEmpty) {
+      return await block();
+    }
+    if (!_isInitialized) await initialize();
+    Trace? trace;
+    try {
+      trace = _perf?.newTrace(traceName);
+      if (trace != null) {
+        if (attributes != null) {
+          attributes.forEach((key, value) {
+            trace!.putAttribute(key, value);
+          });
+        }
+        await trace.start();
+      }
+    } catch (e) {
+      debugPrint('[FirebasePerformance] traceAsync start error ($traceName): $e');
+    }
+
     try {
       final result = await block();
+      if (trace != null && onResult != null) {
+        try {
+          onResult(trace, result);
+        } catch (_) {}
+      }
       return result;
     } finally {
       if (trace != null) {
-        await stopTrace(traceName, metrics: metrics);
+        try {
+          if (metrics != null) {
+            metrics.forEach((metricName, value) {
+              trace!.setMetric(metricName, value);
+            });
+          }
+          await trace.stop();
+        } catch (e) {
+          debugPrint('[FirebasePerformance] traceAsync stop error ($traceName): $e');
+        }
       }
     }
+  }
+
+  /// Start a dedicated isolated TraceSession for lifecycle-bound metrics.
+  static Future<TraceSession> startSession(
+    String traceName, {
+    Map<String, String>? attributes,
+  }) async {
+    if (Firebase.apps.isEmpty) return TraceSession(traceName, null);
+    if (!_isInitialized) await initialize();
+    try {
+      final trace = _perf?.newTrace(traceName);
+      if (trace != null) {
+        if (attributes != null) {
+          attributes.forEach((k, v) => trace.putAttribute(k, v));
+        }
+        await trace.start();
+        return TraceSession(traceName, trace);
+      }
+    } catch (e) {
+      debugPrint('[FirebasePerformance] Error starting session $traceName: $e');
+    }
+    return TraceSession(traceName, null);
   }
 
   /// Create a Dio interceptor that instruments all HTTP requests with Firebase HttpMetric.
   static Interceptor createDioInterceptor() {
     return _DioFirebasePerformanceInterceptor();
+  }
+}
+
+/// A dedicated session object representing an in-flight custom trace.
+class TraceSession {
+  final String name;
+  final Trace? _trace;
+
+  TraceSession(this.name, this._trace);
+
+  void putAttribute(String key, String value) {
+    try {
+      _trace?.putAttribute(key, value);
+    } catch (_) {}
+  }
+
+  void setMetric(String metricName, int value) {
+    try {
+      _trace?.setMetric(metricName, value);
+    } catch (_) {}
+  }
+
+  Future<void> stop({Map<String, int>? metrics}) async {
+    if (_trace == null) return;
+    try {
+      if (metrics != null) {
+        metrics.forEach((k, v) => _trace.setMetric(k, v));
+      }
+      await _trace.stop();
+      debugPrint('[FirebasePerformance] TraceSession stopped: $name');
+    } catch (e) {
+      debugPrint('[FirebasePerformance] TraceSession stop error ($name): $e');
+    }
   }
 }
 
@@ -171,6 +259,16 @@ class _DioFirebasePerformanceInterceptor extends Interceptor {
             }
           } catch (_) {}
         }
+
+        try {
+          final path = response.requestOptions.path;
+          if (path.isNotEmpty) {
+            final sanitized = path.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+            metric.putAttribute('endpoint', sanitized.length > 95 ? sanitized.substring(0, 95) : sanitized);
+          }
+          final statusStr = response.statusCode?.toString() ?? 'unknown';
+          metric.putAttribute('status_code', statusStr);
+        } catch (_) {}
 
         await metric.stop();
       }

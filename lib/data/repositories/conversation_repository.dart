@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import '../../core/config/app_config.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/performance_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
@@ -156,60 +157,75 @@ class ConversationRepository implements IConversationRepository {
     int? assigneeAgentBotId,
     int page = 1,
   }) async {
-    try {
-      final params = <String, dynamic>{
-        'status': status,
-        'page': page,
-        'sort_by': 'last_activity_at_desc',
-      };
+    return PerformanceService.traceAsync<Either<Failure, List<Conversation>>>(
+      'server_fetch_conversations',
+      () async {
+        try {
+          final params = <String, dynamic>{
+            'status': status,
+            'page': page,
+            'sort_by': 'last_activity_at_desc',
+          };
 
-      if (assigneeType.isNotEmpty && assigneeType != 'all') {
-        params['assignee_type'] = assigneeType;
-      }
-
-      if (inboxId != null) params['inbox_id'] = inboxId;
-      if (teamId != null) params['team_id'] = teamId;
-      if (label != null) params['labels[]'] = label;
-      if (assigneeId != null) params['assignee_id'] = assigneeId;
-      if (assigneeAgentBotId != null) params['assignee_agent_bot_id'] = assigneeAgentBotId;
-
-      final response = await _api.get('conversations', queryParameters: params);
-      final data = response.data;
-
-      List list = [];
-      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
-        list = data['data']['payload'];
-      } else if (data is Map && data['payload'] != null) {
-        list = data['payload'];
-      } else if (data is Map && data['data'] is List) {
-        list = data['data'];
-      } else if (data is List) {
-        list = data;
-      }
-
-      final activeAccId = await _storage.getActiveAccountId();
-      final conversations = <Conversation>[];
-      for (final item in list) {
-        if (item is Map) {
-          try {
-            final conv = Conversation.fromJson(Map<String, dynamic>.from(item));
-            if (conv.id > 0) {
-              if (activeAccId != null && activeAccId > 0 && conv.accountId > 0 && conv.accountId != activeAccId) {
-                continue; // Skip conversation belonging to another workspace!
-              }
-              conversations.add(conv);
-            }
-          } catch (e, stack) {
-            debugPrint('Error parsing conversation: $e\n$stack');
+          if (assigneeType.isNotEmpty && assigneeType != 'all') {
+            params['assignee_type'] = assigneeType;
           }
+
+          if (inboxId != null) params['inbox_id'] = inboxId;
+          if (teamId != null) params['team_id'] = teamId;
+          if (label != null) params['labels[]'] = label;
+          if (assigneeId != null) params['assignee_id'] = assigneeId;
+          if (assigneeAgentBotId != null) params['assignee_agent_bot_id'] = assigneeAgentBotId;
+
+          final response = await _api.get('conversations', queryParameters: params);
+          final data = response.data;
+
+          List list = [];
+          if (data is Map && data['data'] != null && data['data']['payload'] != null) {
+            list = data['data']['payload'];
+          } else if (data is Map && data['payload'] != null) {
+            list = data['payload'];
+          } else if (data is Map && data['data'] is List) {
+            list = data['data'];
+          } else if (data is List) {
+            list = data;
+          }
+
+          final activeAccId = await _storage.getActiveAccountId();
+          final conversations = <Conversation>[];
+          for (final item in list) {
+            if (item is Map) {
+              try {
+                final conv = Conversation.fromJson(Map<String, dynamic>.from(item));
+                if (conv.id > 0) {
+                  if (activeAccId != null && activeAccId > 0 && conv.accountId > 0 && conv.accountId != activeAccId) {
+                    continue; // Skip conversation belonging to another workspace!
+                  }
+                  conversations.add(conv);
+                }
+              } catch (e, stack) {
+                debugPrint('Error parsing conversation: $e\n$stack');
+              }
+            }
+          }
+          return Right(conversations);
+        } on DioException catch (e) {
+          return Left(ServerFailure(e.message ?? 'فشل في تحميل المحادثات'));
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
         }
-      }
-      return Right(conversations);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في تحميل المحادثات'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
+      },
+      attributes: {
+        'page': page.toString(),
+        'status': status,
+      },
+      onResult: (trace, either) {
+        either.fold(
+          (_) {},
+          (convs) => trace.setMetric('items_received', convs.length),
+        );
+      },
+    );
   }
 
   @override
@@ -281,53 +297,67 @@ class ConversationRepository implements IConversationRepository {
 
   @override
   Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId}) async {
-    try {
-      final params = <String, dynamic>{};
-      if (beforeId != null) {
-        params['before'] = beforeId;
-      }
-      if (afterId != null) {
-        params['after'] = afterId;
-      }
-
-      final response = await _api.get(
-        'conversations/$conversationId/messages',
-        queryParameters: params.isNotEmpty ? params : null,
-      );
-      final data = response.data;
-
-      List list = [];
-      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
-        list = data['data']['payload'];
-      } else if (data is Map && data['payload'] != null) {
-        list = data['payload'];
-      } else if (data is Map && data['data'] is List) {
-        list = data['data'];
-      } else if (data is List) {
-        list = data;
-      }
-
-      final messages = <Message>[];
-      for (final item in list) {
-        if (item is Map) {
-          try {
-            messages.add(Message.fromJson(Map<String, dynamic>.from(item)));
-          } catch (e) {
-            // Skip corrupted message
+    return PerformanceService.traceAsync<Either<Failure, List<Message>>>(
+      'server_fetch_messages',
+      () async {
+        try {
+          final params = <String, dynamic>{};
+          if (beforeId != null) {
+            params['before'] = beforeId;
           }
+          if (afterId != null) {
+            params['after'] = afterId;
+          }
+
+          final response = await _api.get(
+            'conversations/$conversationId/messages',
+            queryParameters: params.isNotEmpty ? params : null,
+          );
+          final data = response.data;
+
+          List list = [];
+          if (data is Map && data['data'] != null && data['data']['payload'] != null) {
+            list = data['data']['payload'];
+          } else if (data is Map && data['payload'] != null) {
+            list = data['payload'];
+          } else if (data is Map && data['data'] is List) {
+            list = data['data'];
+          } else if (data is List) {
+            list = data;
+          }
+
+          final messages = <Message>[];
+          for (final item in list) {
+            if (item is Map) {
+              try {
+                messages.add(Message.fromJson(Map<String, dynamic>.from(item)));
+              } catch (e) {
+                // Skip corrupted message
+              }
+            }
+          }
+
+          if (beforeId == null && afterId == null && messages.isNotEmpty) {
+            _cachedMessages[conversationId] = List.from(messages);
+          }
+
+          return Right(messages);
+        } on DioException catch (e) {
+          return Left(ServerFailure(e.message ?? 'فشل في تحميل الرسائل'));
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
         }
-      }
-
-      if (beforeId == null && afterId == null && messages.isNotEmpty) {
-        _cachedMessages[conversationId] = List.from(messages);
-      }
-
-      return Right(messages);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في تحميل الرسائل'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
+      },
+      attributes: {
+        'conversation_id': conversationId.toString(),
+      },
+      onResult: (trace, either) {
+        either.fold(
+          (_) {},
+          (msgs) => trace.setMetric('messages_received', msgs.length),
+        );
+      },
+    );
   }
 
   @override
@@ -1635,32 +1665,37 @@ class ConversationRepository implements IConversationRepository {
         return Right(_cachedFilterOptions!);
       }
     }
-    try {
-      final response = await _api.get('conversations/filter_options');
-      final data = response.data;
-      Map<String, dynamic>? jsonMap;
-      if (data is Map) {
-        if (data['payload'] is Map) {
-          jsonMap = Map<String, dynamic>.from(data['payload']);
-        } else if (data['data'] is Map) {
-          jsonMap = Map<String, dynamic>.from(data['data']);
-        } else {
-          jsonMap = Map<String, dynamic>.from(data);
+    return PerformanceService.traceAsync<Either<Failure, ConversationFilterOptions>>(
+      'server_fetch_filter_options',
+      () async {
+        try {
+          final response = await _api.get('conversations/filter_options');
+          final data = response.data;
+          Map<String, dynamic>? jsonMap;
+          if (data is Map) {
+            if (data['payload'] is Map) {
+              jsonMap = Map<String, dynamic>.from(data['payload']);
+            } else if (data['data'] is Map) {
+              jsonMap = Map<String, dynamic>.from(data['data']);
+            } else {
+              jsonMap = Map<String, dynamic>.from(data);
+            }
+          }
+          if (jsonMap != null) {
+            final parsed = ConversationFilterOptions.fromJson(jsonMap);
+            _cachedFilterOptions = parsed;
+            _cachedFilterOptionsTime = DateTime.now();
+            return Right(parsed);
+          }
+          return const Right(ConversationFilterOptions());
+        } on DioException catch (e) {
+          if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
+          return Left(ServerFailure(e.message ?? 'فشل في تحميل خيارات الفلاتر'));
+        } catch (e) {
+          if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
+          return Left(ServerFailure(e.toString()));
         }
-      }
-      if (jsonMap != null) {
-        final parsed = ConversationFilterOptions.fromJson(jsonMap);
-        _cachedFilterOptions = parsed;
-        _cachedFilterOptionsTime = DateTime.now();
-        return Right(parsed);
-      }
-      return const Right(ConversationFilterOptions());
-    } on DioException catch (e) {
-      if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
-      return Left(ServerFailure(e.message ?? 'فشل في تحميل خيارات الفلاتر'));
-    } catch (e) {
-      if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
-      return Left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 }

@@ -166,43 +166,54 @@ class ChatCubit extends Cubit<ChatState> {
     if (!hasCached) {
       emit(state.copyWith(isLoading: true, hasMoreMessages: true, errorMessage: null));
     }
-    final result = await repo.getMessages(conversationId);
-    result.fold(
-      (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
-      (list) {
-        final sorted = List<Message>.from(list)
-          ..sort((a, b) {
-            final cmp = a.createdAt.compareTo(b.createdAt);
-            if (cmp != 0) return cmp;
-            return a.id.compareTo(b.id);
-          });
+    await PerformanceService.traceAsync(
+      'load_chat_messages',
+      () async {
+        final result = await repo.getMessages(conversationId);
+        result.fold(
+          (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
+          (list) {
+            final sorted = List<Message>.from(list)
+              ..sort((a, b) {
+                final cmp = a.createdAt.compareTo(b.createdAt);
+                if (cmp != 0) return cmp;
+                return a.id.compareTo(b.id);
+              });
 
-        // Resolve seen statuses for outgoing messages based on contact activity
-        DateTime? effectiveSeen = contactLastSeenAt;
-        for (final m in sorted) {
-          if (!m.isOutgoing && !m.isPrivateNote && !m.isActivity) {
-            if (effectiveSeen == null || m.createdAt.isAfter(effectiveSeen)) {
-              effectiveSeen = m.createdAt;
+            // Resolve seen statuses for outgoing messages based on contact activity
+            DateTime? effectiveSeen = contactLastSeenAt;
+            for (final m in sorted) {
+              if (!m.isOutgoing && !m.isPrivateNote && !m.isActivity) {
+                if (effectiveSeen == null || m.createdAt.isAfter(effectiveSeen)) {
+                  effectiveSeen = m.createdAt;
+                }
+              }
             }
-          }
-        }
 
-        final resolved = sorted.map((m) {
-          if (m.isOutgoing && !m.isFailed && !m.isPrivateNote) {
-            if (effectiveSeen != null &&
-                (m.createdAt.isBefore(effectiveSeen) || m.createdAt.isAtSameMomentAs(effectiveSeen))) {
-              return m.copyWith(status: 'read');
-            }
-          }
-          return m;
-        }).toList();
+            final resolved = sorted.map((m) {
+              if (m.isOutgoing && !m.isFailed && !m.isPrivateNote) {
+                if (effectiveSeen != null &&
+                    (m.createdAt.isBefore(effectiveSeen) || m.createdAt.isAtSameMomentAs(effectiveSeen))) {
+                  return m.copyWith(status: 'read');
+                }
+              }
+              return m;
+            }).toList();
 
-        emit(state.copyWith(
-          messages: resolved,
-          isLoading: false,
-          errorMessage: null,
-          hasMoreMessages: list.isNotEmpty,
-        ));
+            emit(state.copyWith(
+              messages: resolved,
+              isLoading: false,
+              errorMessage: null,
+              hasMoreMessages: list.isNotEmpty,
+            ));
+          },
+        );
+      },
+      attributes: {
+        'conversation_id': conversationId.toString(),
+      },
+      onResult: (trace, _) {
+        trace.setMetric('messages_count', state.messages.length);
       },
     );
   }
@@ -218,41 +229,53 @@ class ChatCubit extends Cubit<ChatState> {
 
     emit(state.copyWith(isLoadingOlder: true));
 
-    final result = await repo.getMessages(conversationId, beforeId: oldestMessageId);
-    result.fold(
-      (failure) => emit(state.copyWith(isLoadingOlder: false)),
-      (olderList) {
-        if (olderList.isEmpty) {
-          emit(state.copyWith(
-            isLoadingOlder: false,
-            hasMoreMessages: false,
-          ));
-          return;
-        }
+    await PerformanceService.traceAsync(
+      'load_previous_chat_messages',
+      () async {
+        final result = await repo.getMessages(conversationId, beforeId: oldestMessageId);
+        result.fold(
+          (failure) => emit(state.copyWith(isLoadingOlder: false)),
+          (olderList) {
+            if (olderList.isEmpty) {
+              emit(state.copyWith(
+                isLoadingOlder: false,
+                hasMoreMessages: false,
+              ));
+              return;
+            }
 
-        final existingIds = state.messages.map((m) => m.id).toSet();
-        final filteredOlder = olderList.where((m) => !existingIds.contains(m.id)).toList();
+            final existingIds = state.messages.map((m) => m.id).toSet();
+            final filteredOlder = olderList.where((m) => !existingIds.contains(m.id)).toList();
 
-        if (filteredOlder.isEmpty) {
-          emit(state.copyWith(
-            isLoadingOlder: false,
-            hasMoreMessages: false,
-          ));
-          return;
-        }
+            if (filteredOlder.isEmpty) {
+              emit(state.copyWith(
+                isLoadingOlder: false,
+                hasMoreMessages: false,
+              ));
+              return;
+            }
 
-        final combined = [...filteredOlder, ...state.messages]
-          ..sort((a, b) {
-            final cmp = a.createdAt.compareTo(b.createdAt);
-            if (cmp != 0) return cmp;
-            return a.id.compareTo(b.id);
-          });
+            final combined = [...filteredOlder, ...state.messages]
+              ..sort((a, b) {
+                final cmp = a.createdAt.compareTo(b.createdAt);
+                if (cmp != 0) return cmp;
+                return a.id.compareTo(b.id);
+              });
 
-        emit(state.copyWith(
-          messages: combined,
-          isLoadingOlder: false,
-          hasMoreMessages: olderList.length >= 15,
-        ));
+            emit(state.copyWith(
+              messages: combined,
+              isLoadingOlder: false,
+              hasMoreMessages: olderList.length >= 15,
+            ));
+          },
+        );
+      },
+      attributes: {
+        'conversation_id': conversationId.toString(),
+        'before_id': oldestMessageId.toString(),
+      },
+      onResult: (trace, _) {
+        trace.setMetric('messages_count', state.messages.length);
       },
     );
   }
