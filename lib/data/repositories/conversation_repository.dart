@@ -1,151 +1,182 @@
-import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
-import 'package:dio/dio.dart';
-import '../../core/config/app_config.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
-import '../../core/services/performance_service.dart';
-import '../../core/storage/secure_storage_service.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../models/contact.dart';
 import '../models/user.dart';
 import '../models/message_template.dart';
-import '../models/message_template_registry.dart';
 import '../models/conversation_filter_options.dart';
+import 'interfaces/i_conversation_operations.dart';
+import 'interfaces/i_message_operations.dart';
+import 'interfaces/i_metadata_operations.dart';
+import 'interfaces/i_collaborator_operations.dart';
+import 'services/conversation_operations_service.dart';
+import 'services/message_operations_service.dart';
+import 'services/metadata_operations_service.dart';
+import 'services/collaborator_operations_service.dart';
 
-abstract class IConversationRepository {
-  Future<Either<Failure, List<Conversation>>> getConversations({
-    String status = 'open',
-    String assigneeType = 'me',
-    int? inboxId,
-    int? teamId,
-    String? label,
-    int? assigneeId,
-    int? assigneeAgentBotId,
-    int page = 1,
-  });
-  Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1});
-  Future<Either<Failure, Conversation>> getConversation(int conversationId);
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId});
-  Future<Either<Failure, Message>> sendMessage({
-    required int conversationId,
-    required String content,
-    bool isPrivate = false,
-    List<String>? attachmentPaths,
-    int? inReplyToId,
-    String? echoId,
-  });
-  Future<Either<Failure, Message>> editMessage({
-    required int conversationId,
-    required int messageId,
-    required String content,
-  });
-  Future<Either<Failure, Message>> sendReaction({
-    required int conversationId,
-    required int messageId,
-    required String emoji,
-  });
-  Future<Either<Failure, List<ReactionParticipant>>> getReactions({
-    required int conversationId,
-    required int messageId,
-    Map<String, dynamic>? contentAttributes,
-  });
-  Future<Either<Failure, Message>> sendTemplateMessage({
-    required int conversationId,
-    required String templateName,
-    required String category,
-    required String language,
-    required String content,
-    Map<String, dynamic>? processedParams,
-  });
-  Future<Either<Failure, List<MessageTemplate>>> fetchInboxTemplates(int inboxId);
-  Future<Either<Failure, List<MessageTemplate>>> fetchConversationTemplates(int conversationId);
-  Future<Either<Failure, Message>> sendBrowserWhatsAppList({
-    required int conversationId,
-    required String templateId,
-    required Map<String, dynamic> variables,
-  });
-  Future<Either<Failure, Contact>> getCollaborators(int conversationId);
-  Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId);
-  Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId);
-  Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId);
-  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber});
-  Future<Either<Failure, Conversation>> startNewConversation({
-    required int contactId,
-    required int inboxId,
-    required String sourceId,
-    String? message,
-  });
-  Future<Either<Failure, Conversation>> startDirectChat({
-    required String phoneNumber,
-    required int inboxId,
-    required String sourceId,
-    String? contactName,
-  });
-  Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil});
-  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType});
-  Future<Either<Failure, void>> pinConversation(int conversationId);
-  Future<Either<Failure, void>> unpinConversation(int conversationId);
-  Future<Either<Failure, void>> assignTeam(int conversationId, int? teamId);
-  Future<Either<Failure, void>> updateLabels(int conversationId, List<String> labels);
-  Future<Either<Failure, void>> updateLifecycleStage(int conversationId, int stageId);
-  Future<Either<Failure, void>> updateConversationCustomAttributes(int conversationId, Map<String, dynamic> customAttributes);
-  Future<Either<Failure, void>> muteConversation(int conversationId);
-  Future<Either<Failure, void>> unmuteConversation(int conversationId);
-  Future<Either<Failure, void>> markAsRead(int conversationId);
-  Future<Either<Failure, List<Inbox>>> fetchInboxes();
-  Future<Either<Failure, List<Label>>> fetchLabels();
-  Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages();
-  Future<Either<Failure, List<Team>>> fetchTeams();
-  Future<Either<Failure, List<User>>> fetchAgents();
-  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds});
-  Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses();
-  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions();
-  List<Message>? getCachedMessages(int conversationId) => null;
-  void clearCache() {}
-}
+export 'interfaces/i_conversation_operations.dart';
+export 'interfaces/i_message_operations.dart';
+export 'interfaces/i_metadata_operations.dart';
+export 'interfaces/i_collaborator_operations.dart';
 
+/// Unified interface implementing segregated operations for ISP (Interface Segregation Principle) compliance.
+abstract class IConversationRepository implements
+    IConversationOperations,
+    IMessageOperations,
+    IMetadataOperations,
+    ICollaboratorOperations {}
+
+/// Composite repository adhering to Composition Over Inheritance.
+/// Delegates operations to focused, single-responsibility services.
 class ConversationRepository implements IConversationRepository {
-  final ApiClient _api;
-  final SecureStorageService _storage = SecureStorageService();
+  final IConversationOperations _conversationOps;
+  final IMessageOperations _messageOps;
+  final IMetadataOperations _metadataOps;
+  final ICollaboratorOperations _collaboratorOps;
 
-  // In-memory performance cache for instant UI rendering (Zero Perceived Latency)
-  final Map<int, List<Message>> _cachedMessages = {};
-  List<Inbox>? _cachedInboxes;
-  DateTime? _cachedInboxesTime;
+  ConversationRepository({
+    ApiClient? api,
+    IConversationOperations? conversationOps,
+    IMessageOperations? messageOps,
+    IMetadataOperations? metadataOps,
+    ICollaboratorOperations? collaboratorOps,
+  })  : _conversationOps = conversationOps ?? ConversationOperationsService(api: api),
+        _messageOps = messageOps ?? MessageOperationsService(api: api),
+        _metadataOps = metadataOps ?? MetadataOperationsService(api: api),
+        _collaboratorOps = collaboratorOps ?? CollaboratorOperationsService(api: api);
 
-  List<Label>? _cachedLabels;
-  DateTime? _cachedLabelsTime;
-
-  List<Team>? _cachedTeams;
-  DateTime? _cachedTeamsTime;
-
-  List<LifecycleStage>? _cachedStages;
-  DateTime? _cachedStagesTime;
-
-  ConversationFilterOptions? _cachedFilterOptions;
-  DateTime? _cachedFilterOptionsTime;
-
-  List<Map<String, String>>? _cachedCannedResponses;
-  DateTime? _cachedCannedResponsesTime;
-
-  ConversationRepository({ApiClient? api}) : _api = api ?? ApiClient();
+  // ---------------------------------------------------------------------------
+  // Message Operations Delegation
+  // ---------------------------------------------------------------------------
+  @override
+  void clearCache() => _messageOps.clearCache();
 
   @override
-  List<Message>? getCachedMessages(int conversationId) => _cachedMessages[conversationId];
+  List<Message>? getCachedMessages(int conversationId) => _messageOps.getCachedMessages(conversationId);
 
   @override
-  void clearCache() {
-    _cachedMessages.clear();
-    _cachedInboxes = null;
-    _cachedLabels = null;
-    _cachedTeams = null;
-    _cachedStages = null;
-    _cachedFilterOptions = null;
-    _cachedCannedResponses = null;
-  }
+  Future<List<Message>> getLocalCachedMessages(int conversationId) => _messageOps.getLocalCachedMessages(conversationId);
 
+  @override
+  Future<List<Conversation>> getCachedConversations(int accountId) => _conversationOps.getCachedConversations(accountId);
+
+  @override
+  Future<Either<Failure, List<Message>>> getMessages(
+    int conversationId, {
+    int? beforeId,
+    int? afterId,
+  }) =>
+      _messageOps.getMessages(conversationId, beforeId: beforeId, afterId: afterId);
+
+  @override
+  Future<Either<Failure, Message>> sendMessage({
+    required int conversationId,
+    required String content,
+    bool isPrivate = false,
+    List<String>? attachmentPaths,
+    int? inReplyToId,
+    String? echoId,
+  }) =>
+      _messageOps.sendMessage(
+        conversationId: conversationId,
+        content: content,
+        isPrivate: isPrivate,
+        attachmentPaths: attachmentPaths,
+        inReplyToId: inReplyToId,
+        echoId: echoId,
+      );
+
+  @override
+  Future<Either<Failure, Message>> sendTemplateMessage({
+    required int conversationId,
+    required String templateName,
+    required String category,
+    required String language,
+    required String content,
+    Map<String, dynamic>? processedParams,
+  }) =>
+      _messageOps.sendTemplateMessage(
+        conversationId: conversationId,
+        templateName: templateName,
+        category: category,
+        language: language,
+        content: content,
+        processedParams: processedParams,
+      );
+
+  @override
+  Future<Either<Failure, Message>> editMessage({
+    required int conversationId,
+    required int messageId,
+    required String content,
+  }) =>
+      _messageOps.editMessage(
+        conversationId: conversationId,
+        messageId: messageId,
+        content: content,
+      );
+
+  @override
+  Future<Either<Failure, Message>> deleteMessage({
+    required int conversationId,
+    required int messageId,
+    bool everyone = true,
+  }) =>
+      _messageOps.deleteMessage(
+        conversationId: conversationId,
+        messageId: messageId,
+        everyone: everyone,
+      );
+
+  @override
+  Future<Either<Failure, Message>> sendReaction({
+    required int conversationId,
+    required int messageId,
+    required String emoji,
+  }) =>
+      _messageOps.sendReaction(
+        conversationId: conversationId,
+        messageId: messageId,
+        emoji: emoji,
+      );
+
+  @override
+  Future<Either<Failure, List<ReactionParticipant>>> getReactions({
+    required int conversationId,
+    required int messageId,
+    Map<String, dynamic>? contentAttributes,
+  }) =>
+      _messageOps.getReactions(
+        conversationId: conversationId,
+        messageId: messageId,
+        contentAttributes: contentAttributes,
+      );
+
+  @override
+  Future<Either<Failure, List<MessageTemplate>>> fetchInboxTemplates(int inboxId) =>
+      _messageOps.fetchInboxTemplates(inboxId);
+
+  @override
+  Future<Either<Failure, List<MessageTemplate>>> fetchConversationTemplates(int conversationId) =>
+      _messageOps.fetchConversationTemplates(conversationId);
+
+  @override
+  Future<Either<Failure, Message>> sendBrowserWhatsAppList({
+    required int conversationId,
+    required String templateId,
+    required Map<String, dynamic> variables,
+  }) =>
+      _messageOps.sendBrowserWhatsAppList(
+        conversationId: conversationId,
+        templateId: templateId,
+        variables: variables,
+      );
+
+  // ---------------------------------------------------------------------------
+  // Conversation Operations Delegation
+  // ---------------------------------------------------------------------------
   @override
   Future<Either<Failure, List<Conversation>>> getConversations({
     String status = 'open',
@@ -156,653 +187,25 @@ class ConversationRepository implements IConversationRepository {
     int? assigneeId,
     int? assigneeAgentBotId,
     int page = 1,
-  }) async {
-    return PerformanceService.traceAsync<Either<Failure, List<Conversation>>>(
-      'server_fetch_conversations',
-      () async {
-        try {
-          final params = <String, dynamic>{
-            'status': status,
-            'page': page,
-            'sort_by': 'last_activity_at_desc',
-          };
-
-          if (assigneeType.isNotEmpty && assigneeType != 'all') {
-            params['assignee_type'] = assigneeType;
-          }
-
-          if (inboxId != null) params['inbox_id'] = inboxId;
-          if (teamId != null) params['team_id'] = teamId;
-          if (label != null) params['labels[]'] = label;
-          if (assigneeId != null) params['assignee_id'] = assigneeId;
-          if (assigneeAgentBotId != null) params['assignee_agent_bot_id'] = assigneeAgentBotId;
-
-          final response = await _api.get('conversations', queryParameters: params);
-          final data = response.data;
-
-          List list = [];
-          if (data is Map && data['data'] != null && data['data']['payload'] != null) {
-            list = data['data']['payload'];
-          } else if (data is Map && data['payload'] != null) {
-            list = data['payload'];
-          } else if (data is Map && data['data'] is List) {
-            list = data['data'];
-          } else if (data is List) {
-            list = data;
-          }
-
-          final activeAccId = await _storage.getActiveAccountId();
-          final conversations = <Conversation>[];
-          for (final item in list) {
-            if (item is Map) {
-              try {
-                final conv = Conversation.fromJson(Map<String, dynamic>.from(item));
-                if (conv.id > 0) {
-                  if (activeAccId != null && activeAccId > 0 && conv.accountId > 0 && conv.accountId != activeAccId) {
-                    continue; // Skip conversation belonging to another workspace!
-                  }
-                  conversations.add(conv);
-                }
-              } catch (e, stack) {
-                debugPrint('Error parsing conversation: $e\n$stack');
-              }
-            }
-          }
-          return Right(conversations);
-        } on DioException catch (e) {
-          return Left(ServerFailure(e.message ?? 'فشل في تحميل المحادثات'));
-        } catch (e) {
-          return Left(ServerFailure(e.toString()));
-        }
-      },
-      attributes: {
-        'page': page.toString(),
-        'status': status,
-      },
-      onResult: (trace, either) {
-        either.fold(
-          (_) {},
-          (convs) => trace.setMetric('items_received', convs.length),
-        );
-      },
-    );
-  }
-
-  @override
-  Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1}) async {
-    try {
-      final response = await _api.get('conversations/search', queryParameters: {
-        'q': query,
-        'page': page,
-      });
-      final data = response.data;
-
-      List list = [];
-      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
-        list = data['data']['payload'];
-      } else if (data is Map && data['payload'] != null) {
-        list = data['payload'];
-      } else if (data is Map && data['data'] is List) {
-        list = data['data'];
-      } else if (data is List) {
-        list = data;
-      }
-
-      final conversations = <Conversation>[];
-      for (final item in list) {
-        if (item is Map) {
-          try {
-            final conv = Conversation.fromJson(Map<String, dynamic>.from(item));
-            if (conv.id > 0) {
-              conversations.add(conv);
-            }
-          } catch (_) {
-            // Skip corrupted item
-          }
-        }
-      }
-      return Right(conversations);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في البحث عن المحادثات'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Conversation>> getConversation(int conversationId) async {
-    try {
-      final response = await _api.get('conversations/$conversationId');
-      final data = response.data;
-      Map<String, dynamic>? item;
-      if (data is Map && data['data'] != null && data['data']['payload'] != null) {
-        item = Map<String, dynamic>.from(data['data']['payload']);
-      } else if (data is Map && data['payload'] != null) {
-        item = Map<String, dynamic>.from(data['payload']);
-      } else if (data is Map && data['data'] is Map) {
-        item = Map<String, dynamic>.from(data['data']);
-      } else if (data is Map) {
-        item = Map<String, dynamic>.from(data);
-      }
-      if (item != null) {
-        return Right(Conversation.fromJson(item));
-      }
-      return const Left(ServerFailure('المحادثة غير موجودة'));
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في تحميل المحادثة'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<Message>>> getMessages(int conversationId, {int? beforeId, int? afterId}) async {
-    return PerformanceService.traceAsync<Either<Failure, List<Message>>>(
-      'server_fetch_messages',
-      () async {
-        try {
-          final params = <String, dynamic>{};
-          if (beforeId != null) {
-            params['before'] = beforeId;
-          }
-          if (afterId != null) {
-            params['after'] = afterId;
-          }
-
-          final response = await _api.get(
-            'conversations/$conversationId/messages',
-            queryParameters: params.isNotEmpty ? params : null,
-          );
-          final data = response.data;
-
-          List list = [];
-          if (data is Map && data['data'] != null && data['data']['payload'] != null) {
-            list = data['data']['payload'];
-          } else if (data is Map && data['payload'] != null) {
-            list = data['payload'];
-          } else if (data is Map && data['data'] is List) {
-            list = data['data'];
-          } else if (data is List) {
-            list = data;
-          }
-
-          final messages = <Message>[];
-          for (final item in list) {
-            if (item is Map) {
-              try {
-                messages.add(Message.fromJson(Map<String, dynamic>.from(item)));
-              } catch (e) {
-                // Skip corrupted message
-              }
-            }
-          }
-
-          if (beforeId == null && afterId == null && messages.isNotEmpty) {
-            _cachedMessages[conversationId] = List.from(messages);
-          }
-
-          return Right(messages);
-        } on DioException catch (e) {
-          return Left(ServerFailure(e.message ?? 'فشل في تحميل الرسائل'));
-        } catch (e) {
-          return Left(ServerFailure(e.toString()));
-        }
-      },
-      attributes: {
-        'conversation_id': conversationId.toString(),
-      },
-      onResult: (trace, either) {
-        either.fold(
-          (_) {},
-          (msgs) => trace.setMetric('messages_received', msgs.length),
-        );
-      },
-    );
-  }
-
-  @override
-  Future<Either<Failure, Message>> sendMessage({
-    required int conversationId,
-    required String content,
-    bool isPrivate = false,
-    List<String>? attachmentPaths,
-    int? inReplyToId,
-    String? echoId,
-  }) async {
-    try {
-      dynamic postData;
-      if (attachmentPaths != null && attachmentPaths.isNotEmpty) {
-        final formData = FormData();
-        formData.fields.add(MapEntry('content', content));
-        formData.fields.add(const MapEntry('message_type', 'outgoing'));
-        formData.fields.add(MapEntry('private', isPrivate.toString()));
-        if (echoId != null) {
-          formData.fields.add(MapEntry('echo_id', echoId));
-        }
-        if (inReplyToId != null) {
-          formData.fields.add(MapEntry('content_attributes[in_reply_to]', inReplyToId.toString()));
-        }
-        final pathsToSend = attachmentPaths.take(5);
-        for (final path in pathsToSend) {
-          final fileName = path.split(RegExp(r'[\\/]')).last;
-          formData.files.add(MapEntry(
-            'attachments[]',
-            await MultipartFile.fromFile(path, filename: fileName),
-          ));
-        }
-        postData = formData;
-      } else {
-        postData = {
-          'content': content,
-          'message_type': 'outgoing',
-          'private': isPrivate,
-          if (echoId != null) 'echo_id': echoId,
-          if (inReplyToId != null)
-            'content_attributes': {
-              'in_reply_to': inReplyToId,
-            },
-        };
-      }
-
-      final response = await _api.post(
-        'conversations/$conversationId/messages',
-        data: postData,
+  }) =>
+      _conversationOps.getConversations(
+        status: status,
+        assigneeType: assigneeType,
+        inboxId: inboxId,
+        teamId: teamId,
+        label: label,
+        assigneeId: assigneeId,
+        assigneeAgentBotId: assigneeAgentBotId,
+        page: page,
       );
 
-      final resData = response.data;
-      final msgMap = (resData is Map && resData['data'] is Map)
-          ? resData['data']
-          : (resData is Map ? resData : <String, dynamic>{});
-      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
-      return Right(message);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في إرسال الرسالة'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  @override
+  Future<Either<Failure, List<Conversation>>> searchConversations(String query, {int page = 1}) =>
+      _conversationOps.searchConversations(query, page: page);
 
   @override
-  Future<Either<Failure, Message>> sendTemplateMessage({
-    required int conversationId,
-    required String templateName,
-    required String category,
-    required String language,
-    required String content,
-    Map<String, dynamic>? processedParams,
-  }) async {
-    try {
-      final postData = {
-        'content': content,
-        'message_type': 'outgoing',
-        'private': false,
-        'echo_id': 'flutter-template-${DateTime.now().millisecondsSinceEpoch}',
-        'template_params': {
-          'name': templateName,
-          'category': category,
-          'language': language,
-          'processed_params': processedParams ?? {},
-        },
-      };
-
-      final response = await _api.post(
-        'conversations/$conversationId/messages',
-        data: postData,
-      );
-
-      final resData = response.data;
-      final msgMap = (resData is Map && resData['data'] is Map)
-          ? resData['data']
-          : (resData is Map ? resData : <String, dynamic>{});
-      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
-      return Right(message);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في إرسال رسالة القالب'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Message>> editMessage({
-    required int conversationId,
-    required int messageId,
-    required String content,
-  }) async {
-    try {
-      final response = await _api.patch(
-        'conversations/$conversationId/messages/$messageId',
-        data: {'content': content},
-      );
-      final resData = response.data;
-      final msgMap = (resData is Map && resData['data'] is Map)
-          ? resData['data']
-          : (resData is Map ? resData : <String, dynamic>{});
-      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
-      return Right(message);
-    } on DioException catch (e) {
-      final res = e.response?.data;
-      final serverMsg = res is Map
-          ? (res['message'] ?? res['error'])?.toString()
-          : null;
-      return Left(ServerFailure(serverMsg ?? e.message ?? 'فشل في تعديل الرسالة'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Message>> sendReaction({
-    required int conversationId,
-    required int messageId,
-    required String emoji,
-  }) async {
-    try {
-      final response = await _api.put(
-        'conversations/$conversationId/messages/$messageId/reaction',
-        data: {'emoji': emoji},
-      );
-      final resData = response.data;
-      final msgMap = (resData is Map && resData['data'] is Map)
-          ? resData['data']
-          : (resData is Map ? resData : <String, dynamic>{});
-      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
-      return Right(message);
-    } on DioException catch (e) {
-      final res = e.response?.data;
-      final serverMsg = res is Map
-          ? (res['message'] ?? res['error'])?.toString()
-          : null;
-      return Left(ServerFailure(serverMsg ?? e.message ?? 'فشل في إضافة التفاعل'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<ReactionParticipant>>> getReactions({
-    required int conversationId,
-    required int messageId,
-    Map<String, dynamic>? contentAttributes,
-  }) async {
-    try {
-      final response = await _api.get(
-        'conversations/$conversationId/messages/$messageId/reactions',
-      );
-      final data = response.data;
-      final rawParticipants = data is Map ? (data['participants'] ?? data['data']) : data;
-
-      final actorToEmoji = <String, String>{};
-      final rawReactions = contentAttributes?['reactions'] ?? (data is Map ? data['reactions'] : null);
-      if (rawReactions is List) {
-        for (final r in rawReactions) {
-          if (r is Map) {
-            final emoji = r['emoji']?.toString() ?? '';
-            final actor = r['actor']?.toString();
-            if (actor != null && emoji.isNotEmpty) {
-              actorToEmoji[actor] = emoji;
-            }
-          }
-        }
-      }
-
-      final list = <ReactionParticipant>[];
-      if (rawParticipants is List) {
-        for (final p in rawParticipants) {
-          if (p is Map) {
-            final pMap = Map<String, dynamic>.from(p);
-            final actorKey = pMap['actor']?.toString() ??
-                (pMap['type'] != null && pMap['id'] != null ? '${pMap['type']}:${pMap['id']}' : null);
-            final emoji = actorToEmoji[actorKey] ?? pMap['emoji']?.toString();
-            list.add(ReactionParticipant.fromJson(pMap, emoji: emoji));
-          }
-        }
-      }
-      return Right(list);
-    } on DioException catch (e) {
-      final res = e.response?.data;
-      final serverMsg = res is Map
-          ? (res['message'] ?? res['error'])?.toString()
-          : null;
-      return Left(ServerFailure(serverMsg ?? e.message ?? 'فشل في عرض تفاصيل التفاعلات'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<MessageTemplate>>> fetchInboxTemplates(int inboxId) async {
-    try {
-      // Direct endpoint: GET /api/v1/accounts/:account_id/inboxes/:inbox_id/message_templates
-      final response = await _api.get('inboxes/$inboxId/message_templates');
-      final data = response.data;
-
-      dynamic rawTemplates;
-      if (data is Map) {
-        rawTemplates = data['payload'] ??
-            data['message_templates'] ??
-            data['data']?['payload'] ??
-            data['data'];
-      } else if (data is List) {
-        rawTemplates = data;
-      }
-
-      final list = <MessageTemplate>[];
-      if (rawTemplates is List && rawTemplates.isNotEmpty) {
-        for (final t in rawTemplates) {
-          if (t is Map) {
-            try {
-              final tpl = MessageTemplate.fromJson(Map<String, dynamic>.from(t));
-              if (tpl.name.isNotEmpty) {
-                list.add(tpl);
-              }
-            } catch (_) {}
-          }
-        }
-      }
-
-      // If endpoint was empty or failed, also check inboxes/$inboxId fallback
-      if (list.isEmpty) {
-        try {
-          final resFallback = await _api.get('inboxes/$inboxId');
-          final dataFb = resFallback.data;
-          final rawFb = dataFb is Map ? (dataFb['message_templates'] ?? dataFb['payload']?['message_templates']) : null;
-          if (rawFb is List) {
-            for (final t in rawFb) {
-              if (t is Map) {
-                try {
-                  final tpl = MessageTemplate.fromJson(Map<String, dynamic>.from(t));
-                  if (tpl.name.isNotEmpty) list.add(tpl);
-                } catch (_) {}
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (list.isNotEmpty) {
-        MessageTemplateRegistry.registerAll(list);
-        return Right(list);
-      }
-
-      return Right(_getDefaultApprovedTemplates());
-    } catch (_) {
-      return Right(_getDefaultApprovedTemplates());
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<MessageTemplate>>> fetchConversationTemplates(int conversationId) async {
-    try {
-      // Endpoint: GET /api/v1/accounts/:account_id/conversations/:conversation_id/message_templates
-      final response = await _api.get('conversations/$conversationId/message_templates');
-      final data = response.data;
-      final rawTemplates = data is Map ? (data['payload'] ?? data['data']) : (data is List ? data : null);
-
-      final list = <MessageTemplate>[];
-      if (rawTemplates is List) {
-        for (final t in rawTemplates) {
-          if (t is Map) {
-            try {
-              final tpl = MessageTemplate.fromJson(Map<String, dynamic>.from(t));
-              if (tpl.name.isNotEmpty) list.add(tpl);
-            } catch (_) {}
-          }
-        }
-      }
-
-      if (list.isNotEmpty) {
-        MessageTemplateRegistry.registerAll(list);
-        return Right(list);
-      }
-      return Right(_getDefaultApprovedTemplates());
-    } catch (_) {
-      return Right(_getDefaultApprovedTemplates());
-    }
-  }
-
-  @override
-  Future<Either<Failure, Message>> sendBrowserWhatsAppList({
-    required int conversationId,
-    required String templateId,
-    required Map<String, dynamic> variables,
-  }) async {
-    try {
-      final response = await _api.post(
-        'conversations/$conversationId/messages/send_browser_whatsapp_list',
-        data: {
-          'template_id': templateId,
-          'variables': variables,
-        },
-      );
-      final resData = response.data;
-      final msgMap = (resData is Map && resData['payload'] is Map)
-          ? resData['payload']
-          : (resData is Map ? resData : <String, dynamic>{});
-      final message = Message.fromJson(Map<String, dynamic>.from(msgMap));
-      return Right(message);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل إرسال قائمة واتساب'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Contact>> getCollaborators(int conversationId) async {
-    try {
-      final response = await _api.get('conversations/$conversationId/collaborators');
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        return Right(Contact.fromJson(data));
-      } else if (data is Map) {
-        return Right(Contact.fromJson(Map<String, dynamic>.from(data)));
-      }
-      return Left(ServerFailure('Invalid response for collaborators'));
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل تحميل المتعاونين'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId) async {
-    try {
-      final response = await _api.post(
-        'conversations/$conversationId/collaborators',
-        data: {'user_id': userId},
-      );
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        return Right(Contact.fromJson(data));
-      } else if (data is Map) {
-        return Right(Contact.fromJson(Map<String, dynamic>.from(data)));
-      }
-      return Left(ServerFailure('Invalid response'));
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل إضافة المتعاون'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId) async {
-    try {
-      final response = await _api.delete('conversations/$conversationId/collaborators/$userId');
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        return Right(Contact.fromJson(data));
-      } else if (data is Map) {
-        return Right(Contact.fromJson(Map<String, dynamic>.from(data)));
-      }
-      return Left(ServerFailure('Invalid response'));
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل حذف المتعاون'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId) async {
-    try {
-      final response = await _api.get('contacts/$contactId/contactable_inboxes');
-      final data = response.data;
-      final raw = data is Map ? (data['payload'] ?? data['data']) : (data is List ? data : null);
-      if (raw is List) {
-        return Right(raw.map((item) => Map<String, dynamic>.from(item as Map)).toList());
-      }
-      return const Right([]);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل جلب القنوات المتاحة للعميل'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber}) async {
-    try {
-      final query = <String, dynamic>{};
-      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
-        var cleanPhone = phoneNumber.trim();
-        if (!cleanPhone.startsWith('+')) {
-          if (cleanPhone.startsWith('01') && cleanPhone.length == 11) {
-            cleanPhone = '+2$cleanPhone';
-          } else if (cleanPhone.startsWith('201') && cleanPhone.length == 12) {
-            cleanPhone = '+$cleanPhone';
-          } else {
-            cleanPhone = '+$cleanPhone';
-          }
-        }
-        query['phone_number'] = cleanPhone;
-      }
-
-      final response = await _api.get(
-        'inboxes/phone_destinations',
-        queryParameters: query.isNotEmpty ? query : null,
-      );
-
-      final data = response.data;
-      List rawList = [];
-      if (data is List) {
-        rawList = data;
-      } else if (data is Map && data['payload'] is List) {
-        rawList = data['payload'];
-      } else if (data is Map && data['data'] is List) {
-        rawList = data['data'];
-      }
-
-      final results = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      return Right(results);
-    } on DioException catch (e) {
-      return Left(ServerFailure(e.message ?? 'فشل في تحميل وجهات القنوات المتاحة'));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, Conversation>> getConversation(int conversationId) =>
+      _conversationOps.getConversation(conversationId);
 
   @override
   Future<Either<Failure, Conversation>> startDirectChat({
@@ -810,88 +213,13 @@ class ConversationRepository implements IConversationRepository {
     required int inboxId,
     required String sourceId,
     String? contactName,
-  }) async {
-    try {
-      var cleanPhone = phoneNumber.trim();
-      if (!cleanPhone.startsWith('+')) {
-        if (cleanPhone.startsWith('01') && cleanPhone.length == 11) {
-          cleanPhone = '+2$cleanPhone';
-        } else if (cleanPhone.startsWith('201') && cleanPhone.length == 12) {
-          cleanPhone = '+$cleanPhone';
-        } else {
-          cleanPhone = '+$cleanPhone';
-        }
-      }
-
-      // 1. Check if contact exists
-      int? contactId;
-      try {
-        final searchRes = await _api.get('contacts/search', queryParameters: {'q': cleanPhone});
-        final sData = searchRes.data;
-        List cList = [];
-        if (sData is Map && sData['payload'] is List) {
-          cList = sData['payload'];
-        } else if (sData is List) {
-          cList = sData;
-        }
-
-        if (cList.isNotEmpty) {
-          final first = cList.first;
-          contactId = first['id'] is int ? first['id'] : int.tryParse(first['id']?.toString() ?? '');
-        }
-      } catch (_) {}
-
-      // 2. If contact does not exist, create contact
-      if (contactId == null || contactId <= 0) {
-        final createRes = await _api.post('contacts', data: {
-          'name': (contactName != null && contactName.trim().isNotEmpty) ? contactName.trim() : cleanPhone,
-          'phone_number': cleanPhone,
-        });
-        final cData = createRes.data;
-        final cObj = (cData is Map && cData['payload']?['contact'] != null)
-            ? cData['payload']['contact']
-            : (cData is Map && cData['contact'] != null ? cData['contact'] : cData);
-        contactId = cObj is Map ? (cObj['id'] is int ? cObj['id'] : int.tryParse(cObj['id']?.toString() ?? '')) : null;
-      }
-
-      if (contactId == null || contactId <= 0) {
-        return Left(ServerFailure('تعذر تحديد أو إنشاء جهة الاتصال للرقم $cleanPhone'));
-      }
-
-      // 3. Ensure contact_inbox is registered
-      try {
-        await _api.post('contacts/$contactId/contact_inboxes', data: {
-          'inbox_id': inboxId,
-          'source_id': sourceId,
-        });
-      } catch (_) {}
-
-      // 4. POST /api/v1/accounts/:account_id/conversations without message parameter
-      final convRes = await _api.post('conversations', data: {
-        'contact_id': contactId,
-        'inbox_id': inboxId,
-        'source_id': sourceId,
-      });
-
-      final convData = convRes.data;
-      final rawConv = convData is Map ? (convData['payload'] ?? convData['data'] ?? convData) : null;
-      if (rawConv is Map) {
-        return Right(Conversation.fromJson(Map<String, dynamic>.from(rawConv)));
-      }
-      return Left(ServerFailure('استجابة غير صالحة من السيرفر'));
-    } on DioException catch (e) {
-      String errMsg = 'فشل في بدء المحادثة';
-      if (e.response?.data is Map) {
-        final d = e.response!.data as Map;
-        errMsg = d['message']?.toString() ?? d['error']?.toString() ?? errMsg;
-      } else if (e.message != null) {
-        errMsg = e.message!;
-      }
-      return Left(ServerFailure(errMsg));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  }) =>
+      _conversationOps.startDirectChat(
+        phoneNumber: phoneNumber,
+        inboxId: inboxId,
+        sourceId: sourceId,
+        contactName: contactName,
+      );
 
   @override
   Future<Either<Failure, Conversation>> startNewConversation({
@@ -899,803 +227,116 @@ class ConversationRepository implements IConversationRepository {
     required int inboxId,
     required String sourceId,
     String? message,
-  }) async {
-    try {
-      // 1. Normalize sourceId (clean phone number)
-      String cleanSource = sourceId.trim();
-      if (cleanSource.startsWith('01') && cleanSource.length == 11) {
-        cleanSource = '+2$cleanSource';
-      } else if (cleanSource.startsWith('201') && cleanSource.length == 12) {
-        cleanSource = '+$cleanSource';
-      }
-
-      // 2. Ensure contact has a contact_inbox linked to this inbox
-      try {
-        await _api.post('contacts/$contactId/contact_inboxes', data: {
-          'inbox_id': inboxId,
-          'source_id': cleanSource,
-        });
-      } catch (_) {
-        // If it already exists or returns 422, proceed to conversation creation
-      }
-
-      final payload = <String, dynamic>{
-        'contact_id': contactId,
-        'inbox_id': inboxId,
-        'source_id': cleanSource,
-      };
-      if (message != null && message.trim().isNotEmpty) {
-        payload['message'] = {
-          'content': message.trim(),
-          'message_type': 'outgoing',
-          'private': false,
-        };
-      }
-      final response = await _api.post('conversations', data: payload);
-      final data = response.data;
-      final rawConv = data is Map ? (data['payload'] ?? data['data'] ?? data) : null;
-      if (rawConv is Map) {
-        return Right(Conversation.fromJson(Map<String, dynamic>.from(rawConv)));
-      }
-      return Left(ServerFailure('فشل بدء المحادثة'));
-    } on DioException catch (e) {
-      String errMsg = 'فشل إنشاء المحادثة';
-      if (e.response?.data is Map) {
-        final d = e.response!.data as Map;
-        errMsg = d['message']?.toString() ??
-                 d['error']?.toString() ??
-                 (d['errors'] is List ? (d['errors'] as List).join(', ') : null) ??
-                 e.message ??
-                 'فشل إنشاء المحادثة';
-      } else if (e.message != null && e.message!.isNotEmpty) {
-        errMsg = e.message!;
-      }
-      return Left(ServerFailure(errMsg));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  List<MessageTemplate> _getDefaultApprovedTemplates() {
-    return [
-      MessageTemplate(
-        id: 100,
-        name: 'first_subscription_25_nov2026',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'خصم 25% لفترة محدودة',
-        body: 'أهلًا 👋\nلسه بتفكّر تبدأ مع *Message Pro*؟\nابدأ دلوقتي ووفر *ربع قيمة أول اشتراك* 🎉\n\nاختار الاشتراك *الشهري أو النصف سنوي (6 شهور)* واستفيد بخصم *25% على أول اشتراك فقط*.\n\n⏳ اشترك لحد *1 نوفمبر* للاستفادة بالعرض.\n\nشوف الأسعار بعد الخصم، واختار الباقة المناسبة لشغلك 👇',
-        buttons: ['شوف الأسعار بعد الخصم', 'ساعدني أختار باقة', 'إيقاف العروض'],
-        labels: ['marketing', 'offers'],
-      ),
-      MessageTemplate(
-        id: 99,
-        name: 'messagepro_connection_check_20261027',
-        category: 'UTILITY',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'هذه رسالة اختبار ربط واتساب التي طلبتها من Message Pro.\nمرجع الاختبار: MP-20261027.\nلا يلزم اتخاذ أي إجراء.',
-        buttons: [],
-        labels: ['system', 'test'],
-      ),
-      MessageTemplate(
-        id: 84,
-        name: 'messagepro_requested_callback_utility_v1',
-        category: 'UTILITY',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'أهلًا يا فندم، حاولنا نكلم حضرتك بخصوص المكالمة اللي طلبتها عن مسج برو. لو الوقت مش مناسب، ابعتلنا الوقت اللي يناسبك وهنكلمك 📞',
-        buttons: [],
-        labels: ['callbacks', 'support'],
-      ),
-      MessageTemplate(
-        id: 69,
-        name: 'messagepro_first_channel_offer_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'عرض خاص ليك',
-        body: 'مبروك ربط أول قناة 🎉\n\nتقدر تحصل على خصم *٢٠٪* على أول اشتراك في مسج برو لو اشتركت خلال *٧٢ ساعة* من دلوقتي. العرض متاح لغاية *٣٠ سبتمبر ٢٠٢٦ الساعة ١:٣٠ ظهرًا بتوقيت القاهرة*.\n\nحابب تستفيد من العرض؟ اضغط على «اطلب العرض» وهنساعدك تكمل.',
-        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
-        buttons: ['شوف الباقات', 'اطلب العرض'],
-        labels: ['marketing', 'offers'],
-      ),
-      MessageTemplate(
-        id: 64,
-        name: 'messagepro_growth_advanced_25_48h',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: '🔥 *لمدة ٤٨ ساعة: خصم ٢٥٪ على Growth وAdvanced من Message Pro*\n\nاجمع محادثات عملائك في مكان واحد، وخلّي فريقك يعرف مين مسؤول عن كل محادثة وإيه الخطوة الجاية. ومع الأتمتة والـAI، تقدر تنظم الردود والمتابعة حسب طريقة شغلك.\n\nاستخدم كود *SAMPLE25* قبل *29 سبتمبر 2026 الساعة 6 مساءً بتوقيت القاهرة*.\n\n*رد «ابدأ»* وهنساعدك تختار الباقة وتجهّز حسابك. ولو عندك سؤال قبل الاشتراك، ابعته هنا.',
-        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
-        buttons: [],
-        labels: ['marketing'],
-      ),
-      MessageTemplate(
-        id: 65,
-        name: 'messagepro_growth_advanced_25_48h_v2',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'خصم ٢٥٪ لمدة ٤٨ ساعة',
-        body: 'العرض على باقتي *Growth* و*Advanced* من Message Pro.\n\nاجمع محادثات عملائك في مكان واحد، وخلّي فريقك يعرف مين مسؤول عن كل محادثة وإيه الخطوة الجاية. ومع الأتمتة والـAI، تقدر تنظم الردود والمتابعة حسب طريقة شغلك.\n\nاستخدم كود *SAMPLE25* قبل *29 سبتمبر 2026 الساعة 6 مساءً بتوقيت القاهرة*.\n\n*رد «ابدأ»* وهنساعدك تختار الباقة وتجهّز حسابك. ولو عندك سؤال قبل الاشتراك، ابعته هنا.',
-        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
-        buttons: [],
-        labels: ['marketing'],
-      ),
-      MessageTemplate(
-        id: 66,
-        name: 'messagepro_growth_advanced_25_48h_v3',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'خصم ٢٥٪ لمدة ٤٨ ساعة',
-        body: 'عرض على باقتي *Growth* و*Advanced* من مسج برو.\n\nاجمع محادثات عملائك في مكان واحد، وخلّي فريقك عارف مين بيتابع كل عميل. سرّع الردود بالـAI والأتمتة، وابعت عروضك وتحديثاتك لعملائك بالرسائل الجماعية، وانقل البيزنس بتاعك لنقطة احترافية.\n\nاستخدم كود *MP25*\nقبل *٢٩ سبتمبر ٢٠٢٦ الساعة ٩ صباحًا بتوقيت القاهرة*.\n\nمستني إيه؟ ابدأ دلوقتي 👇',
-        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
-        buttons: ['سجّل الآن', 'طلب مكالمة', 'تفاصيل'],
-        labels: ['marketing'],
-      ),
-      MessageTemplate(
-        id: 82,
-        name: 'messagepro_inquiry_received_utility_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'أهلًا يا فندم 👋 بنأكد استلام استفسارك عن مسج برو. هنرد عليك هنا، ولو في تفاصيل تحب تضيفها ابعتها في الشات.',
-        buttons: [],
-        labels: ['inquiry'],
-      ),
-      MessageTemplate(
-        id: 74,
-        name: 'messagepro_lead_followup_callback_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'أهلًا يا فندم، كنت بحاول أتواصل مع حضرتك بخصوص مسج برو. تحب أكلمك في وقت يناسبك تكون متاح فيه؟ 📞',
-        buttons: [],
-        labels: ['followup'],
-      ),
-      MessageTemplate(
-        id: 73,
-        name: 'messagepro_lead_followup_details_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'أهلًا يا فندم، هل التفاصيل واضحة لحضرتك؟ لو في أي سؤال أو حابب ندخل ميتنج نشرح فيه النظام، ابعتلنا هنا 📅',
-        buttons: [],
-        labels: ['followup'],
-      ),
-      MessageTemplate(
-        id: 72,
-        name: 'messagepro_lead_followup_interest_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'أهلًا يا فندم 👋 حبيت أتابع مع حضرتك بخصوص مسج برو. هل لسه مناسب ليك نكمل الكلام عن الخدمة؟ لو عندك أي سؤال، ابعته هنا وهنرد عليك.',
-        buttons: [],
-        labels: ['followup'],
-      ),
-      MessageTemplate(
-        id: 67,
-        name: 'messagepro_pharmacies_followup_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'نظّم رسائل صيدليتك وفروعها',
-        body: '💊 مع مسج برو، اجمع محادثات عملائك في مكان واحد، ووجّه كل محادثة للفرع أو الموظف المناسب. سواء فريقك بيرد من داخل الصيدلية أو من كول سنتر منفصل، تاريخ الكلام واضح والكل عارف مين بيتابع العميل، حتى لو الشفت اتغيّر.\n\nسرّع الردود بالـAI والأتمتة والردود الجاهزة، وابعت عروضك وتحديثاتك لعملائك بالرسائل الجماعية.\n\nحابب تشوف ده على شغل صيدليتك؟ اختار اللي يناسبك 👇',
-        footer: 'لإيقاف رسائل العروض، رد «إيقاف».',
-        buttons: ['تجربة مجانية', 'احجز ديمو', 'اطلب مكالمة', 'تفاصيل أكتر'],
-        labels: ['pharmacies'],
-      ),
-      MessageTemplate(
-        id: 83,
-        name: 'messagepro_requested_details_utility_v1',
-        category: 'UTILITY',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        body: 'أهلًا يا فندم، التفاصيل اللي طلبتها عن مسج برو بعتناها لحضرتك. لو في أي نقطة محتاجة توضيح، ابعتلنا هنا وهنوضحها.',
-        buttons: [],
-        labels: ['details'],
-      ),
-      MessageTemplate(
-        id: 68,
-        name: 'messagepro_signup_welcome_7d_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'أهلًا بيك في مسج برو',
-        body: 'حسابك اتسجّل بنجاح 🎉 ومعاك تجربة مجانية لمدة ٧ أيام.\n\nتقدر دلوقتي تربط أول قناة لاستقبال رسائل عملائك، تضيف فريقك، وتعمل أول AI Agent يساعدك في الرد.\n\nلو محتاج مساعدة في أي خطوة، ابعتلنا هنا وهنساعدك.',
-        footer: 'فريق مسج برو',
-        buttons: ['ابدأ إعداد حسابك', 'محتاج مساعدة'],
-        labels: ['welcome'],
-      ),
-      MessageTemplate(
-        id: 70,
-        name: 'messagepro_trial_ending_hours_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'تجربتك المجانية قربت تخلص',
-        body: 'فاضل *٤٨ ساعة* على انتهاء تجربتك المجانية في مسج برو.\n\nلو محتاج مساعدة في ربط القنوات أو تجهيز الفريق والـAI Agent، ابعتلنا هنا. ولو جاهز تكمل استخدام مسج برو، تقدر تختار الباقة المناسبة ليك.',
-        footer: 'فريق مسج برو',
-        buttons: ['شوف الباقات', 'محتاج مساعدة'],
-        labels: ['trial'],
-      ),
-      MessageTemplate(
-        id: 71,
-        name: 'messagepro_trial_expired_feedback_v1',
-        category: 'MARKETING',
-        language: 'ar_EG',
-        status: 'APPROVED',
-        header: 'تجربتك المجانية انتهت',
-        body: 'تجربتك المجانية في مسج برو انتهت. شكرًا إنك جرّبتنا 🙏\n\nحابين نسمع رأيك: إيه أكتر حاجة فادتك خلال التجربة، وإيه اللي تحب يكون أفضل؟ رد علينا هنا، ورأيك هيساعدنا نقدملك تجربة أنسب.\n\nولو حابب تكمل، تقدر تختار الباقة المناسبة ليك.',
-        footer: 'فريق مسج برو',
-        buttons: ['شوف الباقات', 'شارك رأيك'],
-        labels: ['feedback'],
-      ),
-    ];
-  }
-
-  @override
-  Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil}) async {
-    try {
-      final payload = <String, dynamic>{};
-      if (status == 'snoozed') {
-        payload['status'] = 'snoozed';
-        if (snoozedUntil != null && snoozedUntil.isNotEmpty) {
-          payload['snoozed_until'] = snoozedUntil;
-        }
-      } else if (status == 'open') {
-        payload['status'] = 'open';
-      } else if (status == 'bot') {
-        payload['status'] = 'bot';
-      } else if (status == 'pending') {
-        payload['status'] = 'pending';
-      }
-      // Note: Passing 'status': 'resolved' causes Chatwoot backend to throw 500 Internal Server Error.
-      // Calling toggle_status with empty payload {} cleanly triggers Chatwoot's toggle_status
-      // action, resolving an open conversation.
-
-      final response = await _api.post(
-        'conversations/$conversationId/toggle_status',
-        data: payload,
+  }) =>
+      _conversationOps.startNewConversation(
+        contactId: contactId,
+        inboxId: inboxId,
+        sourceId: sourceId,
+        message: message,
       );
 
-      final currentStatus = response.data is Map && response.data['payload'] is Map
-          ? response.data['payload']['current_status']?.toString()
-          : null;
-
-      if (status == 'resolved' && currentStatus != null && currentStatus != 'resolved') {
-        // If the conversation was previously snoozed, the first toggle moved it to 'open'.
-        // Toggle once more to transition it into 'resolved'.
-        await _api.post(
-          'conversations/$conversationId/toggle_status',
-          data: <String, dynamic>{},
-        );
-      }
-
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  @override
+  Future<Either<Failure, void>> toggleStatus(int conversationId, String status, {String? snoozedUntil}) =>
+      _conversationOps.toggleStatus(conversationId, status, snoozedUntil: snoozedUntil);
 
   @override
-  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType}) async {
-    try {
-      final Map<String, dynamic> data;
-      if (agentId == null || agentId < 0) {
-        data = {'assignee_id': null};
-      } else {
-        data = {'assignee_id': agentId};
-        if (assigneeType != null) {
-          data['assignee_type'] = assigneeType;
-        }
-      }
-
-      await _api.post(
-        'conversations/$conversationId/assignments',
-        data: data,
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType}) =>
+      _conversationOps.assignAgent(conversationId, agentId, assigneeType: assigneeType);
 
   @override
-  Future<Either<Failure, void>> pinConversation(int conversationId) async {
-    try {
-      await _api.post(
-        'conversation_pins',
-        data: {'conversation_id': conversationId},
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, List<int>>> fetchPinnedConversationIds() =>
+      _conversationOps.fetchPinnedConversationIds();
 
   @override
-  Future<Either<Failure, void>> unpinConversation(int conversationId) async {
-    try {
-      await _api.delete('conversation_pins/$conversationId');
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> pinConversation(int conversationId) =>
+      _conversationOps.pinConversation(conversationId);
 
   @override
-  Future<Either<Failure, void>> assignTeam(int conversationId, int? teamId) async {
-    try {
-      await _api.post(
-        'conversations/$conversationId/assignments',
-        data: {'team_id': teamId},
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> unpinConversation(int conversationId) =>
+      _conversationOps.unpinConversation(conversationId);
 
   @override
-  Future<Either<Failure, void>> updateLabels(int conversationId, List<String> labels) async {
-    try {
-      await _api.post(
-        'conversations/$conversationId/labels',
-        data: {'labels': labels},
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> assignTeam(int conversationId, int? teamId) =>
+      _conversationOps.assignTeam(conversationId, teamId);
 
   @override
-  Future<Either<Failure, void>> updateLifecycleStage(int conversationId, int stageId) async {
-    try {
-      await _api.patch(
-        'conversations/$conversationId/lifecycle',
-        data: {'lifecycle_stage_id': stageId},
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> updateLabels(int conversationId, List<String> labels) =>
+      _conversationOps.updateLabels(conversationId, labels);
+
+  @override
+  Future<Either<Failure, void>> updateLifecycleStage(int conversationId, int stageId) =>
+      _conversationOps.updateLifecycleStage(conversationId, stageId);
 
   @override
   Future<Either<Failure, void>> updateConversationCustomAttributes(
     int conversationId,
     Map<String, dynamic> customAttributes,
-  ) async {
-    try {
-      await _api.post(
-        'conversations/$conversationId/custom_attributes',
-        data: {'custom_attributes': customAttributes},
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  ) =>
+      _conversationOps.updateConversationCustomAttributes(conversationId, customAttributes);
 
   @override
-  Future<Either<Failure, void>> muteConversation(int conversationId) async {
-    try {
-      await _api.post('conversations/$conversationId/mute');
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> muteConversation(int conversationId) =>
+      _conversationOps.muteConversation(conversationId);
 
   @override
-  Future<Either<Failure, void>> unmuteConversation(int conversationId) async {
-    try {
-      await _api.post('conversations/$conversationId/unmute');
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> unmuteConversation(int conversationId) =>
+      _conversationOps.unmuteConversation(conversationId);
 
   @override
-  Future<Either<Failure, void>> markAsRead(int conversationId) async {
-    try {
-      await _api.post('conversations/$conversationId/update_last_seen');
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
+  Future<Either<Failure, void>> markAsRead(int conversationId) =>
+      _conversationOps.markAsRead(conversationId);
+
+  // ---------------------------------------------------------------------------
+  // Metadata Operations Delegation
+  // ---------------------------------------------------------------------------
+  @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId) =>
+      _metadataOps.getContactableInboxes(contactId);
 
   @override
-  Future<Either<Failure, List<Inbox>>> fetchInboxes() async {
-    if (_cachedInboxes != null && _cachedInboxesTime != null) {
-      if (DateTime.now().difference(_cachedInboxesTime!).inMinutes < 5) {
-        return Right(_cachedInboxes!);
-      }
-    }
-    try {
-      final response = await _api.get('inboxes');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null
-          ? data['payload']
-          : (data is Map && data['data'] != null && data['data']['payload'] != null
-              ? data['data']['payload']
-              : (data is Map && data['data'] is List
-                  ? data['data']
-                  : (data is List ? data : [])));
-      final parsed = list
-          .whereType<Map>()
-          .map((i) => Inbox.fromJson(Map<String, dynamic>.from(i)))
-          .toList();
-      _cachedInboxes = parsed;
-      _cachedInboxesTime = DateTime.now();
-      return Right(parsed);
-    } catch (_) {
-      if (_cachedInboxes != null) return Right(_cachedInboxes!);
-      return const Right([]);
-    }
-  }
+  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber}) =>
+      _metadataOps.getPhoneDestinations(phoneNumber: phoneNumber);
 
   @override
-  Future<Either<Failure, List<Label>>> fetchLabels() async {
-    if (_cachedLabels != null && _cachedLabelsTime != null) {
-      if (DateTime.now().difference(_cachedLabelsTime!).inMinutes < 5) {
-        return Right(_cachedLabels!);
-      }
-    }
-    try {
-      final response = await _api.get('labels');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null
-          ? data['payload']
-          : (data is Map && data['data'] != null && data['data']['payload'] != null
-              ? data['data']['payload']
-              : (data is Map && data['data'] is List
-                  ? data['data']
-                  : (data is List ? data : [])));
-      final parsed = list
-          .whereType<Map>()
-          .map((l) => Label.fromJson(Map<String, dynamic>.from(l)))
-          .toList();
-      _cachedLabels = parsed;
-      _cachedLabelsTime = DateTime.now();
-      return Right(parsed);
-    } catch (_) {
-      if (_cachedLabels != null) return Right(_cachedLabels!);
-      return const Right([]);
-    }
-  }
+  Future<Either<Failure, List<Inbox>>> fetchInboxes() => _metadataOps.fetchInboxes();
 
   @override
-  Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages() async {
-    if (_cachedStages != null && _cachedStagesTime != null) {
-      if (DateTime.now().difference(_cachedStagesTime!).inMinutes < 5) {
-        return Right(_cachedStages!);
-      }
-    }
-    // 1. Try dedicated lifecycle_stages endpoint
-    try {
-      final response = await _api.get('lifecycle_stages');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null
-          ? data['payload']
-          : (data is Map && data['data'] != null && data['data']['payload'] != null
-              ? data['data']['payload']
-              : (data is Map && data['data'] is List
-                  ? data['data']
-                  : (data is List ? data : [])));
-      if (list.isNotEmpty) {
-        final parsed = list
-            .whereType<Map>()
-            .map((s) => LifecycleStage.fromJson(Map<String, dynamic>.from(s)))
-            .toList();
-        _cachedStages = parsed;
-        _cachedStagesTime = DateTime.now();
-        return Right(parsed);
-      }
-    } catch (_) {}
-
-    // 2. Try custom_attribute_definitions endpoint (where lifecycle stage / lead status options live)
-    try {
-      final response = await _api.get('custom_attribute_definitions');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null
-          ? data['payload']
-          : (data is Map && data['data'] != null && data['data']['payload'] != null
-              ? data['data']['payload']
-              : (data is Map && data['data'] is List
-                  ? data['data']
-                  : (data is List ? data : [])));
-
-      for (final item in list) {
-        if (item is Map) {
-          final key = item['attribute_key']?.toString().toLowerCase();
-          if (key == 'lifecycle_stage' || key == 'lead_status' || key == 'stage') {
-            final rawValues = item['attribute_values'];
-            if (rawValues is List && rawValues.isNotEmpty) {
-              final stages = <LifecycleStage>[];
-              for (int i = 0; i < rawValues.length; i++) {
-                final v = rawValues[i];
-                if (v is Map) {
-                  stages.add(LifecycleStage.fromJson(Map<String, dynamic>.from(v)));
-                } else if (v is String && v.trim().isNotEmpty) {
-                  final parsed = LifecycleStage.fromString(v);
-                  stages.add(LifecycleStage(
-                    id: i + 1,
-                    name: parsed.name,
-                    color: parsed.color,
-                    icon: parsed.icon,
-                  ));
-                }
-              }
-              if (stages.isNotEmpty) {
-                _cachedStages = stages;
-                _cachedStagesTime = DateTime.now();
-                return Right(stages);
-              }
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    if (_cachedStages != null) return Right(_cachedStages!);
-    return const Right([]);
-  }
+  Future<Either<Failure, List<Label>>> fetchLabels() => _metadataOps.fetchLabels();
 
   @override
-  Future<Either<Failure, List<Team>>> fetchTeams() async {
-    if (_cachedTeams != null && _cachedTeamsTime != null) {
-      if (DateTime.now().difference(_cachedTeamsTime!).inMinutes < 5) {
-        return Right(_cachedTeams!);
-      }
-    }
-    try {
-      final response = await _api.get('teams');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null
-          ? data['payload']
-          : (data is Map && data['data'] != null && data['data']['payload'] != null
-              ? data['data']['payload']
-              : (data is Map && data['data'] is List
-                  ? data['data']
-                  : (data is List ? data : [])));
-      final parsed = list
-          .whereType<Map>()
-          .map((t) => Team.fromJson(Map<String, dynamic>.from(t)))
-          .toList();
-      _cachedTeams = parsed;
-      _cachedTeamsTime = DateTime.now();
-      return Right(parsed);
-    } catch (_) {
-      if (_cachedTeams != null) return Right(_cachedTeams!);
-      return const Right([]);
-    }
-  }
+  Future<Either<Failure, List<LifecycleStage>>> fetchLifecycleStages() =>
+      _metadataOps.fetchLifecycleStages();
 
   @override
-  Future<Either<Failure, List<User>>> fetchAgents() async {
-    try {
-      final response = await _api.get('agents');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null
-          ? data['payload']
-          : (data is Map && data['data'] != null && data['data']['payload'] != null
-              ? data['data']['payload']
-              : (data is Map && data['data'] is List
-                  ? data['data']
-                  : (data is List ? data : [])));
-      return Right(list
-          .whereType<Map>()
-          .map((a) => User.fromJson(Map<String, dynamic>.from(a)))
-          .toList());
-    } catch (_) {
-      return const Right([]);
-    }
-  }
+  Future<Either<Failure, List<Team>>> fetchTeams() => _metadataOps.fetchTeams();
 
   @override
-  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds}) async {
-    try {
-      final List<int> ids = [];
-      if (inboxId != null && inboxId > 0) {
-        ids.add(inboxId);
-      } else if (inboxIds != null && inboxIds.isNotEmpty) {
-        ids.addAll(inboxIds);
-      } else {
-        // Fallback: fetch available inboxes so assignable_agents gets the required parameter
-        final inboxesRes = await fetchInboxes();
-        inboxesRes.fold((_) {}, (inboxes) => ids.addAll(inboxes.map((i) => i.id)));
-      }
-
-      String path = 'assignable_agents';
-      if (ids.isNotEmpty) {
-        final queryParams = ids.map((id) => 'inbox_ids[]=$id').join('&');
-        path = '$path?$queryParams';
-      }
-
-      final response = await _api.get(path);
-      final data = response.data;
-      final List listData;
-      if (data is List) {
-        listData = data;
-      } else if (data is Map && data['payload'] is List) {
-        listData = data['payload'];
-      } else if (data is Map && data['data'] is List) {
-        listData = data['data'];
-      } else {
-        listData = [];
-      }
-      final agents = listData
-          .whereType<Map>()
-          .map((item) => User.fromJson(Map<String, dynamic>.from(item)))
-          .toList();
-      return Right(agents);
-    } catch (_) {
-      return fetchAgents();
-    }
-  }
+  Future<Either<Failure, List<User>>> fetchAgents() => _metadataOps.fetchAgents();
 
   @override
-  Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses() async {
-    if (_cachedCannedResponses != null && _cachedCannedResponsesTime != null) {
-      if (DateTime.now().difference(_cachedCannedResponsesTime!).inMinutes < 10) {
-        return Right(_cachedCannedResponses!);
-      }
-    }
-    try {
-      final response = await _api.get('canned_responses');
-      final data = response.data;
-      List list = data is Map && data['payload'] != null ? data['payload'] : (data is List ? data : []);
-
-      // Get server base URL to resolve relative URLs like /rails/active_storage/...
-      final base = await _storage.getBaseUrl();
-      final uri = Uri.tryParse(base.isNotEmpty ? base : AppConfig.defaultBaseUrl);
-      final domainRoot = uri != null ? '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}' : AppConfig.defaultBaseUrl;
-
-      final result = list.whereType<Map>().map<Map<String, String>>((c) {
-        final List<String> extractedUrls = [];
-
-        void addUrl(dynamic u) {
-          if (u == null) return;
-          var str = u.toString().trim();
-          if (str.isEmpty) return;
-          if (str.startsWith('/')) {
-            str = '$domainRoot$str';
-          }
-          if (!extractedUrls.contains(str)) {
-            extractedUrls.add(str);
-          }
-        }
-
-        // 1. Check attachments list or map from all possible Chatwoot/Message-Pro fields
-        void processAttachmentEntry(dynamic a) {
-          if (a is Map) {
-            addUrl(a['data_url'] ?? a['file_url'] ?? a['thumb_url'] ?? a['url'] ?? a['blob_url'] ?? a['download_url']);
-          } else if (a is String) {
-            addUrl(a);
-          }
-        }
-
-        final possibleAttachmentKeys = [
-          'media_attachments',
-          'media_attachment',
-          'attachments',
-          'files',
-          'attached_files',
-          'media'
-        ];
-
-        for (final key in possibleAttachmentKeys) {
-          final val = c[key];
-          if (val is List) {
-            for (final item in val) {
-              processAttachmentEntry(item);
-            }
-          } else if (val != null) {
-            processAttachmentEntry(val);
-          }
-        }
-
-        // 2. Check direct URL fields
-        addUrl(c['image_url']);
-        addUrl(c['file_url']);
-        addUrl(c['media_url']);
-        addUrl(c['attachment_url']);
-        addUrl(c['document_url']);
-
-        // 3. Extract embedded image and file links from content
-        final rawContent = c['content']?.toString() ?? '';
-        final mdImgRegex = RegExp(r'!\[.*?\]\((https?://[^\s\)]+|/[^\s\)]+)\)');
-        for (final m in mdImgRegex.allMatches(rawContent)) {
-          addUrl(m.group(1));
-        }
-
-        final htmlImgRegex = RegExp(r'''<img[^>]+src=["'](https?://[^"']+|/[^"']+)["']''');
-        for (final m in htmlImgRegex.allMatches(rawContent)) {
-          addUrl(m.group(1));
-        }
-
-        final fileLinkRegex = RegExp(r'\[.*?\]\((https?://[^\s\)]+|/[^\s\)]+)\)');
-        for (final m in fileLinkRegex.allMatches(rawContent)) {
-          final u = m.group(1);
-          if (u != null && (u.contains('.') || u.contains('rails/active_storage') || u.contains('download'))) {
-            addUrl(u);
-          }
-        }
-
-        // Clean content by removing markdown images from text so it doesn't look messy
-        String cleanContent = rawContent.replaceAll(mdImgRegex, '').replaceAll(htmlImgRegex, '').trim();
-        if (cleanContent.isEmpty) cleanContent = rawContent;
-
-        final firstImageUrl = extractedUrls.where((u) {
-          final lower = u.toLowerCase();
-          return lower.contains('.png') || lower.contains('.jpg') || lower.contains('.jpeg') ||
-              lower.contains('.webp') || lower.contains('.gif') || lower.contains('image');
-        }).firstOrNull ?? (extractedUrls.isNotEmpty ? extractedUrls.first : '');
-
-        return {
-          'short_code': c['short_code']?.toString() ?? '',
-          'content': cleanContent,
-          'raw_content': rawContent,
-          'image_url': firstImageUrl,
-          'files': extractedUrls.join('|||'),
-          'file_count': extractedUrls.length.toString(),
-        };
-      }).toList();
-      _cachedCannedResponses = result;
-      _cachedCannedResponsesTime = DateTime.now();
-      return Right(result);
-    } catch (_) {
-      if (_cachedCannedResponses != null) return Right(_cachedCannedResponses!);
-      return const Right([]);
-    }
-  }
+  Future<Either<Failure, List<User>>> fetchAssignableAgents({int? inboxId, List<int>? inboxIds}) =>
+      _metadataOps.fetchAssignableAgents(inboxId: inboxId, inboxIds: inboxIds);
 
   @override
-  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions() async {
-    if (_cachedFilterOptions != null && _cachedFilterOptionsTime != null) {
-      if (DateTime.now().difference(_cachedFilterOptionsTime!).inMinutes < 5) {
-        return Right(_cachedFilterOptions!);
-      }
-    }
-    return PerformanceService.traceAsync<Either<Failure, ConversationFilterOptions>>(
-      'server_fetch_filter_options',
-      () async {
-        try {
-          final response = await _api.get('conversations/filter_options');
-          final data = response.data;
-          Map<String, dynamic>? jsonMap;
-          if (data is Map) {
-            if (data['payload'] is Map) {
-              jsonMap = Map<String, dynamic>.from(data['payload']);
-            } else if (data['data'] is Map) {
-              jsonMap = Map<String, dynamic>.from(data['data']);
-            } else {
-              jsonMap = Map<String, dynamic>.from(data);
-            }
-          }
-          if (jsonMap != null) {
-            final parsed = ConversationFilterOptions.fromJson(jsonMap);
-            _cachedFilterOptions = parsed;
-            _cachedFilterOptionsTime = DateTime.now();
-            return Right(parsed);
-          }
-          return const Right(ConversationFilterOptions());
-        } on DioException catch (e) {
-          if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
-          return Left(ServerFailure(e.message ?? 'فشل في تحميل خيارات الفلاتر'));
-        } catch (e) {
-          if (_cachedFilterOptions != null) return Right(_cachedFilterOptions!);
-          return Left(ServerFailure(e.toString()));
-        }
-      },
-    );
-  }
+  Future<Either<Failure, List<Map<String, String>>>> fetchCannedResponses() =>
+      _metadataOps.fetchCannedResponses();
+
+  @override
+  Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions() =>
+      _metadataOps.fetchFilterOptions();
+
+  // ---------------------------------------------------------------------------
+  // Collaborator Operations Delegation
+  // ---------------------------------------------------------------------------
+  @override
+  Future<Either<Failure, Contact>> getCollaborators(int conversationId) =>
+      _collaboratorOps.getCollaborators(conversationId);
+
+  @override
+  Future<Either<Failure, Contact>> addCollaborator(int conversationId, int userId) =>
+      _collaboratorOps.addCollaborator(conversationId, userId);
+
+  @override
+  Future<Either<Failure, Contact>> removeCollaborator(int conversationId, int userId) =>
+      _collaboratorOps.removeCollaborator(conversationId, userId);
 }

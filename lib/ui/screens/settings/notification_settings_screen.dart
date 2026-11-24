@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/di/injection_container.dart';
-import '../../../data/models/notification_settings.dart';
-import '../../../data/repositories/notification_repository.dart';
-import '../../../core/services/sound_service.dart';
-import '../../widgets/app_bar_progress_bar.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/data/models/notification_settings.dart';
+import 'package:message_pro/logic/notification/notification_cubit.dart';
+import 'package:message_pro/ui/widgets/app_bar_progress_bar.dart';
+import 'widgets/notification/push_preset_card.dart';
+import 'widgets/notification/push_events_card.dart';
+import 'widgets/notification/email_events_card.dart';
+import 'widgets/notification/chat_sounds_card.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -15,8 +18,6 @@ class NotificationSettingsScreen extends StatefulWidget {
 }
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  final INotificationRepository _repo = sl<INotificationRepository>();
-
   bool _isLoading = true;
   String? _errorMessage;
   bool _isSaving = false;
@@ -24,8 +25,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   Timer? _feedbackTimer;
 
   NotificationSettings _settings = const NotificationSettings();
-  bool _isAdvancedExpanded = true;
-  bool _isEmailExpanded = false;
 
   @override
   void initState() {
@@ -40,29 +39,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   Future<void> _loadSettings() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    final result = await _repo.getNotificationSettings();
-
-    if (!mounted) return;
-
-    result.fold(
-      (failure) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = failure.message;
-        });
-      },
-      (data) {
-        setState(() {
-          _settings = data;
-          _isLoading = false;
-        });
-      },
-    );
+    final cubit = context.read<NotificationCubit>();
+    await cubit.loadSettings();
+    if (mounted) {
+      setState(() {
+        _settings = cubit.state.settings;
+        _isLoading = false;
+        _errorMessage = cubit.state.errorMessage;
+      });
+    }
   }
 
   Future<void> _saveSettings(NotificationSettings newSettings, {bool isArabic = false}) async {
@@ -71,54 +56,22 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       _isSaving = true;
     });
 
-    final result = await _repo.updateNotificationSettings(newSettings);
-
+    final success = await context.read<NotificationCubit>().saveSettings(newSettings);
     if (!mounted) return;
 
-    result.fold(
-      (failure) {
-        setState(() {
-          _isSaving = false;
-          _saveFeedback = isArabic ? 'تم حفظ التغييرات محلياً' : 'Settings saved locally';
-        });
-        _feedbackTimer?.cancel();
-        _feedbackTimer = Timer(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() => _saveFeedback = null);
-          }
-        });
-      },
-      (saved) {
-        setState(() {
-          _settings = saved;
-          _isSaving = false;
-          _saveFeedback = isArabic ? 'تم حفظ التغييرات بنجاح' : 'Changes saved successfully';
-        });
+    setState(() {
+      _isSaving = false;
+      _saveFeedback = success
+          ? (isArabic ? 'تم حفظ التغييرات بنجاح' : 'Changes saved successfully')
+          : (isArabic ? 'تم حفظ التغييرات محلياً' : 'Settings saved locally');
+    });
 
-        _feedbackTimer?.cancel();
-        _feedbackTimer = Timer(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() => _saveFeedback = null);
-          }
-        });
-      },
-    );
-  }
-
-  void _onPresetChanged(String? val, bool isArabic) {
-    if (val == null) return;
-    final updated = _settings.applyPushPreset(val);
-    _saveSettings(updated, isArabic: isArabic);
-  }
-
-  void _togglePushEvent(String eventKey, bool enable, bool isArabic) {
-    final updated = _settings.togglePushFlag(eventKey, enable);
-    _saveSettings(updated, isArabic: isArabic);
-  }
-
-  void _toggleEmailEvent(String eventKey, bool enable, bool isArabic) {
-    final updated = _settings.toggleEmailFlag(eventKey, enable);
-    _saveSettings(updated, isArabic: isArabic);
+    _feedbackTimer?.cancel();
+    _feedbackTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _saveFeedback = null);
+      }
+    });
   }
 
   String _eventTitle(String eventKey, bool isArabic) {
@@ -175,12 +128,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     final bgColor = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
     final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
-
-    final presetValue = _settings.pushPresetMode;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -246,7 +196,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Save feedback banner
                       if (_saveFeedback != null)
                         Container(
                           width: double.infinity,
@@ -274,8 +223,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                             ],
                           ),
                         ),
-
-                      // Informational description texts
                       Text(
                         isArabic
                             ? 'اختر تنبيهات الموبايل والبريد الإلكتروني لمساحة العمل هذه. يتم حفظ جميع التغييرات مباشرة على الخادم.'
@@ -298,448 +245,34 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         ),
                       ),
                       const SizedBox(height: 18),
-
-                      // Card 1: Mobile push preset selector
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.notifications_active_outlined, color: AppColors.primary, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  isArabic ? 'إشعارات الموبايل المباشرة (Push)' : 'Mobile push notifications',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: borderColor),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: presetValue,
-                                  isExpanded: true,
-                                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: textSecondary),
-                                  style: TextStyle(
-                                    color: textPrimary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  dropdownColor: cardBg,
-                                  onChanged: (val) => _onPresetChanged(val, isArabic),
-                                  items: [
-                                    DropdownMenuItem(
-                                      value: 'All conversations',
-                                      child: Text(isArabic ? 'كل المحادثات' : 'All conversations'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Assigned only',
-                                      child: Text(isArabic ? 'المحادثات المعينة لي فقط' : 'Assigned only'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Custom selection',
-                                      child: Text(isArabic ? 'تحديد مخصص' : 'Custom selection'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'None',
-                                      child: Text(isArabic ? 'إيقاف الإشعارات' : 'None'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              isArabic
-                                  ? 'تتحكم هذه القائمة في أحداث التنبيهات لأجهزتك المحمولة المسجلة لدى الخادم.'
-                                  : 'Controls notification events dispatched to your registered mobile devices.',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: textSecondary,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
+                      PushPresetCard(
+                        presetValue: _settings.pushPresetMode,
+                        onPresetChanged: (val) {
+                          if (val != null) {
+                            _saveSettings(_settings.applyPushPreset(val), isArabic: isArabic);
+                          }
+                        },
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Card 2: Advanced Push notification events
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InkWell(
-                              onTap: () => setState(() => _isAdvancedExpanded = !_isAdvancedExpanded),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.tune_rounded, color: AppColors.primary, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            isArabic ? 'تخصيص أحداث الموبايل' : 'Mobile Alert Events',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: textPrimary,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            isArabic
-                                                ? 'حدد الأحداث التي تود تلقي إشعار فوري بها على هاتفك.'
-                                                : 'Select exactly which events trigger a push alert.',
-                                            style: TextStyle(
-                                              fontSize: 12.5,
-                                              color: textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      _isAdvancedExpanded
-                                          ? Icons.keyboard_arrow_up_rounded
-                                          : Icons.keyboard_arrow_down_rounded,
-                                      color: textSecondary,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            if (_isAdvancedExpanded) ...[
-                              Divider(color: borderColor, height: 1),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                child: Column(
-                                  children: NotificationSettings.allEvents.map((eventKey) {
-                                    final isEnabled = _settings.hasPushFlag(eventKey);
-                                    return SwitchListTile.adaptive(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      activeTrackColor: AppColors.primary,
-                                      activeThumbColor: Colors.white,
-                                      title: Text(
-                                        _eventTitle(eventKey, isArabic),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: textPrimary,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        _eventDescription(eventKey, isArabic),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textSecondary,
-                                        ),
-                                      ),
-                                      value: isEnabled,
-                                      onChanged: (val) => _togglePushEvent(eventKey, val, isArabic),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                      PushEventsCard(
+                        settings: _settings,
+                        onToggleEvent: (key, enable) {
+                          _saveSettings(_settings.togglePushFlag(key, enable), isArabic: isArabic);
+                        },
+                        eventTitle: _eventTitle,
+                        eventDescription: _eventDescription,
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Card 3: Email notification settings
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InkWell(
-                              onTap: () => setState(() => _isEmailExpanded = !_isEmailExpanded),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.email_outlined, color: AppColors.primary, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            isArabic ? 'إشعارات البريد الإلكتروني' : 'Email Notifications',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: textPrimary,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            isArabic
-                                                ? 'تحديد الرسائل والأنشطة المرسلة إلى بريدك المسجل.'
-                                                : 'Choose which activity updates are sent to your inbox.',
-                                            style: TextStyle(
-                                              fontSize: 12.5,
-                                              color: textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      _isEmailExpanded
-                                          ? Icons.keyboard_arrow_up_rounded
-                                          : Icons.keyboard_arrow_down_rounded,
-                                      color: textSecondary,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            if (_isEmailExpanded) ...[
-                              Divider(color: borderColor, height: 1),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                child: Column(
-                                  children: NotificationSettings.allEvents.map((eventKey) {
-                                    final isEnabled = _settings.hasEmailFlag(eventKey);
-                                    return SwitchListTile.adaptive(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      activeTrackColor: AppColors.primary,
-                                      activeThumbColor: Colors.white,
-                                      title: Text(
-                                        _eventTitle(eventKey, isArabic),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: textPrimary,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        _eventDescription(eventKey, isArabic),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textSecondary,
-                                        ),
-                                      ),
-                                      value: isEnabled,
-                                      onChanged: (val) => _toggleEmailEvent(eventKey, val, isArabic),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                      EmailEventsCard(
+                        settings: _settings,
+                        onToggleEvent: (key, enable) {
+                          _saveSettings(_settings.toggleEmailFlag(key, enable), isArabic: isArabic);
+                        },
+                        eventTitle: _eventTitle,
+                        eventDescription: _eventDescription,
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Card 4: In-App Chat Sounds (WhatsApp chime & sent pop)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.volume_up_rounded, color: AppColors.primary, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  isArabic ? 'أصوات المحادثات المباشرة' : 'In-App Chat Sounds',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              activeTrackColor: AppColors.primary,
-                              activeThumbColor: Colors.white,
-                              title: Text(
-                                isArabic ? 'نغمات الرسائل الواردة والمرسلة' : 'Message Sent & Received Tones',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              subtitle: Text(
-                                isArabic
-                                    ? 'تشغيل مؤثر صوتي عند استقبال أو إرسال أي رسالة داخل التطبيق.'
-                                    : 'Play sound effects for incoming and outgoing messages while using the app.',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: textSecondary,
-                                ),
-                              ),
-                              value: SoundService().isSoundEnabled,
-                              onChanged: (val) async {
-                                await SoundService().setSoundEnabled(val);
-                                setState(() {});
-                                if (val) {
-                                  SoundService().playIncomingSound();
-                                }
-                              },
-                            ),
-                            if (SoundService().isSoundEnabled) ...[
-                              const SizedBox(height: 12),
-                              Divider(color: borderColor, height: 1),
-                              const SizedBox(height: 14),
-                              Text(
-                                isArabic ? 'نغمة الرسائل الواردة' : 'Incoming Message Tone',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                isArabic
-                                    ? 'اضغط على أي نغمة لاختيارها وسماعها فوراً:'
-                                    : 'Tap any sound to select and preview it:',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              ...SoundService.availableSounds.map((sound) {
-                                final isSelected = SoundService().selectedSound == sound.id;
-                                return InkWell(
-                                  onTap: () async {
-                                    await SoundService().setSound(sound.id);
-                                    await SoundService().playPreview(sound.id);
-                                    setState(() {});
-                                  },
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(vertical: 4),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? AppColors.primary.withValues(alpha: 0.1)
-                                          : (isDark ? const Color(0xFF1E2024) : const Color(0xFFF7F8FA)),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isSelected ? AppColors.primary : borderColor,
-                                        width: isSelected ? 1.5 : 1.0,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 32,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: isSelected
-                                                ? AppColors.primary
-                                                : (isDark ? const Color(0xFF282A2E) : const Color(0xFFE9EBEF)),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            sound.icon,
-                                            size: 16,
-                                            color: isSelected ? Colors.white : textSecondary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            isArabic ? sound.nameAr : sound.nameEn,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                              color: isSelected ? AppColors.primary : textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.play_circle_fill_rounded,
-                                            color: isSelected ? AppColors.primary : textSecondary,
-                                            size: 22,
-                                          ),
-                                          tooltip: isArabic ? 'استماع' : 'Listen',
-                                          onPressed: () {
-                                            SoundService().playPreview(sound.id);
-                                          },
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Container(
-                                          width: 18,
-                                          height: 18,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: isSelected ? AppColors.primary : textSecondary.withValues(alpha: 0.5),
-                                              width: 2,
-                                            ),
-                                            color: isSelected ? AppColors.primary : Colors.transparent,
-                                          ),
-                                          child: isSelected
-                                              ? const Icon(Icons.check, size: 12, color: Colors.white)
-                                              : null,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ],
-                        ),
-                      ),
-
+                      const ChatSoundsCard(),
                       const SizedBox(height: 30),
                     ],
                   ),

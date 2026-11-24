@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/di/injection_container.dart';
-import '../../../data/models/contact.dart';
-import '../../../data/repositories/contact_repository.dart';
-import '../../widgets/country_code_picker.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/data/models/contact.dart';
+import 'package:message_pro/logic/contacts/contacts_cubit.dart';
+import 'package:message_pro/ui/widgets/country_code_picker.dart';
+import 'widgets/contact_form_text_field.dart';
+import 'widgets/contact_phone_input_field.dart';
 
+/// Clean screen for updating existing contact basic info.
+/// Reuses shared modular form field components.
 class EditContactScreen extends StatefulWidget {
   final Contact contact;
 
@@ -30,7 +34,6 @@ class _EditContactScreenState extends State<EditContactScreen> {
     _emailController = TextEditingController(text: widget.contact.email ?? '');
 
     String phone = widget.contact.phoneNumber ?? '';
-    // Detect country from existing phone number if possible
     for (final c in allCountries) {
       if (phone.startsWith(c.dialCode)) {
         _selectedCountry = c;
@@ -61,7 +64,8 @@ class _EditContactScreenState extends State<EditContactScreen> {
       phone = normalizePhoneNumber(phone, _selectedCountry);
     }
 
-    final result = await sl<IContactRepository>().updateContact(
+    final contactsCubit = context.read<ContactsCubit>();
+    final result = await contactsCubit.updateContact(
       widget.contact.id,
       name: fullName,
       email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
@@ -93,12 +97,9 @@ class _EditContactScreenState extends State<EditContactScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
     final bgColor = isDark ? AppColors.darkBackground : AppColors.lightBackground;
     final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
-    final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final inputBg = isDark ? AppColors.darkSurface : AppColors.lightBackground;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -106,12 +107,8 @@ class _EditContactScreenState extends State<EditContactScreen> {
         backgroundColor: bgColor,
         elevation: 0,
         title: Text(
-          isArabic ? 'تعديل جهة الاتصال' : 'Edit Contact',
-          style: TextStyle(
-            color: textPrimary,
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-          ),
+          isArabic ? 'تعديل بيانات جهة الاتصال' : 'Edit Contact',
+          style: TextStyle(color: textPrimary, fontSize: 17, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -131,122 +128,39 @@ class _EditContactScreenState extends State<EditContactScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                isArabic ? 'بيانات العميل' : 'Contact Information',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary,
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Full name *
-              _buildFieldLabel(isArabic ? 'اسم العميل' : 'Full Name', isRequired: true, textSecondary: textSecondary),
-              const SizedBox(height: 6),
-              _buildTextInput(
+              ContactFormTextField(
+                label: isArabic ? 'الاسم الكامل' : 'Full Name',
                 controller: _nameController,
-                hintText: isArabic ? 'أدخل اسم العميل' : 'Enter client name',
-                inputBg: inputBg,
-                borderColor: borderColor,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
-                validator: (val) => val == null || val.trim().isEmpty ? (isArabic ? 'يرجى كتابة الاسم' : 'Please enter name') : null,
+                isRequired: true,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return isArabic ? 'الرجاء إدخال الاسم' : 'Please enter name';
+                  }
+                  return null;
+                },
               ),
-
-              const SizedBox(height: 14),
-
-              // Phone number
-              _buildFieldLabel(isArabic ? 'رقم الهاتف' : 'Phone Number', textSecondary: textSecondary),
-              const SizedBox(height: 6),
-              Container(
-                decoration: BoxDecoration(
-                  color: inputBg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Row(
-                  children: [
-                    InkWell(
-                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                      onTap: () async {
-                        final picked = await showCountryPickerModal(context);
-                        if (picked != null) {
-                          setState(() => _selectedCountry = picked);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border(right: BorderSide(color: borderColor, width: 1)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _selectedCountry.flag,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _selectedCountry.dialCode,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: textSecondary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        style: TextStyle(color: textPrimary, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: isArabic ? 'رقم الهاتف (أو +966...)' : 'Phone number (or +966...)',
-                          hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              ContactPhoneInputField(
+                controller: _phoneController,
+                selectedCountry: _selectedCountry,
+                onCountryChanged: (c) => setState(() => _selectedCountry = c),
+                label: isArabic ? 'رقم الهاتف' : 'Phone Number',
               ),
-
-              const SizedBox(height: 14),
-
-              // Email address
-              _buildFieldLabel(isArabic ? 'البريد الإلكتروني' : 'Email Address', textSecondary: textSecondary),
-              const SizedBox(height: 6),
-              _buildTextInput(
+              ContactFormTextField(
+                label: isArabic ? 'البريد الإلكتروني' : 'Email Address',
                 controller: _emailController,
-                hintText: isArabic ? 'أدخل البريد الإلكتروني' : 'Enter email address',
+                hintText: 'name@example.com',
                 keyboardType: TextInputType.emailAddress,
-                inputBg: inputBg,
-                borderColor: borderColor,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
               ),
-
-              const SizedBox(height: 28),
-
-              // Save button
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
-                height: 48,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleSave,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -256,73 +170,12 @@ class _EditContactScreenState extends State<EditContactScreen> {
                         )
                       : Text(
                           isArabic ? 'حفظ التعديلات' : 'Save Changes',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFieldLabel(String label, {bool isRequired = false, required Color textSecondary}) {
-    return RichText(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: textSecondary,
-        ),
-        children: [
-          if (isRequired)
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextInput({
-    required TextEditingController controller,
-    required String hintText,
-    TextInputType keyboardType = TextInputType.text,
-    required Color inputBg,
-    required Color borderColor,
-    required Color textPrimary,
-    required Color textSecondary,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      validator: validator,
-      style: TextStyle(color: textPrimary, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 14),
-        filled: true,
-        fillColor: inputBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
     );

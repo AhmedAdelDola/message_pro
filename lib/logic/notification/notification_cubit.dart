@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/services/performance_service.dart';
+import '../../data/models/notification_settings.dart';
 import '../../data/repositories/notification_repository.dart';
 import 'notification_state.dart';
 
@@ -53,5 +54,29 @@ class NotificationCubit extends Cubit<NotificationState> {
       }).toList();
       emit(state.copyWith(notifications: updated));
     });
+  }
+
+  Future<void> loadSettings() async {
+    emit(state.copyWith(isLoadingSettings: true, errorMessage: null));
+    final result = await repo.getNotificationSettings();
+    result.fold(
+      (failure) => emit(state.copyWith(isLoadingSettings: false, errorMessage: failure.message)),
+      (settings) => emit(state.copyWith(isLoadingSettings: false, settings: settings)),
+    );
+  }
+
+  Future<bool> saveSettings(NotificationSettings newSettings) async {
+    emit(state.copyWith(settings: newSettings, isSavingSettings: true));
+    final result = await repo.updateNotificationSettings(newSettings);
+    return result.fold(
+      (failure) {
+        emit(state.copyWith(isSavingSettings: false, errorMessage: failure.message));
+        return false;
+      },
+      (savedSettings) {
+        emit(state.copyWith(settings: savedSettings, isSavingSettings: false));
+        return true;
+      },
+    );
   }
 }

@@ -66,27 +66,28 @@ class _VoiceWaveformWidgetState extends State<VoiceWaveformWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final totalWidth = constraints.maxWidth;
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragUpdate: (details) => _handleSeek(details.localPosition, totalWidth),
-          onTapDown: (details) => _handleSeek(details.localPosition, totalWidth),
-          child: SizedBox(
-            height: widget.height,
-            width: totalWidth,
-            child: CustomPaint(
-              painter: _WaveformPainter(
-                progress: widget.progress.clamp(0.0, 1.0),
-                bars: _barHeights,
-                activeColor: widget.activeColor,
-                inactiveColor: widget.inactiveColor,
-              ),
-            ),
+    return SizedBox(
+      height: widget.height,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (details) {
+          final totalWidth = context.size?.width ?? 0;
+          _handleSeek(details.localPosition, totalWidth);
+        },
+        onTapDown: (details) {
+          final totalWidth = context.size?.width ?? 0;
+          _handleSeek(details.localPosition, totalWidth);
+        },
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: _WaveformPainter(
+            progress: widget.progress.clamp(0.0, 1.0),
+            bars: _barHeights,
+            activeColor: widget.activeColor,
+            inactiveColor: widget.inactiveColor,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

@@ -4,12 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../logic/auth/auth_cubit.dart';
-import '../../../logic/auth/auth_state.dart';
-import '../../../logic/settings/settings_cubit.dart';
-import '../main_layout.dart';
+import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/logic/auth/auth_cubit.dart';
+import 'package:message_pro/logic/auth/auth_state.dart';
+import 'package:message_pro/logic/settings/settings_cubit.dart';
+import 'package:message_pro/ui/screens/main_layout.dart';
 import 'forgot_password_screen.dart';
+import 'widgets/login_header.dart';
+import 'widgets/google_sign_in_button.dart';
+import 'widgets/auth_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,7 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isGoogleLoading = true);
     try {
-      // Native Google Sign-In: On Android and iOS, pass only serverClientId without clientId to avoid custom scheme redirects.
       if (!_isGoogleInitialized) {
         await GoogleSignIn.instance.initialize(
           serverClientId: _googleWebClientId,
@@ -65,9 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final GoogleSignInAccount account = await GoogleSignIn.instance.authenticate();
       final idToken = account.authentication.idToken;
-
-      debugPrint('[GoogleAuth] Native Sign-In success. User: ${account.email}');
-      debugPrint('[GoogleAuth] Google ID Token returned: ${idToken != null && idToken.isNotEmpty} (length: ${idToken?.length ?? 0})');
 
       if (idToken == null || idToken.isEmpty) {
         if (mounted) {
@@ -90,11 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } on GoogleSignInException catch (e) {
-      debugPrint('[GoogleAuth] GoogleSignInException: code=${e.code}, description=${e.description}');
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        // User cancelled, no error to show
-        return;
-      }
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -104,8 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
-    } catch (e, stack) {
-      debugPrint('[GoogleAuth] Error: $e\n$stack');
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -134,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final textTertiary = isDark ? AppColors.textLightMuted : AppColors.textDarkMuted;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final inputBg = isDark ? AppColors.darkInputBg : AppColors.lightInputBg;
-    const accentColor = AppColors.primary; // #4162E3
+    const accentColor = AppColors.primary;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -155,72 +149,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header: Logo on start, Language Switcher on end
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                             
-                                  'assets/images/brand/fulllogobabyblue2.png',
-                              width: 200.w,
-                              height: 62.h,
-                              fit: BoxFit.contain,
-                              alignment: AlignmentDirectional.centerStart,
-                              errorBuilder: (_, __, ___) => Image.asset(
-                                'assets/images/brand/fulllogobabyblue2.png',
-                                width: 160.w,
-                                height: 32.h,
-                                fit: BoxFit.contain,
-                                alignment: AlignmentDirectional.centerStart,
-                              ),
-                            ),
-                            // Language switcher toggle
-                            InkWell(
-                              onTap: () {
-                                final next = isArabic ? const Locale('en') : const Locale('ar');
-                                context.read<SettingsCubit>().setLocale(next);
-                              },
-                              borderRadius: BorderRadius.circular(20.r),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E1E20) : const Color(0xFFF0F2F5),
-                                  borderRadius: BorderRadius.circular(20.r),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/icons/translate-stroke-rounded.svg',
-                                      width: 14.r,
-                                      height: 14.r,
-                                      colorFilter: ColorFilter.mode(textSecondary, BlendMode.srcIn),
-                                      errorBuilder: (_, __, ___) => Icon(
-                                        Icons.language,
-                                        size: 14.r,
-                                        color: textSecondary,
-                                      ),
-                                    ),
-                                    SizedBox(width: 5.w),
-                                    Text(
-                                      isArabic ? 'English' : 'العربية',
-                                      style: TextStyle(
-                                        fontSize: 11.sp,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                        LoginHeader(
+                          isArabic: isArabic,
+                          isDark: isDark,
+                          borderColor: borderColor,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          onLanguageToggle: () {
+                            final next = isArabic ? const Locale('en') : const Locale('ar');
+                            context.read<SettingsCubit>().setLocale(next);
+                          },
                         ),
                         SizedBox(height: 24.h),
-
-                        // Title
                         Text(
                           isArabic ? 'تسجيل الدخول إلى Message Pro' : 'Sign in to Message Pro',
                           textAlign: isArabic ? TextAlign.right : TextAlign.left,
@@ -231,8 +171,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         SizedBox(height: 24.h),
-
-                        // Error Banner
                         if (errorMessage != null) ...[
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
@@ -260,66 +198,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ],
-
-                        // Email Field Label
-                        Text(
-                          isArabic ? 'البريد الإلكتروني' : 'Email',
-                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                          style: TextStyle(
-                            color: textSecondary,
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        SizedBox(height: 7.h),
-
-                        // Email Field
-                        TextFormField(
+                        AuthTextField(
+                          label: isArabic ? 'البريد الإلكتروني' : 'Email',
                           controller: _emailController,
+                          hintText: isArabic ? 'name@company.com' : 'Email',
                           keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          textDirection: TextDirection.ltr,
-                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            color: textPrimary,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: isArabic ? 'name@company.com' : 'Email',
-                            hintTextDirection: TextDirection.ltr,
-                            hintStyle: TextStyle(
-                              color: textTertiary,
-                              fontSize: 13.sp,
-                            ),
-                            filled: true,
-                            fillColor: inputBg,
-                            contentPadding: EdgeInsetsDirectional.only(
-                              start: 12.w,
-                              end: 12.w,
-                              top: 12.h,
-                              bottom: 12.h,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: const BorderSide(color: accentColor, width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: const BorderSide(color: Color(0xFFFB7185)),
-                            ),
-                            focusedErrorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: const BorderSide(color: Color(0xFFFB7185), width: 1.5),
-                            ),
-                          ),
                           validator: (val) {
                             if (val == null || val.trim().isEmpty) {
                               return isArabic ? 'يرجى إدخال البريد الإلكتروني' : 'Email is required';
@@ -331,71 +214,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                         ),
                         SizedBox(height: 14.h),
-
-                        // Password Field Label
-                        Text(
-                          isArabic ? 'كلمة المرور' : 'Password',
-                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                          style: TextStyle(
-                            color: textSecondary,
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        SizedBox(height: 7.h),
-
-                        // Password Field
-                        TextFormField(
+                        AuthTextField(
+                          label: isArabic ? 'كلمة المرور' : 'Password',
                           controller: _passwordController,
+                          hintText: '••••••••',
                           obscureText: _obscurePassword,
                           textInputAction: TextInputAction.done,
-                          textDirection: TextDirection.ltr,
-                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
                           onFieldSubmitted: (_) => _handleLogin(),
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            color: textPrimary,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: '••••••••',
-                            hintTextDirection: TextDirection.ltr,
-                            hintStyle: TextStyle(
-                              color: textTertiary,
-                              fontSize: 13.sp,
-                            ),
-                            filled: true,
-                            fillColor: inputBg,
-                            contentPadding: EdgeInsetsDirectional.only(
-                              start: 12.w,
-                              end: 12.w,
-                              top: 12.h,
-                              bottom: 12.h,
-                            ),
-                            suffixIcon: IconButton(
-                              icon: _buildEyeIcon(textTertiary),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                              splashRadius: 18.r,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: const BorderSide(color: accentColor, width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: const BorderSide(color: Color(0xFFFB7185)),
-                            ),
-                            focusedErrorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(7.r),
-                              borderSide: const BorderSide(color: Color(0xFFFB7185), width: 1.5),
-                            ),
+                          suffixIcon: IconButton(
+                            icon: _buildEyeIcon(textTertiary),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            splashRadius: 18.r,
                           ),
                           validator: (val) {
                             if (val == null || val.isEmpty) {
@@ -409,8 +238,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-
-                        // Forgot Password Link
                         Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: Padding(
@@ -437,8 +264,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         SizedBox(height: 9.h),
-
-                        // Sign In Button
                         SizedBox(
                           height: 45.h,
                           child: ElevatedButton(
@@ -472,8 +297,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
-
-                        // Divider ("or" / "أو")
                         Padding(
                           padding: EdgeInsets.symmetric(vertical: 16.h),
                           child: Row(
@@ -493,49 +316,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                         ),
-
-                        // Google Sign-In Button
-                        SizedBox(
-                          height: 45.h,
-                          child: OutlinedButton(
-                            onPressed: (_isGoogleLoading || isLoading) ? null : _handleGoogleSignIn,
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: borderColor),
-                              backgroundColor: inputBg,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(7.r),
-                              ),
-                            ),
-                            child: _isGoogleLoading
-                                ? SizedBox(
-                                    width: 18.r,
-                                    height: 18.r,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(textPrimary),
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildGoogleLogo(),
-                                      SizedBox(width: 10.w),
-                                      Text(
-                                        isArabic ? 'المتابعة باستخدام Google' : 'Continue with Google',
-                                        style: TextStyle(
-                                          color: textPrimary,
-                                          fontSize: 13.sp,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
+                        GoogleSignInButton(
+                          isLoading: _isGoogleLoading,
+                          isArabic: isArabic,
+                          borderColor: borderColor,
+                          inputBg: inputBg,
+                          textPrimary: textPrimary,
+                          onPressed: (_isGoogleLoading || isLoading) ? null : _handleGoogleSignIn,
                         ),
-
                         SizedBox(height: 36.h),
-
-                        // Footer Text
                         Text(
                           isArabic
                               ? 'ليس لديك حساب؟ سجل عبر جهاز الكمبيوتر.'
@@ -553,22 +342,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGoogleLogo() {
-    return Container(
-      width: 20.r,
-      height: 20.r,
-      alignment: Alignment.center,
-      child: Text(
-        'G',
-        style: TextStyle(
-          fontSize: 17.sp,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF4285F4),
         ),
       ),
     );

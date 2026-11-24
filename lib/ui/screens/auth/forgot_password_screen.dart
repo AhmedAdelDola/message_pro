@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/di/injection_container.dart';
-import '../../../data/repositories/auth_repository.dart';
+import '../../../logic/auth/auth_cubit.dart';
 import '../../widgets/custom_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -39,7 +39,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _message = null;
     });
 
-    final result = await sl<IAuthRepository>().resetPassword(email);
+    final result = await context.read<AuthCubit>().resetPassword(email);
     if (!mounted) return;
 
     result.fold(

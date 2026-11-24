@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/di/injection_container.dart';
-import '../../../data/models/contact.dart';
-import '../../../data/models/conversation.dart';
-import '../../../data/repositories/contact_repository.dart';
-import '../../../logic/conversation/conversation_cubit.dart';
-import '../../../logic/conversation/conversation_state.dart';
-import '../chat/chat_screen.dart';
-import '../contacts/contact_details_screen.dart';
-import '../inbox/widgets/conversation_tile.dart';
-import '../../widgets/avatar_widget.dart';
-import '../../widgets/empty_state_widget.dart';
+import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/data/models/conversation.dart';
+import 'package:message_pro/logic/contacts/contacts_cubit.dart';
+import 'package:message_pro/logic/contacts/contacts_state.dart';
+import 'package:message_pro/logic/conversation/conversation_cubit.dart';
+import 'package:message_pro/logic/conversation/conversation_state.dart';
+import 'package:message_pro/ui/screens/chat/chat_screen.dart';
+import 'package:message_pro/ui/screens/contacts/contact_details_screen.dart';
+import 'package:message_pro/ui/screens/inbox/widgets/conversation_tile.dart';
+import 'package:message_pro/ui/widgets/empty_state_widget.dart';
+import 'widgets/search_contact_tile.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -23,8 +22,6 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _controller = TextEditingController();
-  List<Contact> _contacts = [];
-  bool _isSearching = false;
 
   @override
   void dispose() {
@@ -32,128 +29,142 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void _onSearchChanged(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() {
-        _contacts = [];
-        _isSearching = false;
-      });
-      return;
-    }
-
-    setState(() => _isSearching = true);
-    final result = await sl<IContactRepository>().searchContacts(query.trim());
-    if (!mounted) return;
-
-    result.fold(
-      (failure) => setState(() => _isSearching = false),
-      (results) => setState(() {
-        _contacts = results;
-        _isSearching = false;
-      }),
-    );
+  void _onSearchChanged(String query) {
+    context.read<ContactsCubit>().search(query.trim());
   }
 
   @override
   Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
     return BlocBuilder<ConversationCubit, ConversationState>(
       builder: (context, convState) {
-        final query = _controller.text.trim().toLowerCase();
+        return BlocBuilder<ContactsCubit, ContactsState>(
+          builder: (context, contactsState) {
+            final query = _controller.text.trim().toLowerCase();
 
-        final matchingConvs = query.isEmpty
-            ? <Conversation>[]
-            : convState.conversations.where((c) {
-                return c.contact.name.toLowerCase().contains(query) ||
-                    (c.lastMessage?.content?.toLowerCase().contains(query) ?? false);
-              }).toList();
+            final matchingConvs = query.isEmpty
+                ? <Conversation>[]
+                : convState.conversations.where((c) {
+                    return c.contact.name.toLowerCase().contains(query) ||
+                        (c.lastMessage?.content?.toLowerCase().contains(query) ?? false);
+                  }).toList();
 
-        return Scaffold(
-          appBar: AppBar(
-            titleSpacing: 0,
-            title: TextField(
-              controller: _controller,
-              autofocus: true,
-              style: TextStyle(fontSize: 15.sp),
-              decoration: const InputDecoration(
-                hintText: 'بحث في المحادثات وجهات الاتصال...',
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
+            final contacts = contactsState.contacts;
+            final isSearching = contactsState.status == ContactsStatus.loading;
+
+            return Scaffold(
+              appBar: AppBar(
+                title: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: isArabic
+                        ? 'ابحث في المحادثات وجهات الاتصال...'
+                        : 'Search conversations & contacts...',
+                    border: InputBorder.none,
+                  ),
+                  onChanged: _onSearchChanged,
+                ),
+                actions: [
+                  if (_controller.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _controller.clear();
+                        _onSearchChanged('');
+                      },
+                    ),
+                ],
               ),
-              onChanged: _onSearchChanged,
-            ),
-            actions: [
-              if (_controller.text.isNotEmpty)
-                IconButton(
-                  icon: Icon(Icons.clear, size: 20.r),
-                  onPressed: () {
-                    _controller.clear();
-                    _onSearchChanged('');
-                  },
-                ),
-            ],
-          ),
-          body: query.isEmpty
-              ? const EmptyStateWidget(
-                  lottieAsset: 'assets/animations/empty_search.json',
-                  title: 'البحث الموحد',
-                  description: 'اكتب للبحث السريع في المحادثات وجهات الاتصال',
-                )
-              : ListView(
-                  children: [
-                    if (matchingConvs.isNotEmpty) ...[
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
-                        child: Text(
-                          'المحادثات المطابقة',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp, color: AppColors.primaryLight),
-                        ),
-                      ),
-                      ...matchingConvs.map((conv) => ConversationTile(
-                            conversation: conv,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => ChatScreen(conversation: conv)),
-                              );
-                            },
-                          )),
-                    ],
-
-                    if (_contacts.isNotEmpty) ...[
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
-                        child: Text(
-                          'جهات الاتصال المطابقة',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp, color: AppColors.primaryLight),
-                        ),
-                      ),
-                      ..._contacts.map((contact) => ListTile(
-                            leading: AvatarWidget(
-                              avatarUrl: contact.avatarUrl,
-                              name: contact.name,
-                              size: 40,
+              body: isSearching
+                  ? const Center(child: CircularProgressIndicator())
+                  : query.isEmpty
+                      ? EmptyStateWidget(
+                          title: isArabic ? 'بحث' : 'Search',
+                          description: isArabic
+                              ? 'ابحث في المحادثات باسم جهة الاتصال أو محتوى الرسائل.'
+                              : 'Search for conversations by contact name or message, or search contacts.',
+                          icon: Icons.search,
+                        )
+                      : (matchingConvs.isEmpty && contacts.isEmpty)
+                          ? EmptyStateWidget(
+                              title: isArabic ? 'لا توجد نتائج' : 'No Results',
+                              description: isArabic
+                                  ? 'لم يتم العثور على أي محادثات أو جهات اتصال مطابقة.'
+                                  : 'No conversations or contacts match your query.',
+                              icon: Icons.search_off,
+                            )
+                          : ListView(
+                              children: [
+                                if (matchingConvs.isNotEmpty) ...[
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                    child: Text(
+                                      isArabic
+                                          ? 'المحادثات (${matchingConvs.length})'
+                                          : 'Conversations (${matchingConvs.length})',
+                                      style: TextStyle(
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textLightSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  ...matchingConvs.map(
+                                    (conv) => ConversationTile(
+                                      conversation: conv,
+                                      onTap: () async {
+                                        try {
+                                          context.read<ConversationCubit>().markConversationAsRead(conv.id);
+                                        } catch (_) {}
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ChatScreen(conversation: conv.copyWith(unreadCount: 0)),
+                                          ),
+                                        );
+                                        if (context.mounted) {
+                                          try {
+                                            context.read<ConversationCubit>().markConversationAsRead(conv.id);
+                                          } catch (_) {}
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                                if (contacts.isNotEmpty) ...[
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                    child: Text(
+                                      isArabic
+                                          ? 'جهات الاتصال (${contacts.length})'
+                                          : 'Contacts (${contacts.length})',
+                                      style: TextStyle(
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textLightSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  ...contacts.map(
+                                    (contact) => SearchContactTile(
+                                      contact: contact,
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ContactDetailsScreen(contact: contact),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            title: Text(contact.name, style: TextStyle(fontSize: 14.sp)),
-                            subtitle: Text(contact.phoneNumber ?? contact.email ?? '', style: TextStyle(fontSize: 12.sp)),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => ContactDetailsScreen(contact: contact)),
-                              );
-                            },
-                          )),
-                    ],
-
-                    if (matchingConvs.isEmpty && _contacts.isEmpty && !_isSearching)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: EmptyStateWidget(
-                          lottieAsset: 'assets/animations/empty_search.json',
-                          title: 'لا توجد نتائج مطابقة',
-                          description: 'تأكد من كتابة الاسم أو رقم الهاتف بدقة',
-                        ),
-                      ),
-                  ],
-                ),
+            );
+          },
         );
       },
     );

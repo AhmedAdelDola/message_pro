@@ -1,141 +1,142 @@
 import 'dart:async';
+import 'package:flutter/widgets.dart';
+import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:message_pro/data/models/message.dart';
+import '../../core/error/failures.dart';
 import '../../core/network/websocket_client.dart';
-import '../../core/services/sound_service.dart';
 import '../../core/services/performance_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../data/models/contact.dart';
 import '../../data/models/conversation.dart';
 import '../../data/models/conversation_filter_options.dart';
+import '../../data/models/message.dart';
 import '../../data/repositories/conversation_repository.dart';
 import 'conversation_state.dart';
+import 'handlers/conversation_realtime_handler.dart';
+import 'services/conversation_filter_helper.dart';
 
+/// Cubit responsible for orchestrating conversation lists, filtering, pagination, and actions.
+/// Follows SOLID principles by delegating real-time WebSocket events to [ConversationRealtimeHandler]
+/// and filter/sorting logic to [ConversationFilterHelper].
 class ConversationCubit extends Cubit<ConversationState> {
   final IConversationRepository repo;
   final ActionCableClient ws;
-  final SecureStorageService _storage = SecureStorageService();
-  StreamSubscription<RealtimeEvent>? _eventSub;
-  StreamSubscription<void>? _reconnectSub;
+  final SecureStorageService _storage;
+  final Stopwatch renderStopwatch = Stopwatch();
+  late final ConversationRealtimeHandler _realtimeHandler;
+  Set<int> _cachedPinnedIds = {};
 
   ConversationCubit({
     required this.repo,
     required this.ws,
-  }) : super(const ConversationState()) {
+    SecureStorageService? storage,
+  })  : _storage = storage ?? SecureStorageService(),
+        super(const ConversationState()) {
+    _realtimeHandler = ConversationRealtimeHandler(
+      ws: ws,
+      storage: _storage,
+    );
+    _init();
+  }
+
+  @override
+  void emit(ConversationState state) {
+    if (!isClosed) {
+      super.emit(state);
+    }
+  }
+
+  // --- Initialization & Realtime ---
+
+  Future<void> _init() async {
+    try {
+      final activeId = await _storage.getActiveAccountId();
+      _realtimeHandler.activeAccountId = activeId;
+    } catch (_) {}
     _listenToRealtime();
-    _listenToReconnect();
     loadAuxiliaryData();
     loadFilterOptions();
     loadConversations();
   }
 
-  void _listenToReconnect() {
-    _reconnectSub = ws.onReconnected.listen((_) {
-      loadAuxiliaryData();
-      loadFilterOptions();
-      loadConversations(refresh: false);
-    });
-  }
-
   void _listenToRealtime() {
-    _eventSub = ws.events.listen((event) async {
-      final name = event.event;
-      final payload = event.data;
-
-      // Filter by active account ID to prevent cross-workspace conversation bleed
-      final activeAccId = await _storage.getActiveAccountId();
-      final eventAccId = payload['account_id'] ?? payload['account']?['id'];
-      if (activeAccId != null && activeAccId > 0 && eventAccId != null) {
-        final parsedAcc = eventAccId is int ? eventAccId : int.tryParse(eventAccId.toString());
-        if (parsedAcc != null && parsedAcc > 0 && parsedAcc != activeAccId) {
-          return; // Ignore event belonging to another workspace!
-        }
-      }
-
-      if (name == 'conversation.created') {
-        try {
-          final conv = Conversation.fromJson(Map<String, dynamic>.from(payload));
-          if (activeAccId != null && activeAccId > 0 && conv.accountId > 0 && conv.accountId != activeAccId) {
-            return;
-          }
-          final matchesStatus = state.status == 'all' || conv.status == state.status;
-          if (matchesStatus && conv.id > 0 && !state.conversations.any((c) => c.id == conv.id)) {
-            emit(state.copyWith(
-              conversations: [conv, ...state.conversations],
-            ));
-          }
-        } catch (_) {}
-      } else if (name == 'conversation.updated' ||
-          name == 'conversation.status_changed' ||
-          name == 'assignee.changed') {
-        try {
-          final conv = Conversation.fromJson(Map<String, dynamic>.from(payload));
-          if (activeAccId != null && activeAccId > 0 && conv.accountId > 0 && conv.accountId != activeAccId) {
-            return;
-          }
-          if (conv.id > 0) {
-            final updated = state.conversations.map((c) => c.id == conv.id ? conv : c).toList();
-            emit(state.copyWith(conversations: updated));
-          }
-        } catch (_) {}
-      } else if (name == 'conversation.read') {
-        final convId = payload['id'] ?? payload['conversation_id'];
-        if (convId != null) {
-          final id = convId is int ? convId : int.tryParse(convId.toString());
-          if (id != null) {
-            final updated = state.conversations.map((c) {
-              if (c.id == id) {
-                return c.copyWith(unreadCount: 0);
-              }
-              return c;
-            }).toList();
-            emit(state.copyWith(conversations: updated));
-          }
-        }
-      } else if (name == 'message.created') {
-        if (payload['message_type'] == 0) {
-          SoundService().playIncomingSound();
-        }
-        final convId = payload['conversation_id'];
-        if (convId != null) {
-          final id = convId is int ? convId : int.tryParse(convId.toString());
-          if (id != null) {
-            final existingIndex = state.conversations.indexWhere((c) => c.id == id);
-            if (existingIndex >= 0) {
-              final existing = state.conversations[existingIndex];
-              Message? newMsg;
-              try {
-                newMsg = Message.fromJson(Map<String, dynamic>.from(payload));
-              } catch (_) {}
-              final updated = existing.copyWith(
-                lastMessage: newMsg ?? existing.lastMessage,
-                unreadCount: existing.unreadCount + (payload['message_type'] == 0 ? 1 : 0),
-                updatedAt: DateTime.now(),
-              );
-              final list = List<Conversation>.from(state.conversations);
-              list.removeAt(existingIndex);
-              list.insert(0, updated);
-              emit(state.copyWith(conversations: list));
-            } else if (payload['conversation'] is Map) {
-              try {
-                final newConv = Conversation.fromJson(Map<String, dynamic>.from(payload['conversation']));
-                if (activeAccId != null && activeAccId > 0 && newConv.accountId > 0 && newConv.accountId != activeAccId) {
-                  return;
-                }
-                final matchesStatus = state.status == 'all' || newConv.status == state.status;
-                if (matchesStatus && !state.conversations.any((c) => c.id == newConv.id)) {
-                  emit(state.copyWith(conversations: [newConv, ...state.conversations]));
-                }
-              } catch (_) {}
-            }
-          }
-        }
-      }
-    });
+    _realtimeHandler.startListening(
+      onConversationCreated: _handleConversationCreated,
+      onConversationUpdated: _handleConversationUpdated,
+      onConversationRead: _handleConversationRead,
+      onMessageCreated: _handleMessageCreated,
+      onReconnected: _handleReconnected,
+    );
   }
+
+  void _handleConversationCreated(Conversation conv) {
+    if (!ConversationFilterHelper.matchesStatusFilter(conv, state.status)) return;
+    if (!state.conversations.any((c) => c.id == conv.id)) {
+      emit(state.copyWith(
+        conversations: [conv, ...state.conversations],
+      ));
+    }
+  }
+
+  void _handleConversationUpdated(Conversation conv) {
+    final updated = state.conversations.map((c) => c.id == conv.id ? conv : c).toList();
+    emit(state.copyWith(conversations: updated));
+  }
+
+  void markConversationAsRead(int convId) {
+    if (convId <= 0) return;
+    _handleConversationRead(convId);
+    repo.markAsRead(convId);
+  }
+
+  void _handleConversationRead(int convId) {
+    final updated = state.conversations.map((c) {
+      if (c.id == convId) {
+        return c.copyWith(unreadCount: 0);
+      }
+      return c;
+    }).toList();
+    emit(state.copyWith(conversations: updated));
+  }
+
+  void _handleMessageCreated(int convId, Message? message, Map<String, dynamic> rawPayload) {
+    final existingIndex = state.conversations.indexWhere((c) => c.id == convId);
+    if (existingIndex >= 0) {
+      final existing = state.conversations[existingIndex];
+      final isIncoming = rawPayload['message_type'] == 0;
+      final updated = existing.copyWith(
+        lastMessage: message ?? existing.lastMessage,
+        unreadCount: existing.unreadCount + (isIncoming ? 1 : 0),
+        updatedAt: DateTime.now(),
+      );
+      final list = List<Conversation>.from(state.conversations);
+      list.removeAt(existingIndex);
+      list.insert(0, updated);
+      emit(state.copyWith(conversations: list));
+    } else if (rawPayload['conversation'] is Map) {
+      try {
+        final newConv = Conversation.fromJson(Map<String, dynamic>.from(rawPayload['conversation']));
+        if (!_realtimeHandler.isEventForCurrentAccount(rawPayload, newConv.accountId)) return;
+        if (newConv.id > 0 && ConversationFilterHelper.matchesStatusFilter(newConv, state.status)) {
+          if (!state.conversations.any((c) => c.id == newConv.id)) {
+            emit(state.copyWith(conversations: [newConv, ...state.conversations]));
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  void _handleReconnected() async {
+    final accId = await _storage.getActiveAccountId();
+    _realtimeHandler.activeAccountId = accId;
+    loadAuxiliaryData();
+    loadFilterOptions();
+    loadConversations(refresh: false);
+  }
+
+  // --- Auxiliary & Filter Options ---
 
   Future<void> loadAuxiliaryData() async {
-    // Run independent network/cache calls concurrently for optimal speed
     final inboxesFuture = repo.fetchInboxes();
     final labelsFuture = repo.fetchLabels();
     final teamsFuture = repo.fetchTeams();
@@ -153,8 +154,9 @@ class ConversationCubit extends Cubit<ConversationState> {
     final teams = teamsRes.getOrElse(() => []);
     final stages = stagesRes.getOrElse(() => []);
 
-    final agentsRes = await repo.fetchAssignableAgents(inboxIds: inboxes.map((i) => i.id).toList());
-
+    final agentsRes = await repo.fetchAssignableAgents(
+      inboxIds: inboxes.map((i) => i.id).toList(),
+    );
     if (isClosed) return;
 
     emit(state.copyWith(
@@ -168,44 +170,57 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   Future<void> loadFilterOptions() async {
     if (isClosed) return;
-    await PerformanceService.traceAsync(
-      'load_filter_options',
-      () async {
-        if (state.inboxes.isEmpty) {
-          emit(state.copyWith(isLoadingFilters: true));
-        }
-        final res = await repo.fetchFilterOptions();
-        if (isClosed) return;
-        res.fold(
-          (_) {
-            if (!isClosed) emit(state.copyWith(isLoadingFilters: false));
-          },
-          (options) {
-            if (!isClosed) {
-              emit(state.copyWith(
-                filterOptions: options,
-                isLoadingFilters: false,
-                inboxes: options.inboxes.isNotEmpty ? options.inboxes : state.inboxes,
-                teams: options.teams.isNotEmpty ? options.teams : state.teams,
-                agents: options.agents.isNotEmpty ? options.agents : state.agents,
-              ));
-            }
-          },
-        );
-      },
-    );
+    await PerformanceService.traceAsync('load_filter_options', () async {
+      if (state.inboxes.isEmpty) {
+        emit(state.copyWith(isLoadingFilters: true));
+      }
+      final res = await repo.fetchFilterOptions();
+      if (isClosed) return;
+      res.fold(
+        (_) {
+          if (!isClosed) emit(state.copyWith(isLoadingFilters: false));
+        },
+        (options) {
+          if (!isClosed) {
+            emit(state.copyWith(
+              filterOptions: options,
+              isLoadingFilters: false,
+              inboxes: options.inboxes.isNotEmpty ? options.inboxes : state.inboxes,
+              teams: options.teams.isNotEmpty ? options.teams : state.teams,
+              agents: options.agents.isNotEmpty ? options.agents : state.agents,
+            ));
+          }
+        },
+      );
+    });
   }
+
+  // --- Conversations Loading & Pagination ---
 
   Future<void> loadConversations({bool refresh = true}) async {
     if (isClosed) return;
     final hasExistingData = state.conversations.isNotEmpty;
-    if (refresh && !hasExistingData) {
-      // Only show empty loading state if we have no existing conversations
+    if (!hasExistingData) {
+      final activeAcc = _realtimeHandler.activeAccountId ?? _storage.activeAccountId;
+      if (activeAcc != null && activeAcc > 0 && repo is ConversationRepository) {
+        try {
+          final cached = await (repo as ConversationRepository).getCachedConversations(activeAcc);
+          if (cached.isNotEmpty && state.conversations.isEmpty && !isClosed) {
+            emit(state.copyWith(conversations: cached, isLoading: false));
+          }
+        } catch (_) {}
+      }
+    }
+
+    final hasDataNow = state.conversations.isNotEmpty;
+    if (refresh && !hasDataNow) {
       emit(state.copyWith(conversations: [], isLoading: true, page: 1, hasMore: true, errorMessage: null));
     } else {
-      // Keep existing conversations displayed to give 0 perceived latency
-      emit(state.copyWith(isLoading: !hasExistingData));
+      emit(state.copyWith(isLoading: true));
     }
+
+    final totalStopwatch = Stopwatch()..start();
+    final fetchStopwatch = Stopwatch()..start();
 
     await PerformanceService.traceAsync(
       'load_conversations',
@@ -220,6 +235,8 @@ class ConversationCubit extends Cubit<ConversationState> {
           assigneeAgentBotId: state.selectedAssigneeAgentBotId,
           page: 1,
         );
+        fetchStopwatch.stop();
+        final serverDurationMs = fetchStopwatch.elapsedMilliseconds;
 
         if (isClosed) return;
 
@@ -229,15 +246,36 @@ class ConversationCubit extends Cubit<ConversationState> {
           },
           (list) {
             if (!isClosed) {
+              renderStopwatch.reset();
+              renderStopwatch.start();
+              final listWithPins = _cachedPinnedIds.isEmpty
+                  ? list
+                  : list.map((c) => c.copyWith(isPinned: _cachedPinnedIds.contains(c.id))).toList();
               emit(state.copyWith(
-                conversations: list,
+                conversations: listWithPins,
                 isLoading: false,
                 errorMessage: null,
                 page: 1,
                 hasMore: list.isNotEmpty,
               ));
-              // Preload messages for top 3 active conversations in background
-              _prefetchTopConversations(list);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (renderStopwatch.isRunning) {
+                  renderStopwatch.stop();
+                  totalStopwatch.stop();
+                  final renderDurationMs = renderStopwatch.elapsedMilliseconds;
+                  final totalDurationMs = totalStopwatch.elapsedMilliseconds;
+                  debugPrint(
+                    '════════════════════════════════════════════════════════\n'
+                    '📊 [PERF METRICS] فلتر المحادثات (Status: ${state.status} | Assignee: ${state.assigneeType}):\n'
+                    '   🌐 وقت استجابة السيرفر والشبكة: ${serverDurationMs}ms\n'
+                    '   🎨 وقت رسم الواجهة وظهورها على الشاشة: ${renderDurationMs}ms\n'
+                    '   ⏱️ إجمالي الوقت من لحظة الضغط حتى الظهور الفعلي: ${totalDurationMs}ms\n'
+                    '════════════════════════════════════════════════════════',
+                  );
+                }
+              });
+              _prefetchTopConversations(listWithPins);
+              _syncPinnedConversationsInBackground();
             }
           },
         );
@@ -251,6 +289,51 @@ class ConversationCubit extends Cubit<ConversationState> {
         trace.setMetric('conversation_count', state.conversations.length);
       },
     );
+  }
+
+  Future<void> _syncPinnedConversationsInBackground() async {
+    try {
+      final res = await repo.fetchPinnedConversationIds();
+      if (isClosed) return;
+      res.fold(
+        (_) {},
+        (pinnedIds) async {
+          _cachedPinnedIds = pinnedIds.toSet();
+          if (isClosed) return;
+
+          final updated = state.conversations.map((c) {
+            final shouldBePinned = _cachedPinnedIds.contains(c.id);
+            if (c.isPinned != shouldBePinned) {
+              return c.copyWith(isPinned: shouldBePinned);
+            }
+            return c;
+          }).toList();
+
+          final existingIds = updated.map((c) => c.id).toSet();
+          final missingPinnedIds = _cachedPinnedIds.where((id) => !existingIds.contains(id)).toList();
+
+          if (missingPinnedIds.isNotEmpty) {
+            for (final pId in missingPinnedIds) {
+              if (isClosed) return;
+              final convRes = await repo.getConversation(pId);
+              convRes.fold(
+                (_) {},
+                (conv) {
+                  if (isClosed) return;
+                  if (!updated.any((c) => c.id == conv.id)) {
+                    updated.insert(0, conv.copyWith(isPinned: true));
+                  }
+                },
+              );
+            }
+          }
+
+          if (!isClosed) {
+            emit(state.copyWith(conversations: updated));
+          }
+        },
+      );
+    } catch (_) {}
   }
 
   void _prefetchTopConversations(List<Conversation> list) {
@@ -288,10 +371,7 @@ class ConversationCubit extends Cubit<ConversationState> {
           (failure) => emit(state.copyWith(isLoadingMore: false)),
           (list) {
             if (list.isEmpty) {
-              emit(state.copyWith(
-                isLoadingMore: false,
-                hasMore: false,
-              ));
+              emit(state.copyWith(isLoadingMore: false, hasMore: false));
               return;
             }
 
@@ -299,10 +379,7 @@ class ConversationCubit extends Cubit<ConversationState> {
             final newItems = list.where((c) => !existingIds.contains(c.id)).toList();
 
             if (newItems.isEmpty) {
-              emit(state.copyWith(
-                isLoadingMore: false,
-                hasMore: false,
-              ));
+              emit(state.copyWith(isLoadingMore: false, hasMore: false));
               return;
             }
 
@@ -315,14 +392,14 @@ class ConversationCubit extends Cubit<ConversationState> {
           },
         );
       },
-      attributes: {
-        'page': nextPage.toString(),
-      },
+      attributes: {'page': nextPage.toString()},
       onResult: (trace, _) {
         trace.setMetric('loaded_count', state.conversations.length);
       },
     );
   }
+
+  // --- Workspace & Cache Lifecycle ---
 
   void reset() {
     repo.clearCache();
@@ -330,12 +407,13 @@ class ConversationCubit extends Cubit<ConversationState> {
   }
 
   Future<void> onWorkspaceSwitched(int newAccountId) async {
+    if (_realtimeHandler.activeAccountId == newAccountId && state.conversations.isNotEmpty) {
+      return;
+    }
     await PerformanceService.traceAsync('workspace_switch', () async {
-      // 1. Immediately wipe any in-memory cached inboxes, teams, labels, and filters from the previous workspace
+      _realtimeHandler.activeAccountId = newAccountId;
       repo.clearCache();
 
-      // 2. Reset filters because inbox/team/label/stage IDs from previous workspace do not exist in the new workspace.
-      // Clear previous conversations list and pagination immediately to prevent stale cross-workspace data bleed.
       emit(state.copyWith(
         conversations: const [],
         inboxes: const [],
@@ -359,16 +437,16 @@ class ConversationCubit extends Cubit<ConversationState> {
         filterOptions: const ConversationFilterOptions(),
       ));
 
-      // 3. Re-fetch fresh auxiliary data & filter options for the new workspace
       await Future.wait([
         loadAuxiliaryData(),
         loadFilterOptions(),
       ]);
 
-      // 4. Re-fetch conversations for the new workspace
       await loadConversations(refresh: true);
     }, attributes: {'account_id': newAccountId.toString()});
   }
+
+  // --- Filters Management ---
 
   void selectDrawerFilter({
     required String assigneeType,
@@ -386,6 +464,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearStage: stageId == null,
       clearAssignee: true,
       clearAgentBot: true,
+      isLoading: true,
       page: 1,
     ));
     loadConversations();
@@ -393,7 +472,7 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   void setStatus(String status) {
     if (state.status == status) return;
-    emit(state.copyWith(status: status, page: 1));
+    emit(state.copyWith(status: status, isLoading: true, page: 1));
     loadConversations();
   }
 
@@ -403,6 +482,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       assigneeType: type,
       clearAssignee: true,
       clearAgentBot: true,
+      isLoading: true,
       page: 1,
     ));
     loadConversations();
@@ -417,6 +497,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearInbox: true,
       clearTeam: true,
       assigneeType: 'all',
+      isLoading: true,
       page: 1,
     ));
     loadConversations();
@@ -431,6 +512,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearInbox: true,
       clearTeam: true,
       assigneeType: 'all',
+      isLoading: true,
       page: 1,
     ));
     loadConversations();
@@ -445,6 +527,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearAgentBot: true,
       clearTeam: true,
       assigneeType: 'all',
+      isLoading: true,
       page: 1,
     ));
     loadConversations();
@@ -494,9 +577,53 @@ class ConversationCubit extends Cubit<ConversationState> {
     ));
   }
 
+  /// Sorted and filtered conversations based on active filters and pinned status.
   List<Conversation> get filteredConversations {
-    if (state.selectedLifecycleStageId == null) return state.conversations;
-    return state.conversations.where((c) => (c.effectiveLifecycleStage?.id ?? c.lifecycleStage?.id) == state.selectedLifecycleStageId).toList();
+    return ConversationFilterHelper.applyFiltersAndSorting(
+      state.conversations,
+      selectedLifecycleStageId: state.selectedLifecycleStageId,
+      isAllTab: state.assigneeType == 'all',
+    );
+  }
+
+  // --- Conversation Actions ---
+
+  Future<Either<Failure, void>> togglePinConversation(int conversationId) async {
+    final index = state.conversations.indexWhere((c) => c.id == conversationId);
+    if (index == -1) return const Right(null);
+    final isCurrentlyPinned = state.conversations[index].isPinned;
+
+    if (isCurrentlyPinned) {
+      _cachedPinnedIds.remove(conversationId);
+    } else {
+      _cachedPinnedIds.add(conversationId);
+    }
+
+    final updatedList = List<Conversation>.from(state.conversations);
+    updatedList[index] = updatedList[index].copyWith(isPinned: !isCurrentlyPinned);
+    emit(state.copyWith(conversations: updatedList));
+
+    final res = isCurrentlyPinned
+        ? await repo.unpinConversation(conversationId)
+        : await repo.pinConversation(conversationId);
+
+    res.fold(
+      (failure) {
+        if (isCurrentlyPinned) {
+          _cachedPinnedIds.add(conversationId);
+        } else {
+          _cachedPinnedIds.remove(conversationId);
+        }
+        final rollbackList = List<Conversation>.from(state.conversations);
+        final rIndex = rollbackList.indexWhere((c) => c.id == conversationId);
+        if (rIndex != -1) {
+          rollbackList[rIndex] = rollbackList[rIndex].copyWith(isPinned: isCurrentlyPinned);
+          emit(state.copyWith(conversations: rollbackList));
+        }
+      },
+      (_) {},
+    );
+    return res;
   }
 
   void updateContactLifecycleStage(int contactId, String stageName, {int? conversationId}) {
@@ -527,10 +654,57 @@ class ConversationCubit extends Cubit<ConversationState> {
     emit(state.copyWith(conversations: updatedList));
   }
 
+  Future<Either<Failure, void>> toggleConversationStatus(int conversationId, String status) async {
+    final res = await repo.toggleStatus(conversationId, status);
+    res.fold((_) {}, (_) {
+      loadConversations();
+    });
+    return res;
+  }
+
+  Future<void> muteConversation(int conversationId) async {
+    await repo.muteConversation(conversationId);
+    loadConversations();
+  }
+
+  Future<void> unmuteConversation(int conversationId) async {
+    await repo.unmuteConversation(conversationId);
+    loadConversations();
+  }
+
+  Future<Either<Failure, List<Conversation>>> searchConversations(String query) async {
+    return await repo.searchConversations(query);
+  }
+
+  Future<Either<Failure, Conversation>> getConversation(int id) async {
+    return await repo.getConversation(id);
+  }
+
+  Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber}) async {
+    return await repo.getPhoneDestinations(phoneNumber: phoneNumber);
+  }
+
+  Future<Either<Failure, Conversation>> startDirectChat({
+    required String phoneNumber,
+    required int inboxId,
+    String? sourceId,
+    String? contactName,
+  }) async {
+    final res = await repo.startDirectChat(
+      phoneNumber: phoneNumber,
+      inboxId: inboxId,
+      sourceId: sourceId ?? phoneNumber,
+      contactName: contactName,
+    );
+    res.fold((_) {}, (_) {
+      loadConversations(refresh: true);
+    });
+    return res;
+  }
+
   @override
   Future<void> close() {
-    _eventSub?.cancel();
-    _reconnectSub?.cancel();
+    _realtimeHandler.dispose();
     return super.close();
   }
 }

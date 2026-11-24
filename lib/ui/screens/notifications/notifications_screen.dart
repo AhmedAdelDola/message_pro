@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/di/injection_container.dart';
-import '../../../data/repositories/conversation_repository.dart';
-import '../../../logic/notification/notification_cubit.dart';
-import '../../../logic/notification/notification_state.dart';
-import '../chat/chat_screen.dart';
-import '../../widgets/app_bar_progress_bar.dart';
-import '../../widgets/empty_state_widget.dart';
+import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/logic/conversation/conversation_cubit.dart';
+import 'package:message_pro/logic/notification/notification_cubit.dart';
+import 'package:message_pro/logic/notification/notification_state.dart';
+import 'package:message_pro/ui/screens/chat/chat_screen.dart';
+import 'package:message_pro/ui/widgets/app_bar_progress_bar.dart';
+import 'package:message_pro/ui/widgets/empty_state_widget.dart';
+import 'widgets/notification_tile.dart';
+import 'widgets/notification_tab_bar.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -18,7 +18,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  String _selectedFilter = 'new'; // 'new', 'archived', 'all'
+  String _selectedFilter = 'new';
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final bgColor = isDark ? AppColors.darkBackground : AppColors.lightBackground;
     final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
     final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -47,7 +46,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Header Row (matching Web/Mobile Header)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
@@ -61,52 +59,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           color: textPrimary,
                         ),
                       ),
-                      Row(
-                        children: [
-                          TextButton(
-                            onPressed: state.unreadCount > 0 ? () => cubit.markAllAsRead() : null,
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              isArabic ? 'أرشفة الكل' : 'Archive all',
-                              style: TextStyle(
-                                color: state.unreadCount > 0 ? AppColors.primary : textSecondary.withValues(alpha: 0.5),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
+                      TextButton(
+                        onPressed: state.unreadCount > 0 ? () => cubit.markAllAsRead() : null,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          isArabic ? 'أرشفة الكل' : 'Archive all',
+                          style: TextStyle(
+                            color: state.unreadCount > 0 ? AppColors.primary : textSecondary.withValues(alpha: 0.5),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // Global sleek blue linear progress indicator
                 LinearHeaderLoader(isLoading: state.isLoading),
-
-                // Horizontal Underline Filter Tabs (New | Archived | All)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildTabItem('new', isArabic ? 'جديدة' : 'New', isDark),
-                      const SizedBox(width: 24),
-                      _buildTabItem('archived', isArabic ? 'مؤرشفة' : 'Archived', isDark),
-                      const SizedBox(width: 24),
-                      _buildTabItem('all', isArabic ? 'الكل' : 'All', isDark),
-                    ],
-                  ),
+                NotificationTabBar(
+                  selectedFilter: _selectedFilter,
+                  onFilterChanged: (filter) => setState(() => _selectedFilter = filter),
                 ),
-
-                // Notifications List
                 Expanded(
                   child: RefreshIndicator(
                     color: AppColors.primary,
@@ -124,92 +101,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 itemCount: items.length,
                                 itemBuilder: (context, index) {
                                   final notif = items[index];
-                                  final timeStr = _formatTimestamp(notif.createdAt, isArabic);
-
-                                  return InkWell(
+                                  return NotificationTile(
+                                    notification: notif,
                                     onTap: () async {
                                       if (!notif.isRead) {
                                         cubit.markAsRead(notif.id);
                                       }
                                       if (notif.conversationId != null) {
-                                        final res = await sl<IConversationRepository>()
+                                        final res = await context
+                                            .read<ConversationCubit>()
                                             .getConversation(notif.conversationId!);
-                                        res.fold(
-                                          (_) {},
-                                          (conv) {
-                                            if (context.mounted) {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) => ChatScreen(conversation: conv),
-                                                ),
-                                              );
-                                            }
-                                          },
-                                        );
+                                        res.fold((_) {}, (conv) {
+                                          if (context.mounted) {
+                                            try {
+                                              context.read<ConversationCubit>().markConversationAsRead(conv.id);
+                                            } catch (_) {}
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => ChatScreen(conversation: conv.copyWith(unreadCount: 0)),
+                                              ),
+                                            );
+                                          }
+                                        });
                                       }
                                     },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                      decoration: BoxDecoration(
-                                        color: notif.isRead
-                                            ? Colors.transparent
-                                            : (isDark ? AppColors.darkSurface : AppColors.brandSubtle.withValues(alpha: 0.3)),
-                                        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Distinct colored icon circle matching the browser
-                                          _buildNotificationBadge(notif.notificationType),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  notif.title ?? (isArabic ? 'إشعار جديد' : 'New Notification'),
-                                                  style: TextStyle(
-                                                    fontWeight: notif.isRead ? FontWeight.w500 : FontWeight.w700,
-                                                    fontSize: 14,
-                                                    color: textPrimary,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 3),
-                                                Text(
-                                                  timeStr,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF80838D),
-                                                  ),
-                                                ),
-                                                if (notif.message != null && notif.message!.isNotEmpty) ...[
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    notif.message!,
-                                                    maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      color: textSecondary,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                          if (!notif.isRead)
-                                            Container(
-                                              width: 8,
-                                              height: 8,
-                                              margin: const EdgeInsets.only(top: 6),
-                                              decoration: const BoxDecoration(
-                                                color: AppColors.primary,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
                                   );
                                 },
                               ),
@@ -221,85 +136,5 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildTabItem(String key, String label, bool isDark) {
-    final active = _selectedFilter == key;
-    return InkWell(
-      onTap: () => setState(() => _selectedFilter = key),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: active ? AppColors.primary : Colors.transparent,
-              width: 2.5,
-            ),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: active ? FontWeight.bold : FontWeight.w500,
-            color: active
-                ? AppColors.primary
-                : (isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationBadge(String? type) {
-    Color bg;
-    IconData icon;
-
-    switch (type) {
-      case 'conversation_creation':
-      case 'assigned_conversation_new_message':
-        bg = const Color(0xFF2563EB); // Royal Blue
-        icon = Icons.mark_email_unread_rounded;
-        break;
-      case 'message_created':
-        bg = const Color(0xFF16A34A); // Green
-        icon = Icons.chat_bubble_outline_rounded;
-        break;
-      case 'conversation_mention':
-        bg = const Color(0xFF7C3AED); // Purple
-        icon = Icons.alternate_email_rounded;
-        break;
-      default:
-        bg = AppColors.primary;
-        icon = Icons.notifications_none_rounded;
-        break;
-    }
-
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: bg,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, color: Colors.white, size: 20),
-    );
-  }
-
-  String _formatTimestamp(DateTime dt, bool isArabic) {
-    final now = DateTime.now();
-    final isToday = now.year == dt.year && now.month == dt.month && now.day == dt.day;
-    final timeFormat = DateFormat('h:mm a').format(dt);
-
-    if (isToday) {
-      return isArabic ? 'اليوم في $timeFormat' : 'Today at $timeFormat';
-    }
-    final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday = yesterday.year == dt.year && yesterday.month == dt.month && yesterday.day == dt.day;
-    if (isYesterday) {
-      return isArabic ? 'أمس في $timeFormat' : 'Yesterday at $timeFormat';
-    }
-    return DateFormat('MMM d, h:mm a').format(dt);
   }
 }

@@ -156,6 +156,9 @@ class FakeConversationRepository implements IConversationRepository {
   Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType}) async => const Right(null);
 
   @override
+  Future<Either<Failure, List<int>>> fetchPinnedConversationIds() async => const Right([]);
+
+  @override
   Future<Either<Failure, void>> pinConversation(int conversationId) async => const Right(null);
 
   @override

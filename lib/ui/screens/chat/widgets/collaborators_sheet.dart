@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../data/models/contact.dart';
 import '../../../../data/models/user.dart';
-import '../../../../data/repositories/conversation_repository.dart';
-import '../../../../core/di/injection_container.dart';
+import '../../../../logic/chat/chat_cubit.dart';
 import '../../../widgets/avatar_widget.dart';
 
 class CollaboratorsSheet extends StatefulWidget {
@@ -11,6 +11,7 @@ class CollaboratorsSheet extends StatefulWidget {
   final List<User> workspaceAgents;
   final User? assignee;
   final VoidCallback? onCollaboratorsChanged;
+  final ChatCubit? chatCubit;
 
   const CollaboratorsSheet({
     super.key,
@@ -18,6 +19,7 @@ class CollaboratorsSheet extends StatefulWidget {
     required this.workspaceAgents,
     this.assignee,
     this.onCollaboratorsChanged,
+    this.chatCubit,
   });
 
   @override
@@ -25,7 +27,6 @@ class CollaboratorsSheet extends StatefulWidget {
 }
 
 class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
-  final IConversationRepository _repo = sl<IConversationRepository>();
   bool _isLoading = true;
   bool _isAdding = false;
   bool _showAddPicker = false;
@@ -34,6 +35,8 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
 
   List<Collaborator> _collaborators = [];
   bool _canManageCollaborators = true;
+
+  ChatCubit get _cubit => widget.chatCubit ?? context.read<ChatCubit>();
 
   @override
   void initState() {
@@ -49,7 +52,7 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
 
   Future<void> _loadCollaborators() async {
     setState(() => _isLoading = true);
-    final res = await _repo.getCollaborators(widget.conversationId);
+    final res = await _cubit.fetchCollaborators();
     if (!mounted) return;
     res.fold(
       (failure) {
@@ -77,7 +80,7 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
     }
 
     setState(() => _isAdding = true);
-    final res = await _repo.addCollaborator(widget.conversationId, userId);
+    final res = await _cubit.addCollaboratorAction(userId);
     if (!mounted) return;
     setState(() => _isAdding = false);
 
@@ -109,7 +112,7 @@ class _CollaboratorsSheetState extends State<CollaboratorsSheet> {
   }
 
   Future<void> _removeCollaborator(int userId) async {
-    final res = await _repo.removeCollaborator(widget.conversationId, userId);
+    final res = await _cubit.removeCollaboratorAction(userId);
     if (!mounted) return;
     res.fold(
       (failure) {

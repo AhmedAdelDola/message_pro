@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/di/injection_container.dart';
-import '../../../../data/repositories/conversation_repository.dart';
 import '../../../../logic/conversation/conversation_cubit.dart';
 import '../chat_screen.dart';
 
@@ -32,7 +30,6 @@ class StartDirectChatSheet extends StatefulWidget {
 class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  final IConversationRepository _repo = sl<IConversationRepository>();
 
   List<Map<String, dynamic>> _destinations = [];
   Map<String, dynamic>? _selectedDestination;
@@ -90,7 +87,7 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
     });
 
     final phone = phoneNumber ?? _cleanPhone(_phoneController.text);
-    final result = await _repo.getPhoneDestinations(
+    final result = await context.read<ConversationCubit>().getPhoneDestinations(
       phoneNumber: phone.isNotEmpty ? phone : null,
     );
 
@@ -144,7 +141,7 @@ class _StartDirectChatSheetState extends State<StartDirectChatSheet> {
       _errorMessage = null;
     });
 
-    final result = await _repo.startDirectChat(
+    final result = await context.read<ConversationCubit>().startDirectChat(
       phoneNumber: phone,
       inboxId: inboxId,
       sourceId: sourceId,

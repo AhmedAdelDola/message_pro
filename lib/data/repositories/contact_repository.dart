@@ -2,6 +2,8 @@ import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
+import '../../core/storage/local_cache_service.dart';
+import '../../core/storage/secure_storage_service.dart';
 import '../models/contact.dart';
 import '../models/conversation.dart';
 
@@ -11,6 +13,7 @@ abstract class IContactRepository {
     int perPage = 25,
     String sort = 'name',
   });
+  List<Contact> getCachedContacts(int accountId);
   Future<Either<Failure, List<Contact>>> searchContacts(String query, {int page = 1});
   Future<Either<Failure, Contact>> getContact(int id);
   Future<Either<Failure, List<Conversation>>> getContactConversations(int contactId);
@@ -41,8 +44,12 @@ abstract class IContactRepository {
 
 class ContactRepository implements IContactRepository {
   final ApiClient _api;
+  final SecureStorageService _storage = SecureStorageService();
 
   ContactRepository({ApiClient? api}) : _api = api ?? ApiClient();
+
+  @override
+  List<Contact> getCachedContacts(int accountId) => LocalCacheService().getCachedContacts(accountId);
 
   @override
   Future<Either<Failure, List<Contact>>> getContacts({
@@ -67,6 +74,14 @@ class ContactRepository implements IContactRepository {
       } else if (data is List) {
         list = data;
       }
+
+      if (page == 1 && list.isNotEmpty) {
+        final activeAccId = await _storage.getActiveAccountId();
+        if (activeAccId != null && activeAccId > 0) {
+          LocalCacheService().saveContacts(activeAccId, list);
+        }
+      }
+
       return Right(list.map((c) => Contact.fromJson(c as Map<String, dynamic>)).toList());
     } on DioException catch (e) {
       return Left(ServerFailure(e.message ?? 'فشل تحميل جهات الاتصال'));

@@ -27,6 +27,7 @@ class Conversation {
   final DateTime? contactLastSeenAt;
   final String? replyBlockReason;
   final bool muted;
+  final bool isPinned;
   final Map<String, dynamic> customAttributes;
   final Map<String, dynamic> additionalAttributes;
   final MessageReferral? referral;
@@ -100,6 +101,7 @@ class Conversation {
     this.contactLastSeenAt,
     this.replyBlockReason,
     this.muted = false,
+    this.isPinned = false,
     this.customAttributes = const {},
     this.additionalAttributes = const {},
     this.referral,
@@ -129,6 +131,7 @@ class Conversation {
     DateTime? contactLastSeenAt,
     String? replyBlockReason,
     bool? muted,
+    bool? isPinned,
     Map<String, dynamic>? customAttributes,
     Map<String, dynamic>? additionalAttributes,
     MessageReferral? referral,
@@ -157,29 +160,93 @@ class Conversation {
       contactLastSeenAt: contactLastSeenAt ?? this.contactLastSeenAt,
       replyBlockReason: replyBlockReason ?? this.replyBlockReason,
       muted: muted ?? this.muted,
+      isPinned: isPinned ?? this.isPinned,
       customAttributes: customAttributes ?? this.customAttributes,
       additionalAttributes: additionalAttributes ?? this.additionalAttributes,
       referral: referral ?? this.referral,
     );
   }
 
+  String get displayContactName {
+    final cName = contact.displayNameOrPhone;
+    final lower = cName.toLowerCase();
+    final isGeneric = lower.isEmpty ||
+        lower == 'customer' ||
+        lower == 'عميل' ||
+        lower == 'عميل جديد' ||
+        lower == 'new visitor' ||
+        lower == 'null' ||
+        lower.startsWith('عميل #') ||
+        lower.startsWith('contact #');
+
+    if (isGeneric) {
+      final addPhone = (additionalAttributes['sender_phone_number'] ??
+              additionalAttributes['phone_number'] ??
+              additionalAttributes['wa_id'])
+          ?.toString()
+          .trim();
+      if (addPhone != null && addPhone.isNotEmpty) {
+        return addPhone;
+      }
+    }
+    return cName;
+  }
+
   factory Conversation.fromJson(Map<String, dynamic> json) {
-    final rawId = json['id'] ?? json['conversation_id'] ?? json['display_id'];
+    final rawId = json['id'] ??
+        json['conversation_id'] ??
+        json['display_id'] ??
+        (json['conversation'] is Map ? (json['conversation']['id'] ?? json['conversation']['conversation_id'] ?? json['conversation']['display_id']) : null);
     final int convId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
 
-    // Contact extraction
+    // Contact extraction (Check all possible Chatwoot sender/contact locations)
+    final convObj = json['conversation'] is Map ? json['conversation'] as Map : null;
+    final dynamic rawContactData = json['meta']?['sender'] ??
+        convObj?['meta']?['sender'] ??
+        json['contact_inbox']?['contact'] ??
+        convObj?['contact_inbox']?['contact'] ??
+        json['contact'] ??
+        convObj?['contact'] ??
+        json['sender'] ??
+        convObj?['sender'];
+
     Contact parsedContact;
-    if (json['meta'] != null && json['meta']['sender'] is Map) {
-      parsedContact = Contact.fromJson(Map<String, dynamic>.from(json['meta']['sender']));
-    } else if (json['contact'] is Map) {
-      parsedContact = Contact.fromJson(Map<String, dynamic>.from(json['contact']));
-    } else if (json['sender'] is Map) {
-      parsedContact = Contact.fromJson(Map<String, dynamic>.from(json['sender']));
+    if (rawContactData is Map) {
+      parsedContact = Contact.fromJson(Map<String, dynamic>.from(rawContactData));
     } else {
       parsedContact = Contact(
         id: 0,
         name: convId > 0 ? 'عميل #$convId' : 'عميل جديد',
       );
+    }
+
+    // Fallback phone resolution from additional_attributes / source_id
+    final addAttrs = (json['additional_attributes'] is Map ? json['additional_attributes'] as Map : null) ??
+        (convObj?['additional_attributes'] is Map ? convObj!['additional_attributes'] as Map : null);
+
+    final rawFallbackPhone = (addAttrs?['sender_phone_number'] ??
+        addAttrs?['phone_number'] ??
+        addAttrs?['wa_id'] ??
+        json['source_id'] ??
+        convObj?['source_id'] ??
+        json['contact_inbox']?['source_id'] ??
+        convObj?['contact_inbox']?['source_id'])?.toString().trim();
+
+    if (rawFallbackPhone != null && rawFallbackPhone.isNotEmpty) {
+      if (parsedContact.phoneNumber == null || parsedContact.phoneNumber!.isEmpty) {
+        parsedContact = parsedContact.copyWith(phoneNumber: rawFallbackPhone);
+      }
+      final lowerName = parsedContact.name.toLowerCase();
+      final isGeneric = lowerName.isEmpty ||
+          lowerName == 'customer' ||
+          lowerName == 'عميل' ||
+          lowerName == 'عميل جديد' ||
+          lowerName == 'null' ||
+          lowerName.startsWith('عميل #') ||
+          lowerName.startsWith('contact #');
+      if (isGeneric) {
+        parsedContact = parsedContact.copyWith(name: rawFallbackPhone);
+      }
     }
 
     // Last message
@@ -411,9 +478,20 @@ class Conversation {
       }
     }
 
-    final bool isMuted = json['muted'] == true ||
-        json['meta']?['muted'] == true ||
-        json['muted_at'] != null;
+    bool isMuted = false;
+    final rawMuted = json['muted'] ?? json['meta']?['muted'];
+    if (rawMuted is bool) {
+      isMuted = rawMuted;
+    } else if (rawMuted == 'true' || rawMuted == 1) {
+      isMuted = true;
+    } else if (rawMuted == 'false' || rawMuted == 0) {
+      isMuted = false;
+    } else if (json['muted_at'] != null &&
+        json['muted_at'] != false &&
+        json['muted_at'] != 0 &&
+        json['muted_at'].toString().trim().isNotEmpty) {
+      isMuted = true;
+    }
 
     final Map<String, dynamic> cAttrs = json['custom_attributes'] is Map
         ? Map<String, dynamic>.from(json['custom_attributes'])
@@ -421,6 +499,18 @@ class Conversation {
     final Map<String, dynamic> aAttrs = json['additional_attributes'] is Map
         ? Map<String, dynamic>.from(json['additional_attributes'])
         : {};
+
+    final bool isPinned = json['is_pinned'] == true ||
+        json['pinned'] == true ||
+        json['pinned_at'] != null ||
+        json['conversation_pin'] != null ||
+        json['meta']?['pinned'] == true ||
+        json['meta']?['is_pinned'] == true ||
+        json['meta']?['conversation_pin'] != null ||
+        cAttrs['is_pinned'] == true ||
+        cAttrs['pinned'] == true ||
+        aAttrs['is_pinned'] == true ||
+        aAttrs['pinned'] == true;
 
     MessageReferral? convReferral;
     final wa = cAttrs['whatsapp'] ?? aAttrs['whatsapp'];
@@ -469,6 +559,7 @@ class Conversation {
       contactLastSeenAt: dtContactLastSeen,
       replyBlockReason: rawReplyBlockReason,
       muted: isMuted,
+      isPinned: isPinned,
       customAttributes: cAttrs,
       additionalAttributes: aAttrs,
       referral: convReferral,

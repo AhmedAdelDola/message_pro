@@ -13,6 +13,10 @@ import '../../logic/notification/notification_cubit.dart';
 import '../../logic/calls/calls_cubit.dart';
 import '../../logic/settings/settings_cubit.dart';
 import '../../logic/shorebird/shorebird_cubit.dart';
+import '../../logic/contacts/contacts_cubit.dart';
+import '../../logic/contacts/contact_details_cubit.dart';
+import '../../data/models/contact.dart';
+import '../../data/models/conversation.dart';
 
 final sl = GetIt.instance;
 
@@ -43,13 +47,28 @@ Future<void> initDI() async {
   sl.registerFactory<ConversationCubit>(
     () => ConversationCubit(repo: sl(), ws: sl()),
   );
-  sl.registerFactoryParam<ChatCubit, int, dynamic>(
-    (conversationId, param2) => ChatCubit(
-      conversationId: conversationId,
-      repo: sl(),
-      ws: sl(),
-      contactLastSeenAt: param2 is DateTime ? param2 : null,
-    ),
+  sl.registerFactoryParam<ChatCubit, dynamic, dynamic>(
+    (param1, param2) {
+      if (param1 is Conversation) {
+        return ChatCubit(
+          conversationId: param1.id,
+          accountId: param1.accountId,
+          repo: sl(),
+          ws: sl(),
+          contactLastSeenAt: param1.contactLastSeenAt,
+        );
+      }
+      final convId = param1 is int ? param1 : (int.tryParse(param1?.toString() ?? '') ?? 0);
+      final accId = param2 is int ? param2 : (param2 is Conversation ? param2.accountId : null);
+      final lastSeen = param2 is DateTime ? param2 : null;
+      return ChatCubit(
+        conversationId: convId,
+        accountId: accId,
+        repo: sl(),
+        ws: sl(),
+        contactLastSeenAt: lastSeen,
+      );
+    },
   );
   sl.registerFactory<NotificationCubit>(
     () => NotificationCubit(repo: sl()),
@@ -62,5 +81,16 @@ Future<void> initDI() async {
   );
   sl.registerFactory<ShorebirdCubit>(
     () => ShorebirdCubit(),
+  );
+  sl.registerFactory<ContactsCubit>(
+    () => ContactsCubit(repository: sl()),
+  );
+  sl.registerFactoryParam<ContactDetailsCubit, Contact, List<LifecycleStage>?>(
+    (contact, stages) => ContactDetailsCubit(
+      contactRepo: sl(),
+      conversationRepo: sl(),
+      initialContact: contact,
+      cachedStages: stages,
+    ),
   );
 }

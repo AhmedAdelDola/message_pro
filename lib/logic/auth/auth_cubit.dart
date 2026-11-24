@@ -286,6 +286,10 @@ class AuthCubit extends Cubit<AuthState> {
     } catch (_) {}
   }
 
+  Future<Either<Failure, void>> resetPassword(String email) async {
+    return await authRepo.resetPassword(email);
+  }
+
   Future<void> logout() async {
     ws.disconnect();
     await PushNotificationService.unregisterDeviceToken();

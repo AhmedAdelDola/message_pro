@@ -100,7 +100,7 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
 
     return Container(
       margin: const EdgeInsets.only(top: 4, bottom: 6),
-      constraints: const BoxConstraints(maxWidth: 320),
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(10),
@@ -118,7 +118,6 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
               CachedNetworkImage(
                 imageUrl: meta.imageUrl!,
                 height: 140,
-                width: double.infinity,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
                   height: 140,

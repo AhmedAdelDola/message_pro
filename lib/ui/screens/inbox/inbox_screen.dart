@@ -1,26 +1,25 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hugeicons/hugeicons.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../../../core/constants/app_lottie.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../data/models/conversation.dart';
-import '../../../data/models/user.dart';
-import '../../../data/repositories/conversation_repository.dart';
-import '../../../core/di/injection_container.dart';
-import '../../../logic/auth/auth_cubit.dart';
-import '../../../logic/auth/auth_state.dart';
-import '../../../logic/conversation/conversation_cubit.dart';
-import '../../../logic/conversation/conversation_state.dart';
-import '../chat/chat_screen.dart';
+import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/core/localization/app_localizations.dart';
+import 'package:message_pro/data/models/conversation.dart';
+import 'package:message_pro/logic/conversation/conversation_cubit.dart';
+import 'package:message_pro/logic/conversation/conversation_state.dart';
+import 'package:message_pro/ui/widgets/break_countdown_banner.dart';
+import 'package:message_pro/ui/widgets/app_bar_progress_bar.dart';
 import '../contacts/add_contact_screen.dart';
-import 'widgets/conversation_tile.dart';
+import 'widgets/inbox_screen_header.dart';
 import 'widgets/inbox_filter_drawer.dart';
-import '../../widgets/app_bar_progress_bar.dart';
-import '../../widgets/break_countdown_banner.dart';
-import '../chat/widgets/start_direct_chat_sheet.dart';
+import 'widgets/filter_dropdown_modal.dart';
+import 'widgets/workspaces_bottom_sheet.dart';
+import 'widgets/conversation_action_sheet.dart';
+import 'widgets/content/inbox_segment_tab_bar.dart';
+import 'widgets/content/inbox_active_filter_bar.dart';
+import 'widgets/content/inbox_conversations_list_view.dart';
+import 'widgets/content/conversation_advanced_filters_sheet.dart';
 
+/// Clean, decomposed Inbox Screen orchestrating header, active filter bar, segment tab bar, and conversations list.
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
 
@@ -32,26 +31,17 @@ class _InboxScreenState extends State<InboxScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
 
-  // Primary Segment: 'all', 'mine', 'collaborating', 'unassigned'
   String _activeSegment = 'all';
-
-  // Status Filter: 'all', 'open', 'closed', 'snoozed'
   String _selectedStatus = 'all';
-
-  // Sort: 'newest', 'oldest'
   String _sortBy = 'newest';
-
-  // Unreplied toggle
   bool _unrepliedOnly = false;
 
-  // Search state
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   List<Conversation> _searchResults = [];
   bool _isSearchingServer = false;
 
-  // Drawer selected key
   String _activeKey = 'all';
 
   @override
@@ -59,11 +49,11 @@ class _InboxScreenState extends State<InboxScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final cubit = context.read<ConversationCubit>();
-      cubit.loadAuxiliaryData();
-      cubit.loadFilterOptions();
-      cubit.setAssigneeType('all');
-      cubit.setStatus('all');
+      if (cubit.state.conversations.isEmpty && !cubit.state.isLoading) {
+        cubit.loadConversations();
+      }
     });
   }
 
@@ -92,35 +82,23 @@ class _InboxScreenState extends State<InboxScreen> {
 
     _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
       setState(() => _isSearchingServer = true);
-      final res = await sl<IConversationRepository>().searchConversations(trimmed);
-      if (mounted) {
-        res.fold(
-          (_) => setState(() => _isSearchingServer = false),
-          (list) => setState(() {
-            _searchResults = list;
-            _isSearchingServer = false;
-          }),
+      try {
+        final res = await context.read<ConversationCubit>().searchConversations(
+          trimmed,
         );
+        if (mounted) {
+          res.fold(
+            (_) => setState(() => _isSearchingServer = false),
+            (list) => setState(() {
+              _searchResults = list;
+              _isSearchingServer = false;
+            }),
+          );
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isSearchingServer = false);
       }
     });
-  }
-
-  bool _looksLikePhoneNumber(String text) {
-    final clean = text.replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
-    if (clean.length < 7 || clean.length > 16) return false;
-    return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(clean);
-  }
-
-  String _cleanSearchPhoneNumber(String text) {
-    var p = text.trim().replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
-    if (p.startsWith('00')) {
-      p = '+${p.substring(2)}';
-    } else if (p.startsWith('01') && p.length == 11) {
-      p = '+2$p';
-    } else if (p.startsWith('201') && p.length == 12) {
-      p = '+$p';
-    }
-    return p;
   }
 
   @override
@@ -180,383 +158,147 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  String _formatFilterDropdownLabel(bool isArabic) {
-    String statusStr = isArabic ? 'الكل' : 'All';
-    if (_selectedStatus == 'open') statusStr = isArabic ? 'مفتوحة' : 'Open';
-    if (_selectedStatus == 'closed' || _selectedStatus == 'resolved') statusStr = isArabic ? 'مغلقة' : 'Closed';
-    if (_selectedStatus == 'snoozed') statusStr = isArabic ? 'مؤجلة' : 'Snoozed';
+  String _formatFilterDropdownLabel(BuildContext context) {
+    final l10n = context.l10n;
+    String statusStr = l10n.all;
+    if (_selectedStatus == 'open') statusStr = l10n.open;
+    if (_selectedStatus == 'closed' || _selectedStatus == 'resolved') {
+      statusStr = l10n.closed;
+    }
+    if (_selectedStatus == 'snoozed') {
+      statusStr = l10n.snoozed;
+    }
 
-    String sortStr = _sortBy == 'newest'
-        ? (isArabic ? 'الأحدث' : 'Newest')
-        : (isArabic ? 'الأقدم' : 'Oldest');
-    return isArabic ? '$statusStr، $sortStr' : '$statusStr, $sortStr';
+    final sortStr = _sortBy == 'newest' ? l10n.newest : l10n.oldest;
+    return l10n.isArabic ? '$statusStr، $sortStr' : '$statusStr, $sortStr';
   }
 
-  // Status & Sort Modal matching browser screenshot 85
   void _showFilterDropdownModal() {
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? AppColors.darkCard : Colors.white;
-    final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
-    final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-
-    showDialog(
+    FilterDropdownModal.show(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return Dialog(
-              backgroundColor: cardBg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Container(
-                width: 320,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Section 1: Show
-                    Text(
-                      isArabic ? 'عرض' : 'Show',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _buildRadioRow(
-                      label: isArabic ? 'جميع المحادثات' : 'All conversations',
-                      value: 'all',
-                      groupValue: _selectedStatus,
-                      onChanged: (val) {
-                        setDialogState(() => _selectedStatus = val!);
-                        setState(() {
-                          _selectedStatus = val!;
-                          context.read<ConversationCubit>().setStatus('all');
-                        });
-                      },
-                      textPrimary: textPrimary,
-                    ),
-                    _buildRadioRow(
-                      label: isArabic ? 'المحادثات المفتوحة' : 'Open conversations',
-                      value: 'open',
-                      groupValue: _selectedStatus,
-                      onChanged: (val) {
-                        setDialogState(() => _selectedStatus = val!);
-                        setState(() {
-                          _selectedStatus = val!;
-                          context.read<ConversationCubit>().setStatus('open');
-                        });
-                      },
-                      textPrimary: textPrimary,
-                    ),
-                    _buildRadioRow(
-                      label: isArabic ? 'المحادثات المغلقة' : 'Closed conversations',
-                      value: 'closed',
-                      groupValue: _selectedStatus,
-                      onChanged: (val) {
-                        setDialogState(() => _selectedStatus = val!);
-                        setState(() {
-                          _selectedStatus = val!;
-                          context.read<ConversationCubit>().setStatus('resolved');
-                        });
-                      },
-                      textPrimary: textPrimary,
-                    ),
-                    _buildRadioRow(
-                      label: isArabic ? 'المحادثات المؤجلة' : 'Snoozed conversations',
-                      value: 'snoozed',
-                      groupValue: _selectedStatus,
-                      onChanged: (val) {
-                        setDialogState(() => _selectedStatus = val!);
-                        setState(() {
-                          _selectedStatus = val!;
-                          context.read<ConversationCubit>().setStatus('snoozed');
-                        });
-                      },
-                      textPrimary: textPrimary,
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Section 2: Sort by
-                    Text(
-                      isArabic ? 'الترتيب حسب' : 'Sort by',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _buildRadioRow(
-                      label: isArabic ? 'الأحدث' : 'Newest',
-                      value: 'newest',
-                      groupValue: _sortBy,
-                      onChanged: (val) {
-                        setDialogState(() => _sortBy = val!);
-                        setState(() => _sortBy = val!);
-                      },
-                      textPrimary: textPrimary,
-                    ),
-                    _buildRadioRow(
-                      label: isArabic ? 'الأقدم' : 'Oldest',
-                      value: 'oldest',
-                      groupValue: _sortBy,
-                      onChanged: (val) {
-                        setDialogState(() => _sortBy = val!);
-                        setState(() => _sortBy = val!);
-                      },
-                      textPrimary: textPrimary,
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Section 3: Advanced filters link
-                    InkWell(
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _showAdvancedFiltersBottomSheet();
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Text(
-                          isArabic ? 'تصفية متقدمة' : 'Advanced filters',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+      selectedStatus: _selectedStatus,
+      sortBy: _sortBy,
+      onStatusChanged: (val) {
+        setState(() {
+          _selectedStatus = val;
+          final cubitStatus = val == 'closed' ? 'resolved' : val;
+          context.read<ConversationCubit>().setStatus(cubitStatus);
+        });
+      },
+      onSortChanged: (val) => setState(() => _sortBy = val),
+      onAdvancedFiltersTap: () {
+        ConversationAdvancedFiltersSheet.show(
+          context: context,
+          activeKey: _activeKey,
+          onSelectFilter: _onSelectDrawerItem,
         );
       },
-    );
-  }
-
-  Widget _buildRadioRow({
-    required String label,
-    required String value,
-    required String groupValue,
-    required ValueChanged<String?> onChanged,
-    required Color textPrimary,
-  }) {
-    final isSelected = value == groupValue;
-    return InkWell(
-      onTap: () => onChanged(value),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : const Color(0xFF94A3B8),
-                  width: 2,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: isSelected
-                  ? Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.primary,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   void _showActionSheet(Conversation conv) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    final cubit = context.read<ConversationCubit>();
 
-    showModalBottomSheet(
+    ConversationActionSheet.show(
       context: context,
-      backgroundColor: isDark ? AppColors.darkCard : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                  borderRadius: BorderRadius.circular(999),
+      conversation: conv,
+      onToggleResolve: () async {
+        final nextStatus = conv.status == 'resolved' ? 'open' : 'resolved';
+        final res = await cubit.toggleConversationStatus(conv.id, nextStatus);
+        if (mounted) {
+          res.fold(
+            (_) => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isArabic
+                      ? 'تعذر تحديث حالة المحادثة'
+                      : 'Failed to update conversation status',
                 ),
-              ),
-              // Resolve / Reopen
-              _buildActionRow(
-                icon: Icon(
-                  Icons.check_circle_outline_rounded,
-                  color: conv.status == 'resolved' ? AppColors.success : textPrimary,
-                ),
-                label: conv.status == 'resolved'
-                    ? (isArabic ? 'إعادة فتح المحادثة' : 'Reopen Conversation')
-                    : (isArabic ? 'إغلاق المحادثة' : 'Close Conversation'),
-                textColor: conv.status == 'resolved' ? AppColors.success : textPrimary,
-                borderColor: borderColor,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final nextStatus = conv.status == 'resolved' ? 'open' : 'resolved';
-                  final res = await sl<IConversationRepository>().toggleStatus(conv.id, nextStatus);
-                  if (mounted) {
-                    res.fold(
-                      (failure) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isArabic ? 'تعذر تحديث حالة المحادثة' : 'Failed to update conversation status'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      },
-                      (_) {
-                        context.read<ConversationCubit>().loadConversations();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              nextStatus == 'resolved'
-                                  ? (isArabic ? 'تم حل وإغلاق المحادثة' : 'Conversation marked as resolved')
-                                  : (isArabic ? 'تمت إعادة فتح المحادثة' : 'Conversation reopened'),
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    );
-                  }
-                },
-              ),
-              // Snooze
-              _buildActionRow(
-                icon: Icon(Icons.access_time_rounded, color: textPrimary),
-                label: isArabic ? 'تأجيل المحادثة' : 'Snooze Conversation',
-                textColor: textPrimary,
-                borderColor: borderColor,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final res = await sl<IConversationRepository>().toggleStatus(conv.id, 'snoozed');
-                  if (mounted) {
-                    res.fold(
-                      (failure) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isArabic ? 'تعذر تأجيل المحادثة' : 'Failed to snooze conversation'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      },
-                      (_) {
-                        context.read<ConversationCubit>().loadConversations();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isArabic ? 'تم تأجيل المحادثة' : 'Conversation snoozed'),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    );
-                  }
-                },
-              ),
-              // Mute / Unmute
-              _buildActionRow(
-                icon: Icon(
-                  conv.muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
-                  color: conv.muted ? AppColors.success : textPrimary,
-                ),
-                label: conv.muted
-                    ? (isArabic ? 'إلغاء كتم المحادثة' : 'Unmute Conversation')
-                    : (isArabic ? 'كتم المحادثة (Mute)' : 'Mute Conversation'),
-                textColor: conv.muted ? AppColors.success : textPrimary,
-                borderColor: borderColor,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  if (conv.muted) {
-                    await sl<IConversationRepository>().unmuteConversation(conv.id);
-                  } else {
-                    await sl<IConversationRepository>().muteConversation(conv.id);
-                  }
-                  if (mounted) context.read<ConversationCubit>().loadConversations();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildActionRow({
-    required Widget icon,
-    required String label,
-    required Color textColor,
-    required Color borderColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-        ),
-        child: Row(
-          children: [
-            icon,
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+                backgroundColor: Colors.red,
               ),
             ),
-          ],
-        ),
-      ),
+            (_) => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  nextStatus == 'resolved'
+                      ? (isArabic
+                            ? 'تم حل وإغلاق المحادثة'
+                            : 'Conversation marked as resolved')
+                      : (isArabic
+                            ? 'تمت إعادة فتح المحادثة'
+                            : 'Conversation reopened'),
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            ),
+          );
+        }
+      },
+      onSnooze: () async {
+        final res = await cubit.toggleConversationStatus(conv.id, 'snoozed');
+        if (mounted) {
+          res.fold(
+            (_) => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isArabic
+                      ? 'تعذر تأجيل المحادثة'
+                      : 'Failed to snooze conversation',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            ),
+            (_) => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isArabic ? 'تم تأجيل المحادثة' : 'Conversation snoozed',
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            ),
+          );
+        }
+      },
+      onToggleMute: () async {
+        if (conv.muted) {
+          await cubit.unmuteConversation(conv.id);
+        } else {
+          await cubit.muteConversation(conv.id);
+        }
+      },
+      onTogglePin: () async {
+        final nextPinned = !conv.isPinned;
+        final res = await cubit.togglePinConversation(conv.id);
+        if (mounted) {
+          res.fold(
+            (_) => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isArabic
+                      ? 'تعذر تثبيت/إلغاء تثبيت المحادثة'
+                      : 'Failed to pin/unpin conversation',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            ),
+            (_) => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  nextPinned
+                      ? (isArabic
+                            ? 'تم تثبيت المحادثة في الأعلى'
+                            : 'Conversation pinned to top')
+                      : (isArabic
+                            ? 'تم إلغاء تثبيت المحادثة'
+                            : 'Conversation unpinned'),
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -564,12 +306,15 @@ class _InboxScreenState extends State<InboxScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    final bgColor = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
-    final textSecondary = isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final segmentContainerBg = isDark ? const Color(0xFF1E2024) : const Color(0xFFF1F2F4);
+    final bgColor = isDark
+        ? AppColors.darkBackground
+        : AppColors.lightBackground;
+    final textPrimary = isDark
+        ? AppColors.textLightPrimary
+        : AppColors.textDarkPrimary;
+    final textSecondary = isDark
+        ? AppColors.textLightSecondary
+        : AppColors.textDarkSecondary;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -578,117 +323,83 @@ class _InboxScreenState extends State<InboxScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header or Active Search Bar
-            if (_isSearching)
-              _buildSearchHeader(isDark, isArabic, textPrimary, textSecondary, borderColor)
-            else
-              _buildMainHeader(isDark, textPrimary, isArabic),
-
-            // Global sleek blue linear progress indicator
-            const BreakCountdownBanner(),
-            LinearHeaderLoader(
-              isLoading: context.watch<ConversationCubit>().state.isLoading ||
-                  context.watch<ConversationCubit>().state.isLoadingMore ||
-                  _isSearchingServer,
+            InboxScreenHeader(
+              isSearching: _isSearching,
+              searchController: _searchController,
+              onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+              onWorkspacesTap: () {
+                WorkspacesBottomSheet.show(
+                  context,
+                  onWorkspaceSwitched: () {
+                    setState(() {
+                      _activeSegment = 'all';
+                      _activeKey = 'all';
+                      _selectedStatus = 'all';
+                    });
+                  },
+                );
+              },
+              onAddContactTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AddContactScreen()),
+                );
+              },
+              onStartSearch: () => setState(() => _isSearching = true),
+              onCloseSearch: () {
+                _searchDebounce?.cancel();
+                setState(() {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _searchResults = [];
+                  _isSearchingServer = false;
+                });
+              },
+              onSearchChanged: _onSearchChanged,
+              onClearSearch: () {
+                _searchController.clear();
+                _searchDebounce?.cancel();
+                setState(() {
+                  _searchResults = [];
+                  _isSearchingServer = false;
+                });
+              },
             ),
 
-            // Active Filter Indicator Bar
+            const BreakCountdownBanner(),
+
             if (!_isSearching)
-              BlocBuilder<ConversationCubit, ConversationState>(
-                builder: (context, state) {
-                  final cubit = context.read<ConversationCubit>();
-                  String? activeFilterName;
+              InboxActiveFilterBar(isDark: isDark, isArabic: isArabic),
 
-                  if (state.selectedAssigneeAgentBotId != null) {
-                    final ai = state.filterOptions?.aiAgents.where((a) => a.agentBotId == state.selectedAssigneeAgentBotId).firstOrNull;
-                    activeFilterName = '${isArabic ? "بوت ذكي" : "AI Agent"}: ${ai?.name ?? "#${state.selectedAssigneeAgentBotId}"}';
-                  } else if (state.selectedAssigneeId != null) {
-                    final agent = state.filterOptions?.agents.where((a) => a.id == state.selectedAssigneeId).firstOrNull;
-                    activeFilterName = '${isArabic ? "موظف" : "Agent"}: ${agent?.name ?? "#${state.selectedAssigneeId}"}';
-                  } else if (state.selectedInboxId != null) {
-                    final inbox = state.filterOptions?.inboxes.where((i) => i.id == state.selectedInboxId).firstOrNull;
-                    activeFilterName = '${isArabic ? "قناة" : "Channel"}: ${inbox?.name ?? "#${state.selectedInboxId}"}';
-                  } else if (state.selectedTeamId != null) {
-                    final team = state.filterOptions?.teams.where((t) => t.id == state.selectedTeamId).firstOrNull;
-                    activeFilterName = '${isArabic ? "فريق" : "Team"}: ${team?.name ?? "#${state.selectedTeamId}"}';
-                  }
-
-                  if (activeFilterName == null) return const SizedBox.shrink();
-
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.primary),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            activeFilterName,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () => cubit.clearAllFilters(),
-                          borderRadius: BorderRadius.circular(12),
-                          child: const Padding(
-                            padding: EdgeInsets.all(2),
-                            child: Icon(Icons.close_rounded, size: 16, color: AppColors.primary),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+            if (!_isSearching)
+              InboxSegmentTabBar(
+                activeSegment: _activeSegment,
+                onSegmentChanged: _onSegmentChanged,
+                isDark: isDark,
+                isArabic: isArabic,
               ),
 
-            // Segmented Primary Filter Tabs: All | Mine | Collaborating | Unassigned
-            if (!_isSearching)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: segmentContainerBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    _buildSegmentTab('all', isArabic ? 'الكل' : 'All', isDark),
-                    _buildSegmentTab('mine', isArabic ? 'خاصتي' : 'Mine', isDark),
-                    _buildSegmentTab('collaborating', isArabic ? 'المتعاونة' : 'Collaborating', isDark),
-                    _buildSegmentTab('unassigned', isArabic ? 'غير معينة' : 'Unassigned', isDark),
-                  ],
-                ),
-              ),
-
-            // Secondary Filter Row: "Open, Newest ⌄" & "Unreplied" Toggle
+            // Secondary Filter Row
             if (!_isSearching)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 4,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Status & Sort Dropdown Button
                     InkWell(
                       onTap: _showFilterDropdownModal,
                       borderRadius: BorderRadius.circular(6),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 6,
+                        ),
                         child: Row(
                           children: [
                             Text(
-                              _formatFilterDropdownLabel(isArabic),
+                              _formatFilterDropdownLabel(context),
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -696,13 +407,15 @@ class _InboxScreenState extends State<InboxScreen> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: textSecondary),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 16,
+                              color: textSecondary,
+                            ),
                           ],
                         ),
                       ),
                     ),
-
-                    // Unreplied Toggle Switch
                     Row(
                       children: [
                         Transform.scale(
@@ -710,11 +423,12 @@ class _InboxScreenState extends State<InboxScreen> {
                           child: Switch(
                             value: _unrepliedOnly,
                             activeThumbColor: AppColors.primary,
-                            onChanged: (val) => setState(() => _unrepliedOnly = val),
+                            onChanged: (val) =>
+                                setState(() => _unrepliedOnly = val),
                           ),
                         ),
                         Text(
-                          isArabic ? 'بدون رد' : 'Unreplied',
+                          context.l10n.unreplied,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -727,26 +441,42 @@ class _InboxScreenState extends State<InboxScreen> {
                 ),
               ),
 
-            // Conversation List
+            // Live progress bar directly above conversations
+            LinearHeaderLoader(
+              isLoading:
+                  context.watch<ConversationCubit>().state.isLoading ||
+                  context.watch<ConversationCubit>().state.isLoadingMore ||
+                  _isSearchingServer,
+            ),
+
+            // Conversations List View
             Expanded(
               child: BlocBuilder<ConversationCubit, ConversationState>(
                 builder: (context, state) {
                   final cubit = context.read<ConversationCubit>();
                   var conversations = cubit.filteredConversations;
 
-                  // Filter by Unreplied toggle
                   if (_unrepliedOnly) {
-                    conversations = conversations.where((c) => c.unreadCount > 0).toList();
+                    conversations = conversations
+                        .where((c) => c.unreadCount > 0)
+                        .toList();
                   }
 
-                  // Sort
-                  if (_sortBy == 'oldest') {
-                    conversations = List<Conversation>.from(conversations);
-                    conversations.sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
-                  }
+                  final isAllTab =
+                      _activeSegment == 'all' || state.assigneeType == 'all';
+                  conversations = List<Conversation>.from(conversations);
+                  conversations.sort((a, b) {
+                    if (isAllTab && a.isPinned != b.isPinned) {
+                      return a.isPinned ? -1 : 1;
+                    }
+                    if (_sortBy == 'oldest') {
+                      return a.updatedAt.compareTo(b.updatedAt);
+                    }
+                    return b.updatedAt.compareTo(a.updatedAt);
+                  });
 
-                  // Apply search filter if searching
-                  if (_isSearching && _searchController.text.trim().isNotEmpty) {
+                  if (_isSearching &&
+                      _searchController.text.trim().isNotEmpty) {
                     final query = _searchController.text.toLowerCase().trim();
                     final Map<int, Conversation> combined = {};
                     for (final c in _searchResults) {
@@ -757,278 +487,30 @@ class _InboxScreenState extends State<InboxScreen> {
                     }
                     conversations = combined.values.where((c) {
                       final name = c.contact.name.toLowerCase();
-                      final snippet = (c.lastMessage?.content ?? '').toLowerCase();
+                      final snippet = (c.lastMessage?.content ?? '')
+                          .toLowerCase();
                       final email = (c.contact.email ?? '').toLowerCase();
                       final phone = (c.contact.phoneNumber ?? '').toLowerCase();
-                      return name.contains(query) || snippet.contains(query) || email.contains(query) || phone.contains(query);
+                      return name.contains(query) ||
+                          snippet.contains(query) ||
+                          email.contains(query) ||
+                          phone.contains(query);
                     }).toList();
                   }
 
-                  if (state.isLoading && conversations.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-
-                  if (state.errorMessage != null && conversations.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              size: 48,
-                              color: AppColors.danger,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              isArabic ? 'حدث خطأ أثناء تحميل المحادثات' : 'Error loading conversations',
-                              style: TextStyle(
-                                color: textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () => cubit.loadConversations(),
-                              icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: Text(isArabic ? 'إعادة المحاولة' : 'Try Again'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (conversations.isEmpty) {
-                    final searchQuery = _searchController.text.trim();
-                    final isPhoneQuery = _isSearching && _looksLikePhoneNumber(searchQuery);
-
-                    if (isPhoneQuery) {
-                      final cleanNumber = _cleanSearchPhoneNumber(searchQuery);
-                      return Center(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(22),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E2024) : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 58,
-                                  height: 58,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.chat_bubble_outline_rounded,
-                                    color: AppColors.primary,
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  isArabic ? 'لا توجد محادثة سابقة مع هذا الرقم' : 'No existing chat with this number',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: textSecondary,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Directionality(
-                                  textDirection: TextDirection.ltr,
-                                  child: Text(
-                                    searchQuery,
-                                    style: TextStyle(
-                                      color: textPrimary,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      StartDirectChatSheet.show(context, initialPhone: cleanNumber);
-                                    },
-                                    icon: const Icon(Icons.add_comment_rounded, size: 18),
-                                    label: Text(
-                                      isArabic ? 'بدء محادثة جديدة مع الرقم' : 'Start chat with this number',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      elevation: 0,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            AppLottie.emptyInbox(
-                              width: 140,
-                              height: 140,
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              isArabic ? 'لا توجد محادثات لعرضها' : 'No conversations to show',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ],
-                        )
-                            .animate()
-                            .fadeIn(duration: 350.ms, curve: Curves.easeOut)
-                            .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
-                      ),
-                    );
-                  }
-
-                  final searchQuery = _searchController.text.trim();
-                  final isPhoneQuery = _isSearching && _looksLikePhoneNumber(searchQuery);
-                  final cleanSearchNumber = isPhoneQuery ? _cleanSearchPhoneNumber(searchQuery) : '';
-                  final hasExactMatch = isPhoneQuery && conversations.any((c) {
-                    final cPhone = (c.contact.phoneNumber ?? '').replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
-                    final sPhone = cleanSearchNumber.replaceAll('+', '');
-                    return cPhone.isNotEmpty && (cPhone.endsWith(sPhone) || sPhone.endsWith(cPhone));
-                  });
-                  final showStartChatBanner = isPhoneQuery && !hasExactMatch;
-
-                  final extraBannerCount = showStartChatBanner ? 1 : 0;
-                  final totalItemCount = conversations.length + extraBannerCount + (state.isLoadingMore ? 1 : 0);
-
-                  return RefreshIndicator(
-                    color: AppColors.primary,
+                  return InboxConversationsListView(
+                    conversations: conversations,
+                    scrollController: _scrollController,
                     onRefresh: () => cubit.loadConversations(),
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: totalItemCount,
-                      itemBuilder: (context, index) {
-                        if (showStartChatBanner && index == 0) {
-                          return InkWell(
-                            onTap: () {
-                              StartDirectChatSheet.show(context, initialPhone: cleanSearchNumber);
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 38,
-                                    height: 38,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.add_comment_rounded, color: Colors.white, size: 20),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          isArabic ? 'بدء محادثة جديدة' : 'Start new conversation',
-                                          style: TextStyle(
-                                            color: textPrimary,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Directionality(
-                                          textDirection: TextDirection.ltr,
-                                          child: Text(
-                                            isArabic ? 'فتح محادثة مع $searchQuery' : 'Open chat with $searchQuery',
-                                            style: TextStyle(
-                                              color: textSecondary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    isArabic ? Icons.arrow_back_ios_new_rounded : Icons.arrow_forward_ios_rounded,
-                                    size: 14,
-                                    color: AppColors.primary,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-
-                        final effectiveIndex = showStartChatBanner ? index - 1 : index;
-
-                        if (effectiveIndex == conversations.length) {
-                          return const SizedBox(height: 16);
-                        }
-                        final conv = conversations[effectiveIndex];
-                        return ConversationTile(
-                          key: ValueKey(conv.id),
-                          conversation: conv,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(conversation: conv),
-                              ),
-                            );
-                          },
-                          onLongPress: () => _showActionSheet(conv),
-                        )
-                            .animate()
-                            .fadeIn(duration: 250.ms, curve: Curves.easeOut)
-                            .slideY(begin: 0.05, end: 0, duration: 250.ms, curve: Curves.easeOut);
-                      },
-                    ),
+                    onLongPress: _showActionSheet,
+                    isLoading: state.isLoading,
+                    isLoadingMore: state.isLoadingMore,
+                    errorMessage: state.errorMessage,
+                    onRetry: () => cubit.loadConversations(),
+                    isSearching: _isSearching,
+                    searchQuery: _searchController.text.trim(),
+                    isDark: isDark,
+                    isArabic: isArabic,
                   );
                 },
               ),
@@ -1036,805 +518,6 @@ class _InboxScreenState extends State<InboxScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  // Chats Tab Header matching browser Tab 1
-  Widget _buildMainHeader(bool isDark, Color textPrimary, bool isArabic) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              // Drawer Menu Button with Active Filter Indicator Dot
-              BlocBuilder<ConversationCubit, ConversationState>(
-                builder: (context, state) {
-                  final hasActiveFilter = state.selectedInboxId != null ||
-                      state.selectedTeamId != null ||
-                      state.selectedAssigneeId != null ||
-                      state.selectedAssigneeAgentBotId != null;
-
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      InkWell(
-                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E1F24) : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: hasActiveFilter ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: HugeIcon(
-                            icon: HugeIcons.strokeRoundedMenu01,
-                            color: hasActiveFilter ? AppColors.primary : textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      if (hasActiveFilter)
-                        Positioned(
-                          top: -2,
-                          right: isArabic ? null : -2,
-                          left: isArabic ? -2 : null,
-                          child: Container(
-                            width: 9,
-                            height: 9,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: isDark ? const Color(0xFF131418) : Colors.white, width: 1.5),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              // Workspace Square Button (matching Image 3 & web navbar exactly)
-              BlocBuilder<AuthCubit, AuthState>(
-                builder: (context, authState) {
-                  final user = authState is Authenticated ? authState.user : null;
-                  final activeAccount = user != null && user.accounts.isNotEmpty
-                      ? user.accounts.firstWhere(
-                          (a) => a.id == user.accountId,
-                          orElse: () => user.accounts.first,
-                        )
-                      : null;
-                  final initial = (activeAccount?.name.trim().isNotEmpty == true)
-                      ? activeAccount!.name.trim()[0].toUpperCase()
-                      : 'E';
-
-                  return Tooltip(
-                    message: activeAccount?.name ?? (isArabic ? 'مساحة العمل' : 'Workspace'),
-                    child: InkWell(
-                      onTap: () => _showWorkspacesBottomSheet(context),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E1F24) : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF3B82F6), width: 1.6),
-                          boxShadow: isDark
-                              ? null
-                              : [
-                                  BoxShadow(
-                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3B82F6),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 10),
-              // "Chats" tab with active blue underline indicator
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isArabic ? 'المحادثات' : 'Chats',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Container(
-                    width: isArabic ? 55 : 44,
-                    height: 2.5,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              IconButton(
-                icon: HugeIcon(icon: HugeIcons.strokeRoundedUserAdd01, color: textPrimary, size: 21),
-                tooltip: isArabic ? 'جهة اتصال جديدة' : 'New Contact',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AddContactScreen()),
-                  );
-                },
-              ),
-              IconButton(
-                icon: HugeIcon(icon: HugeIcons.strokeRoundedSearch01, color: textPrimary, size: 21),
-                tooltip: isArabic ? 'بحث' : 'Search',
-                onPressed: () => setState(() => _isSearching = true),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Search input header matching browser screenshot 309
-  Widget _buildSearchHeader(
-    bool isDark,
-    bool isArabic,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
-  ) {
-    final inputBg = isDark ? AppColors.darkSurface : const Color(0xFFF1F2F4);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: inputBg,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: borderColor),
-              ),
-              child: Row(
-                children: [
-                  HugeIcon(icon: HugeIcons.strokeRoundedSearch01, color: textSecondary, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      autofocus: true,
-                      style: TextStyle(
-                        color: textPrimary,
-                        fontSize: 14,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: isArabic ? 'بحث في المحادثات...' : 'Search conversations...',
-                        hintStyle: TextStyle(
-                          color: textSecondary.withValues(alpha: 0.8),
-                          fontSize: 14,
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
-                        filled: false,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: _onSearchChanged,
-                    ),
-                  ),
-                  if (_searchController.text.isNotEmpty)
-                    InkWell(
-                      onTap: () {
-                        _searchController.clear();
-                        _searchDebounce?.cancel();
-                        setState(() {
-                          _searchResults = [];
-                          _isSearchingServer = false;
-                        });
-                      },
-                      child: Icon(Icons.close_rounded, size: 18, color: textSecondary),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.close_rounded, color: textPrimary, size: 22),
-            onPressed: () {
-              _searchDebounce?.cancel();
-              setState(() {
-                _isSearching = false;
-                _searchController.clear();
-                _searchResults = [];
-                _isSearchingServer = false;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSegmentTab(String key, String label, bool isDark) {
-    final isSelected = _activeSegment == key;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onSegmentChanged(key),
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark ? const Color(0xFF2C2E33) : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected
-                  ? AppColors.primary
-                  : (isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showWorkspacesBottomSheet(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final cardBg = isDark ? const Color(0xFF161616) : Colors.white;
-    final textPrimary = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final borderColor = isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBg,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetCtx) {
-        return BlocBuilder<AuthCubit, AuthState>(
-          builder: (context, authState) {
-            final user = authState is Authenticated ? authState.user : null;
-            final accounts = user?.accounts ?? [];
-            final currentAccountId = user?.accountId;
-
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Drag Handle Pill
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-
-                    // Header row: Title + Subtitle + Close icon
-                    Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4162E3).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.business_rounded,
-                            color: Color(0xFF4162E3),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isArabic ? 'مساحات العمل' : 'Workspaces',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                isArabic
-                                    ? 'اختر مساحة العمل التي ترغب بالتبديل إليها'
-                                    : 'Select the workspace you want to switch to',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                          color: textSecondary,
-                          onPressed: () => Navigator.pop(sheetCtx),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    if (accounts.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Center(
-                          child: Text(
-                            isArabic ? 'لا توجد مساحات عمل إضافية' : 'No workspaces available',
-                            style: TextStyle(color: textSecondary, fontSize: 13.5),
-                          ),
-                        ),
-                      )
-                    else
-                      Builder(
-                        builder: (_) {
-                          final hasExplicitOrg = accounts.any((a) =>
-                              (a.organizationName != null && a.organizationName!.trim().isNotEmpty) ||
-                              [' - ', ' | ', ' / ', ' : ', ' — '].any((sep) => a.name.contains(sep)));
-
-                          final defaultOrgName = hasExplicitOrg
-                              ? (isArabic ? 'مساحات عمل أخرى' : 'Other Workspaces')
-                              : (isArabic ? 'المؤسسة الرئيسية' : 'Main Organization');
-
-                          final Map<String, List<Account>> groupedAccounts = {};
-                          for (final account in accounts) {
-                            final org = account.getEffectiveOrgName(defaultOrgName);
-                            groupedAccounts.putIfAbsent(org, () => []).add(account);
-                          }
-
-                          return ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxHeight: MediaQuery.of(context).size.height * 0.6,
-                            ),
-                            child: ListView(
-                              shrinkWrap: true,
-                              children: [
-                                for (final entry in groupedAccounts.entries) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 10, bottom: 8),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF4162E3).withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: const Icon(
-                                            Icons.domain_rounded,
-                                            size: 14,
-                                            color: Color(0xFF4162E3),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            entry.key,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: isDark ? const Color(0xFF262626) : const Color(0xFFF1F5F9),
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Text(
-                                            '${entry.value.length} ${isArabic ? (entry.value.length == 1 ? 'مساحة' : 'مساحات') : (entry.value.length == 1 ? 'workspace' : 'workspaces')}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: textSecondary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  for (final account in entry.value) ...[
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: InkWell(
-                                        onTap: () async {
-                                          final isActive = account.id == currentAccountId;
-                                          if (!isActive) {
-                                            Navigator.pop(sheetCtx);
-                                            setState(() {
-                                              _activeSegment = 'all';
-                                              _activeKey = 'all';
-                                              _selectedStatus = 'all';
-                                            });
-                                            await context.read<AuthCubit>().switchAccount(account.id);
-                                            if (!context.mounted) return;
-                                            await context.read<ConversationCubit>().onWorkspaceSwitched(account.id);
-                                            if (!context.mounted) return;
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  isArabic
-                                                      ? 'تم التبديل إلى ${account.name}'
-                                                      : 'Switched to ${account.name}',
-                                                ),
-                                                duration: const Duration(seconds: 2),
-                                              ),
-                                            );
-                                          } else {
-                                            Navigator.pop(sheetCtx);
-                                          }
-                                        },
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: (account.id == currentAccountId)
-                                                ? (isDark
-                                                    ? const Color(0xFF131D2D)
-                                                    : const Color(0xFFEFF6FF))
-                                                : (isDark
-                                                    ? const Color(0xFF1E1F24)
-                                                    : const Color(0xFFF9FAFB)),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: (account.id == currentAccountId)
-                                                  ? const Color(0xFF4162E3)
-                                                  : borderColor,
-                                              width: (account.id == currentAccountId) ? 1.5 : 1,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              // Workspace Square with border matching image
-                                              Container(
-                                                width: 40,
-                                                height: 40,
-                                                decoration: BoxDecoration(
-                                                  color: isDark
-                                                      ? const Color(0xFF131D2D)
-                                                      : ((account.id == currentAccountId)
-                                                          ? Colors.white
-                                                          : const Color(0xFFEFF6FF)),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: const Color(0xFF4162E3),
-                                                    width: 1.5,
-                                                  ),
-                                                ),
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  account.name.trim().isNotEmpty
-                                                      ? account.name.trim()[0].toUpperCase()
-                                                      : 'E',
-                                                  style: const TextStyle(
-                                                    fontSize: 18,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Color(0xFF4162E3),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 14),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      account.name,
-                                                      style: TextStyle(
-                                                        fontSize: 14.5,
-                                                        fontWeight: (account.id == currentAccountId)
-                                                            ? FontWeight.bold
-                                                            : FontWeight.w600,
-                                                        color: (account.id == currentAccountId)
-                                                            ? const Color(0xFF4162E3)
-                                                            : textPrimary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 3),
-                                                    Row(
-                                                      children: [
-                                                        Text(
-                                                          '#${account.id}',
-                                                          style: TextStyle(
-                                                            fontSize: 11.5,
-                                                            color: textSecondary,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(width: 8),
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                              horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: (isDark
-                                                                ? Colors.white10
-                                                                : Colors.black.withValues(alpha: 0.05)),
-                                                            borderRadius: BorderRadius.circular(4),
-                                                          ),
-                                                          child: Text(
-                                                            account.role.toUpperCase(),
-                                                            style: TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight: FontWeight.w600,
-                                                              color: textSecondary,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              if (account.id == currentAccountId)
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 8, vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF4162E3)
-                                                        .withValues(alpha: 0.15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.check_circle_rounded,
-                                                        size: 14,
-                                                        color: Color(0xFF4162E3),
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        isArabic ? 'الحالية' : 'Active',
-                                                        style: const TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: Color(0xFF4162E3),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                )
-                                              else
-                                                Icon(
-                                                  isArabic
-                                                      ? Icons.keyboard_arrow_left_rounded
-                                                      : Icons.keyboard_arrow_right_rounded,
-                                                  color: textSecondary,
-                                                  size: 20,
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showAdvancedFiltersBottomSheet() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final cardBg = isDark ? const Color(0xFF161616) : Colors.white;
-    final textPrimary = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0D0D0D);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final dividerColor = isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBg,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetCtx) {
-        return SafeArea(
-          child: BlocBuilder<ConversationCubit, ConversationState>(
-            builder: (context, state) {
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 14),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          isArabic ? 'تصفية متقدمة' : 'Advanced Filters',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: textPrimary,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (_activeKey != 'all')
-                          TextButton(
-                            onPressed: () {
-                              _onSelectDrawerItem('all', 'All');
-                              Navigator.pop(sheetCtx);
-                            },
-                            child: Text(
-                              isArabic ? 'إعادة ضبط' : 'Reset',
-                              style: const TextStyle(color: AppColors.primary),
-                            ),
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                          color: textSecondary,
-                          onPressed: () => Navigator.pop(sheetCtx),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.55,
-                      ),
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: [
-                          if (state.lifecycleStages.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                              child: Text(
-                                isArabic ? 'مراحل العميل' : 'Lifecycle Stages',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ),
-                            ...state.lifecycleStages.map((stage) {
-                              final sKey = 'stage_${stage.id}';
-                              final isSelected = _activeKey == sKey;
-                              return ListTile(
-                                dense: true,
-                                leading: Text(stage.icon ?? '🌱', style: const TextStyle(fontSize: 16)),
-                                title: Text(stage.name, style: TextStyle(color: textPrimary, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                                trailing: isSelected ? const Icon(Icons.check_rounded, color: AppColors.primary, size: 18) : null,
-                                onTap: () {
-                                  _onSelectDrawerItem(sKey, stage.name);
-                                  Navigator.pop(sheetCtx);
-                                },
-                              );
-                            }),
-                            Divider(color: dividerColor, height: 20),
-                          ],
-                          if (state.labels.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                              child: Text(
-                                isArabic ? 'التصنيفات' : 'Labels',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ),
-                            ...state.labels.map((lbl) {
-                              final lKey = 'label_${lbl.title}';
-                              final isSelected = _activeKey == lKey;
-                              return ListTile(
-                                dense: true,
-                                leading: Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: Color(int.parse(lbl.color.replaceAll('#', '0xFF'))),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                title: Text(lbl.title, style: TextStyle(color: textPrimary, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                                trailing: isSelected ? const Icon(Icons.check_rounded, color: AppColors.primary, size: 18) : null,
-                                onTap: () {
-                                  _onSelectDrawerItem(lKey, lbl.title);
-                                  Navigator.pop(sheetCtx);
-                                },
-                              );
-                            }),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
     );
   }
 }

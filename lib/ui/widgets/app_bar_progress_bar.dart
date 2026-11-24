@@ -23,7 +23,9 @@ class AppBarProgressBar extends StatelessWidget implements PreferredSizeWidget {
     if (!isLoading) {
       return SizedBox(
         height: height,
-        child: idleBorderColor != null ? Container(color: idleBorderColor) : null,
+        child: idleBorderColor != null
+            ? Container(color: idleBorderColor)
+            : null,
       );
     }
     return SizedBox(
@@ -46,22 +48,22 @@ class LinearHeaderLoader extends StatelessWidget {
   const LinearHeaderLoader({
     super.key,
     required this.isLoading,
-    this.height = 2.5,
+    this.height = 3.5,
     this.color = const Color(0xFF4162E3),
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!isLoading) {
-      return SizedBox(height: height);
-    }
-    return SizedBox(
-      height: height,
-      child: LinearProgressIndicator(
-        minHeight: height,
-        backgroundColor: Colors.transparent,
-        valueColor: AlwaysStoppedAnimation<Color>(color),
-      ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      height: isLoading ? height : 0,
+      child: isLoading
+          ? LinearProgressIndicator(
+              minHeight: height,
+              backgroundColor: color.withValues(alpha: 0.12),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            )
+          : const SizedBox.shrink(),
     );
   }
 }

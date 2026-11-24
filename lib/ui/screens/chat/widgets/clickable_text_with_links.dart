@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/services/link_preview_service.dart';
+import '../../../../data/models/message.dart';
 
 class ClickableTextWithLinks extends StatefulWidget {
   final String text;
@@ -83,7 +84,7 @@ class _ClickableTextWithLinksState extends State<ClickableTextWithLinks> {
   Widget build(BuildContext context) {
     _disposeRecognizers();
 
-    final text = widget.text;
+    final text = Message.cleanMessageText(widget.text);
     final defaultLinkStyle = widget.linkStyle ??
         widget.textStyle.copyWith(
           color: const Color(0xFF38BDF8),

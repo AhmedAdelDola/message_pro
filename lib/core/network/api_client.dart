@@ -51,18 +51,20 @@ class ApiClient {
     );
     _dio.interceptors.add(PerformanceService.createDioInterceptor());
     _dio.interceptors.add(AuthInterceptor());
-    _dio.interceptors.add(
-      PrettyDioLogger(
-        requestHeader: true,
-        requestBody: true,
-        responseBody: true,
-        responseHeader: true,
-        error: true,
-        compact: false,
-        maxWidth: 120,
-        logPrint: (object) => debugPrint('$object'),
-      ),
-    );
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        PrettyDioLogger(
+          requestHeader: false,
+          requestBody: false,
+          responseBody: false,
+          responseHeader: false,
+          error: true,
+          compact: true,
+          maxWidth: 90,
+          logPrint: (object) => debugPrint('$object'),
+        ),
+      );
+    }
     _initBaseUrl();
   }
 

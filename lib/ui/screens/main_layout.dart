@@ -39,7 +39,9 @@ class MainLayoutState extends State<MainLayout> {
       if (!mounted) return;
       final authState = context.read<AuthCubit>().state;
       if (authState is Authenticated) {
-        context.read<ConversationCubit>().onWorkspaceSwitched(authState.user.accountId);
+        context.read<ConversationCubit>().onWorkspaceSwitched(
+          authState.user.accountId,
+        );
         context.read<NotificationCubit>().loadNotifications();
       }
     });
@@ -65,14 +67,19 @@ class MainLayoutState extends State<MainLayout> {
     final isRTL = Localizations.localeOf(context).languageCode == 'ar';
 
     final bgColor = isDark ? const Color(0xFF0D0D0D) : const Color(0xFFFAFAFA);
-    final borderColor = isDark ? const Color(0xFF212121) : const Color(0xFFEAEAEA);
+    final borderColor = isDark
+        ? const Color(0xFF212121)
+        : const Color(0xFFEAEAEA);
     const activeColor = Color(0xFF4162E3);
     const inactiveColor = Color(0xFF80838D);
 
     return BlocBuilder<ConversationCubit, ConversationState>(
       buildWhen: (prev, curr) => prev.conversations != curr.conversations,
       builder: (context, convState) {
-        final unreadConvs = convState.conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+        final unreadConvs = convState.conversations.fold<int>(
+          0,
+          (sum, c) => sum + c.unreadCount,
+        );
 
         return BlocBuilder<NotificationCubit, NotificationState>(
           buildWhen: (prev, curr) => prev.notifications != curr.notifications,
@@ -91,7 +98,9 @@ class MainLayoutState extends State<MainLayout> {
               },
               listener: (context, authState) {
                 if (authState is Authenticated) {
-                  context.read<ConversationCubit>().onWorkspaceSwitched(authState.user.accountId);
+                  context.read<ConversationCubit>().onWorkspaceSwitched(
+                    authState.user.accountId,
+                  );
                   context.read<NotificationCubit>().loadNotifications();
                 } else if (authState is Unauthenticated) {
                   context.read<ConversationCubit>().reset();
@@ -101,7 +110,9 @@ class MainLayoutState extends State<MainLayout> {
               child: Scaffold(
                 backgroundColor: bgColor,
                 body: IndexedStack(
-                  key: ValueKey(context.watch<AuthCubit>().currentUser?.accountId ?? 0),
+                  key: ValueKey(
+                    context.watch<AuthCubit>().currentUser?.accountId ?? 0,
+                  ),
                   index: _currentIndex,
                   children: _screens,
                 ),
@@ -122,7 +133,11 @@ class MainLayoutState extends State<MainLayout> {
                           _buildTabItem(
                             index: 0,
                             label: isRTL ? 'المكالمات' : 'Calls',
-                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedCall, color: color, size: 22),
+                            iconBuilder: (color) => HugeIcon(
+                              icon: HugeIcons.strokeRoundedCall,
+                              color: color,
+                              size: 22,
+                            ),
                             badgeCount: 0,
                             activeColor: activeColor,
                             inactiveColor: inactiveColor,
@@ -130,7 +145,11 @@ class MainLayoutState extends State<MainLayout> {
                           _buildTabItem(
                             index: 1,
                             label: isRTL ? 'جهات الاتصال' : 'Contact',
-                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedUserGroup, color: color, size: 22),
+                            iconBuilder: (color) => HugeIcon(
+                              icon: HugeIcons.strokeRoundedContact,
+                              color: color,
+                              size: 22,
+                            ),
                             badgeCount: 0,
                             activeColor: activeColor,
                             inactiveColor: inactiveColor,
@@ -138,7 +157,11 @@ class MainLayoutState extends State<MainLayout> {
                           _buildTabItem(
                             index: 2,
                             label: isRTL ? 'المحادثات' : 'Inbox',
-                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedBubbleChat, color: color, size: 22),
+                            iconBuilder: (color) => HugeIcon(
+                              icon: HugeIcons.strokeRoundedInbox,
+                              color: color,
+                              size: 22,
+                            ),
                             badgeCount: unreadConvs,
                             activeColor: activeColor,
                             inactiveColor: inactiveColor,
@@ -146,7 +169,11 @@ class MainLayoutState extends State<MainLayout> {
                           _buildTabItem(
                             index: 3,
                             label: isRTL ? 'الإشعارات' : 'Notification',
-                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: color, size: 22),
+                            iconBuilder: (color) => HugeIcon(
+                              icon: HugeIcons.strokeRoundedNotification01,
+                              color: color,
+                              size: 22,
+                            ),
                             badgeCount: unreadNotifs,
                             activeColor: activeColor,
                             inactiveColor: inactiveColor,
@@ -154,7 +181,11 @@ class MainLayoutState extends State<MainLayout> {
                           _buildTabItem(
                             index: 4,
                             label: isRTL ? 'الإعدادات' : 'Setting',
-                            iconBuilder: (color) => HugeIcon(icon: HugeIcons.strokeRoundedSettings01, color: color, size: 22),
+                            iconBuilder: (color) => HugeIcon(
+                              icon: HugeIcons.strokeRoundedSettings01,
+                              color: color,
+                              size: 22,
+                            ),
                             badgeCount: 0,
                             activeColor: activeColor,
                             inactiveColor: inactiveColor,
@@ -206,12 +237,18 @@ class MainLayoutState extends State<MainLayout> {
                       top: -4,
                       right: -8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2CA54A),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
                         child: Text(
                           badgeCount > 99 ? '99+' : '$badgeCount',
                           style: const TextStyle(

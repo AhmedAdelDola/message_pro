@@ -57,21 +57,60 @@ class Contact {
     );
   }
 
+  String get displayNameOrPhone {
+    final lower = name.trim().toLowerCase();
+    final isGeneric = lower.isEmpty ||
+        lower == 'customer' ||
+        lower == 'عميل' ||
+        lower == 'عميل جديد' ||
+        lower == 'new visitor' ||
+        lower == 'visitor' ||
+        lower == 'null' ||
+        lower.startsWith('عميل #') ||
+        lower.startsWith('contact #');
+
+    if (isGeneric) {
+      if (phoneNumber != null && phoneNumber!.trim().isNotEmpty) {
+        return phoneNumber!.trim();
+      }
+      if (email != null && email!.trim().isNotEmpty) {
+        return email!.trim();
+      }
+      if (identifier != null && identifier!.trim().isNotEmpty) {
+        return identifier!.trim();
+      }
+    }
+    return name.isNotEmpty ? name : 'عميل';
+  }
+
   factory Contact.fromJson(Map<String, dynamic> json) {
-    final rawName = json['name']?.toString().trim();
-    final rawPhone = json['phone_number']?.toString().trim();
+    final rawName = (json['name'] ?? json['available_name'] ?? json['sender_name'])?.toString().trim();
+    final rawPhone = (json['phone_number'] ??
+            json['phone'] ??
+            json['source_id'] ??
+            json['wa_id'] ??
+            json['additional_attributes']?['phone_number'] ??
+            json['additional_attributes']?['wa_id'] ??
+            json['custom_attributes']?['phone_number'])
+        ?.toString()
+        .trim();
     final rawEmail = json['email']?.toString().trim();
     final rawIdentifier = json['identifier']?.toString().trim();
     final rawId = json['id'];
     final int contactId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
 
-    String displayName;
-    final isGeneric = rawName != null &&
-        (rawName.toLowerCase() == 'customer' ||
-            rawName.toLowerCase() == 'عميل' ||
-            rawName.toLowerCase() == 'visitor' ||
-            rawName.toLowerCase() == 'null');
+    final lowerName = rawName?.toLowerCase() ?? '';
+    final isGeneric = lowerName.isEmpty ||
+        lowerName == 'customer' ||
+        lowerName == 'عميل' ||
+        lowerName == 'عميل جديد' ||
+        lowerName == 'visitor' ||
+        lowerName == 'new visitor' ||
+        lowerName == 'null' ||
+        lowerName.startsWith('عميل #') ||
+        lowerName.startsWith('contact #');
 
+    String displayName;
     if (rawName != null && rawName.isNotEmpty && !isGeneric) {
       displayName = rawName;
     } else if (rawPhone != null && rawPhone.isNotEmpty) {

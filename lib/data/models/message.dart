@@ -131,18 +131,30 @@ class MessageReferral {
 class MessageActions {
   final bool canEdit;
   final int? editUntil; // Unix timestamp in seconds
+  final bool canDelete;
+  final int? deleteUntil; // Unix timestamp in seconds
   final bool canReact;
+  final bool canForward;
 
   const MessageActions({
     this.canEdit = false,
     this.editUntil,
+    this.canDelete = false,
+    this.deleteUntil,
     this.canReact = false,
+    this.canForward = false,
   });
 
   bool get isEditExpired {
     if (editUntil == null) return false;
     final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     return nowSec > editUntil!;
+  }
+
+  bool get isDeleteExpired {
+    if (deleteUntil == null) return false;
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return nowSec > deleteUntil!;
   }
 
   Duration? get remainingEditTime {
@@ -152,20 +164,35 @@ class MessageActions {
     return diff > 0 ? Duration(seconds: diff) : Duration.zero;
   }
 
+  Duration? get remainingDeleteTime {
+    if (deleteUntil == null) return null;
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final diff = deleteUntil! - nowSec;
+    return diff > 0 ? Duration(seconds: diff) : Duration.zero;
+  }
+
   factory MessageActions.fromJson(Map<String, dynamic> json) {
     return MessageActions(
       canEdit: json['edit'] == true,
       editUntil: json['edit_until'] is num
           ? (json['edit_until'] as num).toInt()
           : int.tryParse(json['edit_until']?.toString() ?? ''),
+      canDelete: json['delete'] == true,
+      deleteUntil: json['delete_until'] is num
+          ? (json['delete_until'] as num).toInt()
+          : int.tryParse(json['delete_until']?.toString() ?? ''),
       canReact: json['react'] == true,
+      canForward: json['forward'] == true,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'edit': canEdit,
     if (editUntil != null) 'edit_until': editUntil,
+    'delete': canDelete,
+    if (deleteUntil != null) 'delete_until': deleteUntil,
     'react': canReact,
+    'forward': canForward,
   };
 }
 
@@ -256,6 +283,7 @@ class Message {
   final String status; // sent, delivered, read, failed
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final int? senderId;
   final String? senderName;
   final String? senderAvatar;
   final String? senderType; // 'User', 'AgentBot', 'Contact'
@@ -277,6 +305,7 @@ class Message {
     this.status = 'sent',
     required this.createdAt,
     this.updatedAt,
+    this.senderId,
     this.senderName,
     this.senderAvatar,
     this.senderType,
@@ -299,6 +328,7 @@ class Message {
     String? status,
     DateTime? createdAt,
     DateTime? updatedAt,
+    int? senderId,
     String? senderName,
     String? senderAvatar,
     String? senderType,
@@ -320,6 +350,7 @@ class Message {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      senderId: senderId ?? this.senderId,
       senderName: senderName ?? this.senderName,
       senderAvatar: senderAvatar ?? this.senderAvatar,
       senderType: senderType ?? this.senderType,
@@ -413,12 +444,14 @@ class Message {
   }
 
   bool canEditBy(User? currentUser) {
+    if (isDeleted) return false;
     if (!messageActions.canEdit) return false;
     if (messageActions.isEditExpired) return false;
     if (!isOutgoing) return false;
     if (attachments.isNotEmpty) return false;
     if (currentUser == null) return true;
     if (currentUser.isAdmin) return true;
+    if (senderId != null && senderId == currentUser.id) return true;
     if (senderName != null &&
         senderName!.trim().toLowerCase() == currentUser.name.trim().toLowerCase()) {
       return true;
@@ -427,20 +460,87 @@ class Message {
     return false;
   }
 
-  bool get canReact => messageActions.canReact;
-
-  bool get isEdited {
-    if (contentAttributes['is_edited'] == true ||
-        contentAttributes['edited'] == true ||
-        additionalAttributes['is_edited'] == true ||
-        contentAttributes['edit_history'] != null) {
-      return true;
-    }
-    if (updatedAt != null && updatedAt!.isAfter(createdAt.add(const Duration(seconds: 2)))) {
+  bool canDeleteBy(User? currentUser) {
+    if (isDeleted) return false;
+    if (!messageActions.canDelete) return false;
+    if (messageActions.isDeleteExpired) return false;
+    if (currentUser == null) return true;
+    if (currentUser.isAdmin) return true;
+    if (senderId != null && senderId == currentUser.id) return true;
+    if (senderName != null &&
+        senderName!.trim().toLowerCase() == currentUser.name.trim().toLowerCase()) {
       return true;
     }
     return false;
   }
+
+  bool get canDelete => messageActions.canDelete;
+
+  bool get canReact => !isDeleted && messageActions.canReact;
+
+  bool get isDeleted {
+    return contentAttributes['deleted'] == true ||
+        additionalAttributes['deleted'] == true;
+  }
+
+  bool get isEdited {
+    if (isDeleted) return false;
+    if (contentAttributes['is_edited'] == true ||
+        contentAttributes['edited'] == true ||
+        additionalAttributes['is_edited'] == true) {
+      return true;
+    }
+    final history = contentAttributes['edit_history'];
+    if (history is List && history.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Cleans raw escape backslashes and formats markdown mentions as `@PersonName`.
+  static String cleanMessageText(String text) {
+    if (text.isEmpty) return text;
+
+    // 1. Convert Chatwoot markdown mentions:
+    // [@Name](mention://user/123/Name) or \[ @Name \](mention://...) -> @Name
+    var cleaned = text.replaceAllMapped(
+      RegExp(r'\\?\[@([^\]\n]+)\\?\]\(mention:\/\/[^\)]+\)'),
+      (m) {
+        final name = m.group(1)?.trim() ?? '';
+        return '@$name';
+      },
+    );
+
+    // Also match standalone [@Name] brackets
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'\\?\[@([^\]\n]+)\\?\]'),
+      (m) {
+        final name = m.group(1)?.trim() ?? '';
+        return '@$name';
+      },
+    );
+
+    // 2. Normalize and unescape newlines
+    cleaned = cleaned
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '')
+        .replaceAll(r'\r\n', '\n')
+        .replaceAll(r'\n', '\n');
+
+    // 3. Remove backslashes used to escape punctuation or markdown:
+    // e.g. \[ -> [, \] -> ], \- -> -, \. -> ., \* -> *, \_ -> _, etc.
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'\\([\[\]\(\)*_~+\-.!#>`\\/|\$])'),
+      (m) => m.group(1)!,
+    );
+
+    // 4. Remove any remaining stray backslashes before spaces or at line end
+    cleaned = cleaned.replaceAll(r'\ ', ' ').replaceAll(RegExp(r'\\(?=\s|$)'), '');
+
+    return cleaned;
+  }
+
+  String get cleanContent => cleanMessageText(content ?? '');
 
   Map<String, int> get reactionsSummary {
     final map = <String, int>{};
@@ -515,14 +615,21 @@ class Message {
 
   factory Message.fromJson(Map<String, dynamic> json) {
     final rawSender = json['sender'];
+    int? sId;
     String? sName;
     String? sAvatar;
     String? sType;
     if (rawSender is Map) {
+      sId = rawSender['id'] is int
+          ? rawSender['id']
+          : int.tryParse(rawSender['id']?.toString() ?? '');
       sName = rawSender['name']?.toString();
       sAvatar = (rawSender['avatar_url'] ?? rawSender['thumbnail'])?.toString();
       sType = rawSender['type']?.toString();
     }
+    sId ??= json['sender_id'] is int
+        ? json['sender_id']
+        : int.tryParse(json['sender_id']?.toString() ?? '');
     sType ??= json['sender_type']?.toString();
 
     final rawAttachments = json['attachments'];
@@ -685,6 +792,7 @@ class Message {
       status: parsedStatus,
       createdAt: dt,
       updatedAt: updatedDt,
+      senderId: sId,
       senderName: sName,
       senderAvatar: sAvatar,
       senderType: sType,

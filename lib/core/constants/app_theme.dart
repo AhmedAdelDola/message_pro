@@ -4,14 +4,33 @@ import 'app_colors.dart';
 
 class AppTheme {
   static const String englishFontFamily = 'Inter';
+  static const String arabicFontFamily = 'IBMPlexSansArabic';
+
   static List<String> get arabicFontFallback => [
+        arabicFontFamily,
+        GoogleFonts.ibmPlexSansArabic().fontFamily ?? 'IBMPlexSansArabic',
         'Almarai',
         GoogleFonts.almarai().fontFamily ?? 'Almarai',
-        'IBMPlexSansArabic',
-        GoogleFonts.ibmPlexSansArabic().fontFamily ?? 'IBMPlexSansArabic',
       ];
 
   static String get fontFamily => englishFontFamily;
+
+  static String getFontFamilyForLocale(Locale? locale) {
+    if (locale?.languageCode == 'ar') {
+      return arabicFontFamily;
+    }
+    return englishFontFamily;
+  }
+
+  static List<String> getFontFallbackForLocale(Locale? locale) {
+    if (locale?.languageCode == 'ar') {
+      return [
+        englishFontFamily,
+        GoogleFonts.inter().fontFamily ?? 'Inter',
+      ];
+    }
+    return arabicFontFallback;
+  }
 
   static TextStyle font({
     TextStyle? textStyle,
@@ -53,8 +72,9 @@ class AppTheme {
     return textStyle != null ? base.merge(textStyle) : base;
   }
 
-  static ThemeData lightTheme() {
-    final fallback = arabicFontFallback;
+  static ThemeData lightTheme([Locale? locale]) {
+    final activeFontFamily = getFontFamilyForLocale(locale);
+    final fallback = getFontFallbackForLocale(locale);
 
     TextStyle style({
       required FontWeight fontWeight,
@@ -62,7 +82,7 @@ class AppTheme {
       double? fontSize,
     }) {
       return TextStyle(
-        fontFamily: englishFontFamily,
+        fontFamily: activeFontFamily,
         fontFamilyFallback: fallback,
         fontWeight: fontWeight,
         color: color,
@@ -88,7 +108,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      fontFamily: englishFontFamily,
+      fontFamily: activeFontFamily,
       fontFamilyFallback: fallback,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.lightBackground,
@@ -155,8 +175,9 @@ class AppTheme {
     );
   }
 
-  static ThemeData darkTheme() {
-    final fallback = arabicFontFallback;
+  static ThemeData darkTheme([Locale? locale]) {
+    final activeFontFamily = getFontFamilyForLocale(locale);
+    final fallback = getFontFallbackForLocale(locale);
 
     TextStyle style({
       required FontWeight fontWeight,
@@ -164,7 +185,7 @@ class AppTheme {
       double? fontSize,
     }) {
       return TextStyle(
-        fontFamily: englishFontFamily,
+        fontFamily: activeFontFamily,
         fontFamilyFallback: fallback,
         fontWeight: fontWeight,
         color: color,
@@ -190,7 +211,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      fontFamily: englishFontFamily,
+      fontFamily: activeFontFamily,
       fontFamilyFallback: fallback,
       primaryColor: AppColors.primaryLight,
       scaffoldBackgroundColor: AppColors.darkBackground,

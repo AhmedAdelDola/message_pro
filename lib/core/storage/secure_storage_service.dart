@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 
 class SecureStorageService {
-  static final SecureStorageService _instance = SecureStorageService._internal();
+  static final SecureStorageService _instance =
+      SecureStorageService._internal();
   factory SecureStorageService() => _instance;
   SecureStorageService._internal();
 
@@ -20,12 +21,25 @@ class SecureStorageService {
   static const _keyAccountId = 'mp_account_id';
   static const _keyBaseUrl = 'mp_base_url';
 
+  // In-memory caching for sub-millisecond retrieval (avoids repeated KeyStore platform-channel latency)
+  Map<String, String>? _cachedAuthHeaders;
+  String? _cachedPubSubToken;
+  Map<String, dynamic>? _cachedUserData;
+
   Future<void> saveAuthCredentials({
     required String accessToken,
     required String client,
     required String uid,
     String? pubSubToken,
   }) async {
+    _cachedAuthHeaders = {
+      'access-token': accessToken,
+      'client': client,
+      'uid': uid,
+    };
+    if (pubSubToken != null) {
+      _cachedPubSubToken = pubSubToken;
+    }
     await _secureStorage.write(key: _keyAccessToken, value: accessToken);
     await _secureStorage.write(key: _keyClient, value: client);
     await _secureStorage.write(key: _keyUid, value: uid);
@@ -35,71 +49,109 @@ class SecureStorageService {
   }
 
   Future<Map<String, String>?> getAuthHeaders() async {
+    if (_cachedAuthHeaders != null) {
+      return _cachedAuthHeaders;
+    }
     final token = await _secureStorage.read(key: _keyAccessToken);
     final client = await _secureStorage.read(key: _keyClient);
     final uid = await _secureStorage.read(key: _keyUid);
 
     if (token != null && client != null && uid != null) {
-      return {
-        'access-token': token,
-        'client': client,
-        'uid': uid,
-      };
+      _cachedAuthHeaders = {'access-token': token, 'client': client, 'uid': uid};
+      return _cachedAuthHeaders;
     }
     return null;
   }
 
   Future<String?> getPubSubToken() async {
-    return await _secureStorage.read(key: _keyPubSubToken);
+    if (_cachedPubSubToken != null) return _cachedPubSubToken;
+    _cachedPubSubToken = await _secureStorage.read(key: _keyPubSubToken);
+    return _cachedPubSubToken;
   }
 
   Future<void> saveUserData(Map<String, dynamic> userMap) async {
+    _cachedUserData = Map<String, dynamic>.from(userMap);
     await _secureStorage.write(key: _keyUserData, value: jsonEncode(userMap));
   }
 
   Future<Map<String, dynamic>?> getUserData() async {
+    if (_cachedUserData != null) return _cachedUserData;
     final raw = await _secureStorage.read(key: _keyUserData);
     if (raw != null) {
       try {
-        return jsonDecode(raw) as Map<String, dynamic>;
+        _cachedUserData = jsonDecode(raw) as Map<String, dynamic>;
+        return _cachedUserData;
       } catch (_) {}
     }
     return null;
   }
 
+  int? _cachedAccountId;
+
   Future<void> saveActiveAccountId(int accountId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyAccountId, accountId);
+    _cachedAccountId = accountId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_keyAccountId, accountId);
+    } catch (_) {}
   }
 
   Future<int?> getActiveAccountId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_keyAccountId);
+    if (_cachedAccountId != null) return _cachedAccountId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _cachedAccountId = prefs.getInt(_keyAccountId);
+      return _cachedAccountId;
+    } catch (_) {
+      return null;
+    }
   }
 
+  int? get activeAccountId => _cachedAccountId;
+
   Future<void> saveBaseUrl(String url) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyBaseUrl, url);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyBaseUrl, url);
+    } catch (_) {}
   }
 
   Future<String> getBaseUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyBaseUrl) ?? AppConfig.defaultBaseUrl;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyBaseUrl) ?? AppConfig.defaultBaseUrl;
+    } catch (_) {
+      return AppConfig.defaultBaseUrl;
+    }
   }
 
   Future<void> setString(String key, String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+    } catch (_) {}
   }
 
   Future<String?> getString(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(key);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> clearAll() async {
-    await _secureStorage.deleteAll();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyAccountId);
+    _cachedAccountId = null;
+    _cachedAuthHeaders = null;
+    _cachedPubSubToken = null;
+    _cachedUserData = null;
+    try {
+      await _secureStorage.deleteAll();
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyAccountId);
+    } catch (_) {}
   }
 }

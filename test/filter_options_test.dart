@@ -97,6 +97,8 @@ class FakeConversationRepository implements IConversationRepository {
   @override
   Future<Either<Failure, void>> assignAgent(int conversationId, int? agentId, {String? assigneeType}) async => const Right(null);
   @override
+  Future<Either<Failure, List<int>>> fetchPinnedConversationIds() async => const Right([]);
+  @override
   Future<Either<Failure, void>> pinConversation(int conversationId) async => const Right(null);
   @override
   Future<Either<Failure, void>> unpinConversation(int conversationId) async => const Right(null);
@@ -134,6 +136,7 @@ class FakeWebSocketClient implements ActionCableClient {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('ConversationFilterOptions Model Tests', () {
     test('Parses direct JSON response accurately', () {
       final json = {
