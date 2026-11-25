@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/models/conversation.dart';
 
@@ -66,12 +67,12 @@ class ConversationActionSheet extends StatelessWidget {
           ),
           // Pin / Unpin
           _buildActionRow(
-            icon: Transform.rotate(
-              angle: 0.5,
-              child: Icon(
-                conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-                color: conversation.isPinned ? AppColors.primary : textPrimary,
-              ),
+            icon: HugeIcon(
+              icon: conversation.isPinned
+                  ? HugeIcons.strokeRoundedPinOff
+                  : HugeIcons.strokeRoundedPin,
+              size: 20,
+              color: conversation.isPinned ? AppColors.primary : textPrimary,
             ),
             label: conversation.isPinned
                 ? (isArabic ? 'إلغاء تثبيت المحادثة' : 'Unpin Conversation')

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:message_pro/data/models/contact.dart';
 import 'package:message_pro/data/models/conversation.dart';
@@ -104,7 +105,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.push_pin_rounded), findsOneWidget);
+      expect(find.byType(HugeIcon), findsOneWidget);
     });
 
     testWidgets('ConversationTile does NOT render pushpin icon when isPinned is false', (tester) async {
@@ -128,7 +129,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.push_pin_rounded), findsNothing);
+      expect(find.byType(HugeIcon), findsNothing);
     });
   });
 }

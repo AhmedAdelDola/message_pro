@@ -158,7 +158,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         // Overflow Menu
         PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert_rounded),
+          icon: HugeIcon(
+            icon: HugeIcons.strokeRoundedMoreVertical,
+            size: 21.r,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           onSelected: (val) {
             switch (val) {
@@ -195,8 +199,10 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'resolve_reopen',
                 child: Row(
                   children: [
-                    Icon(
-                      isResolved ? Icons.replay_rounded : Icons.check_circle_outline_rounded,
+                    HugeIcon(
+                      icon: isResolved
+                          ? HugeIcons.strokeRoundedRefreshCcw
+                          : HugeIcons.strokeRoundedCheckmarkCircle02,
                       color: isResolved ? const Color(0xFF10B981) : const Color(0xFF0284C7),
                       size: 19.r,
                     ),
@@ -214,8 +220,10 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'snooze_options',
                 child: Row(
                   children: [
-                    Icon(
-                      status == 'snoozed' ? Icons.alarm_off_rounded : Icons.alarm_rounded,
+                    HugeIcon(
+                      icon: status == 'snoozed'
+                          ? HugeIcons.strokeRoundedAlarmClockOff
+                          : HugeIcons.strokeRoundedAlarmClock,
                       color: const Color(0xFFFA8900),
                       size: 19.r,
                     ),
@@ -231,7 +239,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'canned',
                 child: Row(
                   children: [
-                    Icon(Icons.bolt_rounded, color: const Color(0xFFF59E0B), size: 19.r),
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedZap,
+                      color: const Color(0xFFF59E0B),
+                      size: 19.r,
+                    ),
                     SizedBox(width: 10.w),
                     Text(
                       isArabic ? 'الردود الجاهزة (Canned responses)' : 'Canned responses',
@@ -244,8 +256,10 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'mute',
                 child: Row(
                   children: [
-                    Icon(
-                      isMuted ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+                    HugeIcon(
+                      icon: isMuted
+                          ? HugeIcons.strokeRoundedNotification01
+                          : HugeIcons.strokeRoundedNotificationOff01,
                       color: isMuted ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                       size: 19.r,
                     ),
@@ -264,7 +278,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'contact_details',
                 child: Row(
                   children: [
-                    Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 19.r),
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedUserCircle,
+                      color: AppColors.primary,
+                      size: 19.r,
+                    ),
                     SizedBox(width: 10.w),
                     Text(
                       isArabic ? 'عرض بيانات العميل' : 'View contact details',
@@ -277,7 +295,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'assign_agent',
                 child: Row(
                   children: [
-                    Icon(Icons.assignment_ind_outlined, color: const Color(0xFF10B981), size: 19.r),
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedUserAdd01,
+                      color: const Color(0xFF10B981),
+                      size: 19.r,
+                    ),
                     SizedBox(width: 10.w),
                     Text(
                       isArabic ? 'تعيين مسؤول (Assign)' : 'Assign agent',
@@ -307,7 +329,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 value: 'copy_link',
                 child: Row(
                   children: [
-                    Icon(Icons.link_rounded, color: const Color(0xFF6366F1), size: 19.r),
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedLink01,
+                      color: const Color(0xFF6366F1),
+                      size: 19.r,
+                    ),
                     SizedBox(width: 10.w),
                     Text(
                       isArabic ? 'نسخ رابط المحادثة' : 'Copy conversation link',

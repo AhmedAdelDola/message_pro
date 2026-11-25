@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../../data/models/message.dart';
 import '../../../../widgets/media_viewers/audio_player_bubble.dart';
 import '../../../../widgets/media_viewers/document_attachment_tile.dart';
 import '../../../../widgets/media_viewers/image_viewer_screen.dart';
+import '../../../../widgets/media_viewers/video_player_screen.dart';
 
 class BubbleAttachmentsView extends StatelessWidget {
   final Message message;
@@ -123,69 +123,55 @@ class BubbleAttachmentsView extends StatelessWidget {
       return _buildGridImageTile(context, images[idx], urls, idx, height: height);
     }
 
+    Widget grid;
     if (count == 2) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Row(
-          children: [
-            Expanded(child: buildTile(0, height: 130)),
-            const SizedBox(width: 4),
-            Expanded(child: buildTile(1, height: 130)),
-          ],
-        ),
+      grid = Row(
+        children: [
+          Expanded(child: buildTile(0, height: 130)),
+          const SizedBox(width: 4),
+          Expanded(child: buildTile(1, height: 130)),
+        ],
       );
-    }
-
-    if (count == 3) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            buildTile(0, height: 120),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(child: buildTile(1, height: 85)),
-                const SizedBox(width: 4),
-                Expanded(child: buildTile(2, height: 85)),
-              ],
-            ),
-          ],
-        ),
+    } else if (count == 3) {
+      grid = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          buildTile(0, height: 120),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(child: buildTile(1, height: 85)),
+              const SizedBox(width: 4),
+              Expanded(child: buildTile(2, height: 85)),
+            ],
+          ),
+        ],
       );
-    }
-
-    if (count == 4) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(child: buildTile(0, height: 100)),
-                const SizedBox(width: 4),
-                Expanded(child: buildTile(1, height: 100)),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(child: buildTile(2, height: 100)),
-                const SizedBox(width: 4),
-                Expanded(child: buildTile(3, height: 100)),
-              ],
-            ),
-          ],
-        ),
+    } else if (count == 4) {
+      grid = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(child: buildTile(0, height: 100)),
+              const SizedBox(width: 4),
+              Expanded(child: buildTile(1, height: 100)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(child: buildTile(2, height: 100)),
+              const SizedBox(width: 4),
+              Expanded(child: buildTile(3, height: 100)),
+            ],
+          ),
+        ],
       );
-    }
-
-    // 5 images (or more)
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Column(
+    } else {
+      // 5 images (or more)
+      grid = Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
@@ -206,6 +192,14 @@ class BubbleAttachmentsView extends StatelessWidget {
             ],
           ),
         ],
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 260),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: grid,
       ),
     );
   }
@@ -229,7 +223,6 @@ class BubbleAttachmentsView extends StatelessWidget {
         child: CachedNetworkImage(
           imageUrl: att.dataUrl,
           fit: BoxFit.cover,
-          width: double.infinity,
           placeholder: (ctx, url) => Container(
             color: Colors.black12,
             child: const Center(child: CircularProgressIndicator(strokeWidth: 1.5)),
@@ -253,12 +246,11 @@ class BubbleAttachmentsView extends StatelessWidget {
     }
 
     return InkWell(
-      onTap: () async {
-        final uri = Uri.tryParse(att.dataUrl);
-        if (uri != null && await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      },
+      onTap: () => VideoPlayerScreen.open(
+        context,
+        videoUrl: att.dataUrl,
+        title: att.fileName,
+      ),
       borderRadius: BorderRadius.circular(10),
       child: Container(
         constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),

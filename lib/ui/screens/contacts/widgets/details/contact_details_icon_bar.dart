@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class ContactDetailsIconBar extends StatelessWidget {
   final int activeIndex;
@@ -12,15 +13,15 @@ class ContactDetailsIconBar extends StatelessWidget {
     required this.isDark,
   });
 
-  static const List<IconData> _icons = [
-    Icons.assignment_ind_outlined, // 0: Contact details
-    Icons.phone_outlined,          // 1: Calls
-    Icons.auto_awesome_outlined,   // 2: AI activity
-    Icons.local_offer_outlined,    // 3: Attachments
-    Icons.timer_outlined,          // 4: Activities
-    Icons.article_outlined,        // 5: Notes
-    Icons.calendar_today_outlined, // 6: Calendar
-    Icons.storefront_outlined,     // 7: Commerce
+  static final List<List<List<dynamic>>> _icons = [
+    HugeIcons.strokeRoundedUserAccount, // 0: Contact details
+    HugeIcons.strokeRoundedCall02,      // 1: Calls
+    HugeIcons.strokeRoundedAiChat02,    // 2: AI activity
+    HugeIcons.strokeRoundedTag01,       // 3: Attachments
+    HugeIcons.strokeRoundedTimer02,     // 4: Activities
+    HugeIcons.strokeRoundedNote02,      // 5: Notes
+    HugeIcons.strokeRoundedCalendar03,  // 6: Calendar
+    HugeIcons.strokeRoundedStore01,     // 7: Commerce
   ];
 
   @override
@@ -49,6 +50,7 @@ class ContactDetailsIconBar extends StatelessWidget {
               duration: const Duration(milliseconds: 160),
               width: 34,
               height: 34,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isActive
                     ? const Color(0xFF4162E3)
@@ -58,8 +60,8 @@ class ContactDetailsIconBar extends StatelessWidget {
                     ? null
                     : Border.all(color: borderColor, width: 1),
               ),
-              child: Icon(
-                _icons[index],
+              child: HugeIcon(
+                icon: _icons[index],
                 size: 18,
                 color: isActive
                     ? Colors.white

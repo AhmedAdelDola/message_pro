@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:message_pro/data/models/contact_details_aggregate.dart';
 import 'package:message_pro/ui/widgets/avatar_widget.dart';
+import 'package:message_pro/ui/widgets/media_viewers/image_viewer_screen.dart';
+import 'package:message_pro/ui/widgets/media_viewers/video_player_screen.dart';
 
 class ContactAttachmentsTabView extends StatefulWidget {
   final List<ContactAttachmentItem> items;
@@ -155,7 +157,25 @@ class _ContactAttachmentsTabViewState extends State<ContactAttachmentsTabView> {
                             ),
                           ),
                         InkWell(
-                          onTap: () => _openUrl(item.dataUrl),
+                          onTap: () {
+                            final ft = item.fileType.toLowerCase();
+                            if (ft.contains('video')) {
+                              VideoPlayerScreen.open(
+                                context,
+                                videoUrl: item.dataUrl,
+                                title: item.fileName,
+                              );
+                            } else if (isImage) {
+                              ImageViewerScreen.openGallery(
+                                context,
+                                imageUrls: [item.dataUrl],
+                                initialIndex: 0,
+                                title: item.fileName,
+                              );
+                            } else {
+                              _openUrl(item.dataUrl);
+                            }
+                          },
                           borderRadius: BorderRadius.circular(8),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),

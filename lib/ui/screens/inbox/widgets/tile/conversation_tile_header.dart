@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../data/models/conversation.dart';
 
@@ -92,13 +93,10 @@ class ConversationTileHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         if (conversation.isPinned) ...[
-          Transform.rotate(
-            angle: 0.5,
-            child: Icon(
-              Icons.push_pin_rounded,
-              size: 15,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedPin,
+            size: 15,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
           ),
           const SizedBox(width: 4),
         ],
