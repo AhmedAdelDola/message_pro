@@ -24,7 +24,6 @@ class ConversationCubit extends Cubit<ConversationState> {
   final SecureStorageService _storage;
   final Stopwatch renderStopwatch = Stopwatch();
   late final ConversationRealtimeHandler _realtimeHandler;
-  Set<int> _cachedPinnedIds = {};
 
   ConversationCubit({
     required this.repo,
@@ -65,6 +64,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       onConversationUpdated: _handleConversationUpdated,
       onConversationRead: _handleConversationRead,
       onMessageCreated: _handleMessageCreated,
+      onPinsChanged: () => loadConversations(refresh: false),
       onReconnected: _handleReconnected,
     );
   }
@@ -78,8 +78,13 @@ class ConversationCubit extends Cubit<ConversationState> {
     }
   }
 
-  void _handleConversationUpdated(Conversation conv) {
-    final updated = state.conversations.map((c) => c.id == conv.id ? conv : c).toList();
+  void _handleConversationUpdated(Conversation conv, bool hasExplicitPin) {
+    final updated = state.conversations.map((c) {
+      if (c.id == conv.id) {
+        return hasExplicitPin ? conv : conv.copyWith(isPinned: c.isPinned);
+      }
+      return c;
+    }).toList();
     emit(state.copyWith(conversations: updated));
   }
 
@@ -199,8 +204,17 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   Future<void> loadConversations({bool refresh = true}) async {
     if (isClosed) return;
+    final hasActiveFilter = state.selectedInboxId != null ||
+        state.selectedTeamId != null ||
+        state.selectedLabel != null ||
+        state.selectedLifecycleStageId != null ||
+        state.selectedAssigneeId != null ||
+        state.selectedAssigneeAgentBotId != null ||
+        state.status != 'all' ||
+        state.assigneeType != 'all';
+
     final hasExistingData = state.conversations.isNotEmpty;
-    if (!hasExistingData) {
+    if (!hasExistingData && !hasActiveFilter) {
       final activeAcc = _realtimeHandler.activeAccountId ?? _storage.activeAccountId;
       if (activeAcc != null && activeAcc > 0 && repo is ConversationRepository) {
         try {
@@ -233,6 +247,7 @@ class ConversationCubit extends Cubit<ConversationState> {
           label: state.selectedLabel,
           assigneeId: state.selectedAssigneeId,
           assigneeAgentBotId: state.selectedAssigneeAgentBotId,
+          lifecycleStageId: state.selectedLifecycleStageId,
           page: 1,
         );
         fetchStopwatch.stop();
@@ -248,11 +263,8 @@ class ConversationCubit extends Cubit<ConversationState> {
             if (!isClosed) {
               renderStopwatch.reset();
               renderStopwatch.start();
-              final listWithPins = _cachedPinnedIds.isEmpty
-                  ? list
-                  : list.map((c) => c.copyWith(isPinned: _cachedPinnedIds.contains(c.id))).toList();
               emit(state.copyWith(
-                conversations: listWithPins,
+                conversations: list,
                 isLoading: false,
                 errorMessage: null,
                 page: 1,
@@ -274,8 +286,7 @@ class ConversationCubit extends Cubit<ConversationState> {
                   );
                 }
               });
-              _prefetchTopConversations(listWithPins);
-              _syncPinnedConversationsInBackground();
+              _prefetchTopConversations(list);
             }
           },
         );
@@ -289,51 +300,6 @@ class ConversationCubit extends Cubit<ConversationState> {
         trace.setMetric('conversation_count', state.conversations.length);
       },
     );
-  }
-
-  Future<void> _syncPinnedConversationsInBackground() async {
-    try {
-      final res = await repo.fetchPinnedConversationIds();
-      if (isClosed) return;
-      res.fold(
-        (_) {},
-        (pinnedIds) async {
-          _cachedPinnedIds = pinnedIds.toSet();
-          if (isClosed) return;
-
-          final updated = state.conversations.map((c) {
-            final shouldBePinned = _cachedPinnedIds.contains(c.id);
-            if (c.isPinned != shouldBePinned) {
-              return c.copyWith(isPinned: shouldBePinned);
-            }
-            return c;
-          }).toList();
-
-          final existingIds = updated.map((c) => c.id).toSet();
-          final missingPinnedIds = _cachedPinnedIds.where((id) => !existingIds.contains(id)).toList();
-
-          if (missingPinnedIds.isNotEmpty) {
-            for (final pId in missingPinnedIds) {
-              if (isClosed) return;
-              final convRes = await repo.getConversation(pId);
-              convRes.fold(
-                (_) {},
-                (conv) {
-                  if (isClosed) return;
-                  if (!updated.any((c) => c.id == conv.id)) {
-                    updated.insert(0, conv.copyWith(isPinned: true));
-                  }
-                },
-              );
-            }
-          }
-
-          if (!isClosed) {
-            emit(state.copyWith(conversations: updated));
-          }
-        },
-      );
-    } catch (_) {}
   }
 
   void _prefetchTopConversations(List<Conversation> list) {
@@ -362,6 +328,7 @@ class ConversationCubit extends Cubit<ConversationState> {
           label: state.selectedLabel,
           assigneeId: state.selectedAssigneeId,
           assigneeAgentBotId: state.selectedAssigneeAgentBotId,
+          lifecycleStageId: state.selectedLifecycleStageId,
           page: nextPage,
         );
 
@@ -464,10 +431,12 @@ class ConversationCubit extends Cubit<ConversationState> {
       clearStage: stageId == null,
       clearAssignee: true,
       clearAgentBot: true,
+      conversations: const [],
       isLoading: true,
       page: 1,
+      hasMore: true,
     ));
-    loadConversations();
+    loadConversations(refresh: true);
   }
 
   void setStatus(String status) {
@@ -566,15 +535,37 @@ class ConversationCubit extends Cubit<ConversationState> {
     emit(state.copyWith(
       selectedLabel: label,
       clearLabel: label == null,
+      assigneeType: 'all',
+      clearInbox: true,
+      clearTeam: true,
+      clearStage: true,
+      clearAssignee: true,
+      clearAgentBot: true,
+      conversations: const [],
+      isLoading: true,
+      page: 1,
+      hasMore: true,
     ));
-    loadConversations();
+    loadConversations(refresh: true);
   }
 
   void setLifecycleStageFilter(int? stageId) {
+    if (state.selectedLifecycleStageId == stageId) return;
     emit(state.copyWith(
       selectedLifecycleStageId: stageId,
       clearStage: stageId == null,
+      assigneeType: 'all',
+      clearInbox: true,
+      clearTeam: true,
+      clearLabel: true,
+      clearAssignee: true,
+      clearAgentBot: true,
+      conversations: const [],
+      isLoading: true,
+      page: 1,
+      hasMore: true,
     ));
+    loadConversations(refresh: true);
   }
 
   /// Sorted and filtered conversations based on active filters and pinned status.
@@ -593,12 +584,6 @@ class ConversationCubit extends Cubit<ConversationState> {
     if (index == -1) return const Right(null);
     final isCurrentlyPinned = state.conversations[index].isPinned;
 
-    if (isCurrentlyPinned) {
-      _cachedPinnedIds.remove(conversationId);
-    } else {
-      _cachedPinnedIds.add(conversationId);
-    }
-
     final updatedList = List<Conversation>.from(state.conversations);
     updatedList[index] = updatedList[index].copyWith(isPinned: !isCurrentlyPinned);
     emit(state.copyWith(conversations: updatedList));
@@ -609,11 +594,6 @@ class ConversationCubit extends Cubit<ConversationState> {
 
     res.fold(
       (failure) {
-        if (isCurrentlyPinned) {
-          _cachedPinnedIds.add(conversationId);
-        } else {
-          _cachedPinnedIds.remove(conversationId);
-        }
         final rollbackList = List<Conversation>.from(state.conversations);
         final rIndex = rollbackList.indexWhere((c) => c.id == conversationId);
         if (rIndex != -1) {

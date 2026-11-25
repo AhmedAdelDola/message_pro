@@ -56,6 +56,7 @@ class MockConversationRepository implements IConversationRepository {
     String? label,
     int? assigneeId,
     int? assigneeAgentBotId,
+    int? lifecycleStageId,
     int page = 1,
   }) async => const Right([]);
 
@@ -169,7 +170,7 @@ void main() {
     expect(find.text('القنوات'), findsOneWidget);
     expect(find.text('وكلاء الذكاء الاصطناعي'), findsOneWidget);
     expect(find.text('الموظفين'), findsOneWidget);
-    expect(find.text('فرق العمل'), findsOneWidget);
+    expect(find.text('الفرق'), findsOneWidget);
 
     // 3. Verify items inside sections are visible
     expect(find.text('WhatsApp Support'), findsOneWidget);
@@ -178,8 +179,8 @@ void main() {
     expect(find.text('Ahmed Ali'), findsOneWidget);
     expect(find.text('Support Team'), findsOneWidget);
 
-    // 4. Verify AI badge is present
-    expect(find.text('AI'), findsOneWidget);
+    // 4. Verify AI agent avatar/fallback robot badge is present
+    expect(find.text('🤖'), findsOneWidget);
 
     // 5. Test collapsible interaction: tap on "القنوات" header to toggle collapse/expand
     await tester.tap(find.text('القنوات'));

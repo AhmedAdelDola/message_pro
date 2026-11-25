@@ -160,8 +160,9 @@ class IncomingBubbleView extends StatelessWidget {
                                     LinkPreviewService.extractFirstUrl(
                                       message.cleanContent,
                                     );
-                                if (firstUrl == null)
+                                if (firstUrl == null) {
                                   return const SizedBox.shrink();
+                                }
                                 return LinkPreviewCard(
                                   url: firstUrl,
                                   isOutgoing: false,

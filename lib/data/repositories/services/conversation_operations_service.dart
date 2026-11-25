@@ -24,6 +24,7 @@ class ConversationOperationsService implements IConversationOperations {
     String? label,
     int? assigneeId,
     int? assigneeAgentBotId,
+    int? lifecycleStageId,
     int page = 1,
   }) async {
     return PerformanceService.traceAsync<Either<Failure, List<Conversation>>>(
@@ -44,8 +45,12 @@ class ConversationOperationsService implements IConversationOperations {
           if (teamId != null) params['team_id'] = teamId;
           if (label != null) params['labels[]'] = label;
           if (assigneeId != null) params['assignee_id'] = assigneeId;
-          if (assigneeAgentBotId != null)
+          if (assigneeAgentBotId != null) {
             params['assignee_agent_bot_id'] = assigneeAgentBotId;
+          }
+          if (lifecycleStageId != null) {
+            params['lifecycle_stage_id'] = lifecycleStageId;
+          }
 
           final response = await _api.get(
             'conversations',
@@ -71,6 +76,12 @@ class ConversationOperationsService implements IConversationOperations {
           if (page == 1 &&
               status == 'all' &&
               assigneeType == 'all' &&
+              inboxId == null &&
+              teamId == null &&
+              label == null &&
+              assigneeId == null &&
+              assigneeAgentBotId == null &&
+              lifecycleStageId == null &&
               activeAccId != null &&
               activeAccId > 0 &&
               list.isNotEmpty) {

@@ -76,8 +76,9 @@ class _AssigneeSheetState extends State<AssigneeSheet> {
 
     // Human workspace agents (strictly excluding bots)
     final filteredAgents = widget.agents.where((a) {
-      if (a.isBot || a.assigneeType == 'AgentBot' || a.type == 'ai_agent')
+      if (a.isBot || a.assigneeType == 'AgentBot' || a.type == 'ai_agent') {
         return false;
+      }
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return a.name.toLowerCase().contains(q) ||

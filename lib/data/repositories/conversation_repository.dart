@@ -186,6 +186,7 @@ class ConversationRepository implements IConversationRepository {
     String? label,
     int? assigneeId,
     int? assigneeAgentBotId,
+    int? lifecycleStageId,
     int page = 1,
   }) =>
       _conversationOps.getConversations(
@@ -196,6 +197,7 @@ class ConversationRepository implements IConversationRepository {
         label: label,
         assigneeId: assigneeId,
         assigneeAgentBotId: assigneeAgentBotId,
+        lifecycleStageId: lifecycleStageId,
         page: page,
       );
 

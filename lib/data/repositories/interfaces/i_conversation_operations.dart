@@ -11,6 +11,7 @@ abstract class IConversationOperations {
     String? label,
     int? assigneeId,
     int? assigneeAgentBotId,
+    int? lifecycleStageId,
     int page = 1,
   });
 

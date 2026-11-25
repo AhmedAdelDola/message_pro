@@ -500,15 +500,19 @@ class Conversation {
         ? Map<String, dynamic>.from(json['additional_attributes'])
         : {};
 
-    final bool isPinned = json['is_pinned'] == true ||
+    final bool isPinned = json['isPinned'] == true ||
+        json['is_pinned'] == true ||
         json['pinned'] == true ||
         json['pinned_at'] != null ||
         json['conversation_pin'] != null ||
+        json['meta']?['isPinned'] == true ||
         json['meta']?['pinned'] == true ||
         json['meta']?['is_pinned'] == true ||
         json['meta']?['conversation_pin'] != null ||
+        cAttrs['isPinned'] == true ||
         cAttrs['is_pinned'] == true ||
         cAttrs['pinned'] == true ||
+        aAttrs['isPinned'] == true ||
         aAttrs['is_pinned'] == true ||
         aAttrs['pinned'] == true;
 

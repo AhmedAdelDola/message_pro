@@ -409,18 +409,33 @@ class PushNotificationService {
       // On iOS, wait for APNs token to be set by the system before requesting FCM token
       if (defaultTargetPlatform == TargetPlatform.iOS) {
         String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-        if (apnsToken == null) {
-          debugPrint('[PushNotification] Waiting for iOS APNs token to initialize...');
+        int retries = 0;
+        while (apnsToken == null && retries < 5) {
+          retries++;
+          debugPrint('[PushNotification] Waiting for iOS APNs token (attempt $retries/5)...');
           await Future.delayed(const Duration(seconds: 2));
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        }
+        if (apnsToken == null) {
+          debugPrint('[PushNotification] ⚠️ iOS APNs token is still null (Simulator or missing Push capability/APNs key)');
         }
       }
 
-      // ignore: deprecated_member_use
-      String? token = await FirebaseMessaging.instance.getToken();
-      if ((token == null || token.isEmpty) && defaultTargetPlatform == TargetPlatform.iOS) {
-        // Retry once after brief delay for APNs handshake on cold boot
-        await Future.delayed(const Duration(seconds: 3));
+      String? token;
+      try {
+        // ignore: deprecated_member_use
         token = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        debugPrint('[PushNotification] Initial getToken failed: $e');
+      }
+      if ((token == null || token.isEmpty) && defaultTargetPlatform == TargetPlatform.iOS) {
+        await Future.delayed(const Duration(seconds: 3));
+        try {
+          // ignore: deprecated_member_use
+          token = await FirebaseMessaging.instance.getToken();
+        } catch (e) {
+          debugPrint('[PushNotification] Retry getToken failed: $e');
+        }
       }
       if (token == null || token.isEmpty) {
         debugPrint('[PushNotification] FCM token is null or empty');

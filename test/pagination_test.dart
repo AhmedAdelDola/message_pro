@@ -25,6 +25,7 @@ class FakeConversationRepository implements IConversationRepository {
     String? label,
     int? assigneeId,
     int? assigneeAgentBotId,
+    int? lifecycleStageId,
     int page = 1,
   }) async {
     if (getConversationsHandler != null) {

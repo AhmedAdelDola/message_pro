@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage_service.dart';
@@ -224,18 +225,23 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<Either<Failure, void>> registerPushToken(String token, {String deviceName = 'android'}) async {
     try {
+      final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+      final platform = isIos ? 'ios' : 'android';
+      final brand = isIos ? 'Apple' : 'Android';
+      final osVersion = isIos ? '17.0' : '34';
+
       await _api.post(
         'notification_subscriptions',
         data: {
           'subscription_type': 'fcm',
           'subscription_attributes': {
             'deviceName': deviceName,
-            'devicePlatform': 'android',
-            'apiLevel': '34',
-            'brandName': 'Android',
+            'devicePlatform': platform,
+            'apiLevel': osVersion,
+            'brandName': brand,
             'buildNumber': '10',
             'push_token': token,
-            'device_id': 'android_$token',
+            'device_id': '${platform}_$token',
             'device_name': deviceName,
           },
           'push_token': token,

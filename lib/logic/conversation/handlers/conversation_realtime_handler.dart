@@ -41,9 +41,10 @@ class ConversationRealtimeHandler {
   /// Begins listening to ActionCable real-time events and reconnect notifications.
   void startListening({
     required void Function(Conversation conv) onConversationCreated,
-    required void Function(Conversation conv) onConversationUpdated,
+    required void Function(Conversation conv, bool hasExplicitPin) onConversationUpdated,
     required void Function(int conversationId) onConversationRead,
     required void Function(int conversationId, Message? message, Map<String, dynamic> rawPayload) onMessageCreated,
+    required void Function() onPinsChanged,
     required void Function() onReconnected,
   }) {
     _eventSub?.cancel();
@@ -71,6 +72,10 @@ class ConversationRealtimeHandler {
         case 'conversation.status_changed':
         case 'assignee.changed':
           _handleConversationUpdated(payload, onConversationUpdated);
+          break;
+
+        case 'conversation.pins_changed':
+          onPinsChanged();
           break;
 
         case 'conversation.read':
@@ -104,13 +109,16 @@ class ConversationRealtimeHandler {
 
   void _handleConversationUpdated(
     Map<String, dynamic> payload,
-    void Function(Conversation conv) onConversationUpdated,
+    void Function(Conversation conv, bool hasExplicitPin) onConversationUpdated,
   ) {
     try {
       final conv = Conversation.fromJson(Map<String, dynamic>.from(payload));
       if (!isEventForCurrentAccount(payload, conv.accountId)) return;
       if (conv.id > 0) {
-        onConversationUpdated(conv);
+        final hasExplicitPin = payload.containsKey('isPinned') ||
+            payload.containsKey('is_pinned') ||
+            payload.containsKey('pinned');
+        onConversationUpdated(conv, hasExplicitPin);
       }
     } catch (e) {
       debugPrint('[ConversationRealtimeHandler] Error parsing conversation.updated: $e');

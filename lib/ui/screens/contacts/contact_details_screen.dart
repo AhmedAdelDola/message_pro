@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:message_pro/core/constants/app_colors.dart';
 import 'package:message_pro/core/di/injection_container.dart';
 import 'package:message_pro/data/models/contact.dart';
@@ -10,16 +9,19 @@ import 'package:message_pro/logic/contacts/contact_details_state.dart';
 import 'package:message_pro/logic/conversation/conversation_cubit.dart';
 import '../chat/chat_screen.dart';
 import 'edit_contact_screen.dart';
-import 'widgets/contact_attributes_tab.dart';
-import 'widgets/contact_conversations_tab.dart';
-import 'widgets/contact_details_tab.dart';
 import 'widgets/contact_inbox_picker.dart';
 import 'widgets/contact_lifecycle_picker.dart';
-import 'widgets/contact_notes_tab.dart';
-import 'widgets/details/contact_profile_header.dart';
-import 'widgets/details/contact_quick_actions_bar.dart';
+import 'widgets/details/contact_activities_tab_view.dart';
+import 'widgets/details/contact_ai_activity_tab_view.dart';
+import 'widgets/details/contact_attachments_tab_view.dart';
+import 'widgets/details/contact_calendar_tab_view.dart';
+import 'widgets/details/contact_calls_tab_view.dart';
+import 'widgets/details/contact_commerce_tab_view.dart';
+import 'widgets/details/contact_details_icon_bar.dart';
+import 'widgets/details/contact_info_tab_view.dart';
+import 'widgets/details/contact_notes_tab_view.dart';
 
-/// Clean screen displaying contact details, lifecycle stages, conversations, and custom attributes.
+/// Website-matched 8-tab Contact Details screen powered by the aggregate endpoint.
 class ContactDetailsScreen extends StatelessWidget {
   final Contact contact;
   final int? conversationId;
@@ -39,7 +41,7 @@ class ContactDetailsScreen extends StatelessWidget {
       create: (_) => sl<ContactDetailsCubit>(
         param1: contact,
         param2: stages,
-      )..loadDetails(),
+      )..loadDetails(conversationId: conversationId),
       child: _ContactDetailsContent(
         conversationId: conversationId,
         onContactUpdated: onContactUpdated,
@@ -61,23 +63,30 @@ class _ContactDetailsContent extends StatefulWidget {
   State<_ContactDetailsContent> createState() => _ContactDetailsContentState();
 }
 
-class _ContactDetailsContentState extends State<_ContactDetailsContent>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-  final TextEditingController _noteController = TextEditingController();
-  final List<Map<String, dynamic>> _notes = [];
+class _ContactDetailsContentState extends State<_ContactDetailsContent> {
+  int _activeTabIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _noteController.dispose();
-    super.dispose();
+  String _tabTitle(int index, bool isArabic) {
+    switch (index) {
+      case 0:
+        return isArabic ? 'تفاصيل العميل' : 'Contact details';
+      case 1:
+        return isArabic ? 'المكالمات' : 'Calls';
+      case 2:
+        return isArabic ? 'نشاط الذكاء الاصطناعي' : 'AI activity';
+      case 3:
+        return isArabic ? 'المرفقات' : 'Attachments';
+      case 4:
+        return isArabic ? 'الأنشطة' : 'Activities';
+      case 5:
+        return isArabic ? 'الملاحظات' : 'Notes';
+      case 6:
+        return isArabic ? 'التقويم' : 'Calendar';
+      case 7:
+        return isArabic ? 'المتجر' : 'Commerce';
+      default:
+        return isArabic ? 'تفاصيل العميل' : 'Contact details';
+    }
   }
 
   void _copyToClipboard(String text, String label) {
@@ -92,36 +101,19 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
     );
   }
 
-  Future<void> _makeCall(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      _copyToClipboard(phone, 'Phone number');
+  Future<void> _openEditContact(BuildContext context, Contact contact) async {
+    final updatedContact = await Navigator.push<Contact>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditContactScreen(contact: contact),
+      ),
+    );
+    if (updatedContact != null && context.mounted) {
+      widget.onContactUpdated?.call(updatedContact);
+      context.read<ContactDetailsCubit>().loadDetails(
+            conversationId: widget.conversationId,
+          );
     }
-  }
-
-  Future<void> _sendEmail(String email) async {
-    final uri = Uri.parse('mailto:$email');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      _copyToClipboard(email, 'Email address');
-    }
-  }
-
-  void _addNote() {
-    final text = _noteController.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _notes.insert(0, {
-        'content': text,
-        'author': 'أنت',
-        'createdAt': DateTime.now(),
-      });
-      _noteController.clear();
-    });
-    FocusScope.of(context).unfocus();
   }
 
   Future<void> _handleStartConversation(BuildContext context, Contact contact) async {
@@ -136,7 +128,11 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
     if (inboxes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isArabic ? 'لا توجد قنوات متاحة لبدء محادثة' : 'No inboxes available to start chat'),
+          content: Text(
+            isArabic
+                ? 'لا توجد قنوات متاحة لبدء محادثة'
+                : 'No inboxes available to start chat',
+          ),
           backgroundColor: const Color(0xFFFF382E),
         ),
       );
@@ -190,10 +186,10 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
 
         try {
           context.read<ConversationCubit>().updateContactLifecycleStage(
-            state.contact.id,
-            fullStage,
-            conversationId: widget.conversationId,
-          );
+                state.contact.id,
+                fullStage,
+                conversationId: widget.conversationId,
+              );
         } catch (_) {}
       },
     );
@@ -235,8 +231,12 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(
-                  isArabic ? 'إضافة تصنيف' : 'Add Label',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                  isArabic ? 'إضافة تصنيف' : 'Add Tag',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                  ),
                 ),
               ),
               const Divider(height: 1),
@@ -245,7 +245,9 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
                   padding: const EdgeInsets.all(24),
                   child: Center(
                     child: Text(
-                      isArabic ? 'لا توجد تصنيفات إضافية متاحة' : 'No more labels available',
+                      isArabic
+                          ? 'لا توجد وسوم إضافية متاحة'
+                          : 'No more tags available',
                       style: TextStyle(color: textSecondary),
                     ),
                   ),
@@ -258,17 +260,19 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
                     itemBuilder: (_, index) {
                       final label = availableLabels[index];
                       return ListTile(
-                        leading: const Icon(Icons.label_outline_rounded, color: AppColors.primary),
+                        leading: const Icon(Icons.label_outline_rounded, size: 20),
                         title: Text(label, style: TextStyle(color: textPrimary)),
                         onTap: () {
                           Navigator.pop(ctx);
-                          final updated = List<String>.from(state.labels)..add(label);
-                          context.read<ContactDetailsCubit>().updateLabels(updated);
+                          context
+                              .read<ContactDetailsCubit>()
+                              .updateLabels([...state.labels, label]);
                         },
                       );
                     },
                   ),
                 ),
+              const SizedBox(height: 12),
             ],
           ),
         );
@@ -280,148 +284,179 @@ class _ContactDetailsContentState extends State<_ContactDetailsContent>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final bgColor = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary = isDark ? AppColors.textLightPrimary : AppColors.textDarkPrimary;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    final bgColor = isDark ? const Color(0xFF141518) : const Color(0xFFFEFEFE);
+    final borderColor = isDark
+        ? const Color(0xFF2C2D32)
+        : const Color(0xFF353C45).withValues(alpha: 0.16);
+    final primaryText = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF282E34);
 
     return BlocConsumer<ContactDetailsCubit, ContactDetailsState>(
       listener: (context, state) {
+        if (state.createdConversation != null) {
+          final conv = state.createdConversation!;
+          context.read<ContactDetailsCubit>().clearCreatedConversation();
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => ChatScreen(conversation: conv)),
+          );
+        }
         if (state.feedbackMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.feedbackMessage!),
-              duration: const Duration(seconds: 1),
+              backgroundColor: const Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
             ),
           );
-          widget.onContactUpdated?.call(state.contact);
         }
         if (state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.errorMessage!), backgroundColor: const Color(0xFFFF382E)),
-          );
-        }
-        if (state.createdConversation != null) {
-          final conv = state.createdConversation!;
-          context.read<ContactDetailsCubit>().clearCreatedConversation();
-          context.read<ConversationCubit>().loadConversations(refresh: true);
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => ChatScreen(conversation: conv)),
+            SnackBar(
+              content: Text(state.errorMessage!),
+              backgroundColor: const Color(0xFFEF4444),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       },
       builder: (context, state) {
-        final contact = state.contact;
+        final cubit = context.read<ContactDetailsCubit>();
 
         return Scaffold(
           backgroundColor: bgColor,
           appBar: AppBar(
             backgroundColor: bgColor,
+            surfaceTintColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
-              icon: Icon(Icons.close_rounded, color: textPrimary, size: 22),
-              onPressed: () => Navigator.of(context).pop(),
+              icon: Icon(Icons.arrow_back_rounded, color: primaryText),
+              onPressed: () => Navigator.pop(context),
             ),
+            titleSpacing: 0,
             title: Text(
-              isArabic ? 'تفاصيل جهة الاتصال' : 'Contact details',
-              style: TextStyle(color: textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 21),
-                color: AppColors.primary,
-                tooltip: isArabic ? 'تعديل جهة الاتصال' : 'Edit Contact',
-                onPressed: () async {
-                  final updated = await Navigator.of(context).push<Contact>(
-                    MaterialPageRoute(builder: (_) => EditContactScreen(contact: contact)),
-                  );
-                  if (updated != null && context.mounted) {
-                    context.read<ContactDetailsCubit>().loadDetails();
-                    widget.onContactUpdated?.call(updated);
-                  }
-                },
+              _tabTitle(_activeTabIndex, isArabic),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: primaryText,
               ),
-              const SizedBox(width: 4),
-            ],
+            ),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Container(color: borderColor, height: 1),
+              child: Divider(height: 1, thickness: 1, color: borderColor),
             ),
           ),
-          body: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ContactProfileHeader(
-                        state: state,
-                        onLifecycleTap: () => _showLifecyclePicker(context, state),
-                        onAddLabelTap: () => _showLabelsPickerModal(context, state),
-                        onRemoveLabel: (lbl) {
-                          final updated = List<String>.from(state.labels)..remove(lbl);
-                          context.read<ContactDetailsCubit>().updateLabels(updated);
-                        },
-                      ),
-                      ContactQuickActionsBar(
-                        contact: contact,
-                        onStartChatTap: () => _handleStartConversation(context, contact),
-                        onCallTap: _makeCall,
-                        onEmailTap: _sendEmail,
-                      ),
-                      const SizedBox(height: 8),
-                      TabBar(
-                        controller: _tabController,
-                        labelColor: AppColors.primary,
-                        unselectedLabelColor: isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary,
-                        indicatorColor: AppColors.primary,
-                        indicatorWeight: 2.5,
-                        tabs: [
-                          Tab(text: isArabic ? 'البيانات' : 'Details'),
-                          Tab(text: isArabic ? 'الخصائص' : 'Attributes'),
-                          Tab(text: isArabic ? 'المحادثات' : 'Chats'),
-                          Tab(text: isArabic ? 'الملاحظات' : 'Notes'),
-                        ],
-                      ),
-                    ],
-                  ),
+          body: Column(
+            children: [
+              ContactDetailsIconBar(
+                activeIndex: _activeTabIndex,
+                isDark: isDark,
+                onTabSelected: (index) => setState(() => _activeTabIndex = index),
+              ),
+              if (state.isLoadingAggregate)
+                const LinearProgressIndicator(
+                  minHeight: 2,
+                  color: Color(0xFF4162E3),
                 ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                ContactDetailsTab(
-                  contact: contact,
-                  lifecycleStage: state.activeLifecycleStage,
-                  contactLabels: state.labels,
-                  isLoadingLabels: state.isLoadingLabels,
-                  onSelectLifecycleStage: () => _showLifecyclePicker(context, state),
-                  onAddLabel: () => _showLabelsPickerModal(context, state),
-                  onRemoveLabel: (lbl) {
-                    final updated = List<String>.from(state.labels)..remove(lbl);
-                    context.read<ContactDetailsCubit>().updateLabels(updated);
-                  },
-                  onCopy: _copyToClipboard,
-                  onSendEmail: _sendEmail,
+              Expanded(
+                child: IndexedStack(
+                  index: _activeTabIndex,
+                  children: [
+                    // 0: Contact details
+                    ContactInfoTabView(
+                      state: state,
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onCopyId: () => _copyToClipboard(state.contact.id.toString(), 'ID'),
+                      onCopyPhone: (p) => _copyToClipboard(p, isArabic ? 'رقم الهاتف' : 'Phone'),
+                      onCopyEmail: (e) => _copyToClipboard(e, isArabic ? 'البريد' : 'Email'),
+                      onEditContact: () => _openEditContact(context, state.contact),
+                      onManageFields: () => _openEditContact(context, state.contact),
+                      onPickLifecycleStage: () => _showLifecyclePicker(context, state),
+                      onAddTag: () => _showLabelsPickerModal(context, state),
+                      onRemoveTag: (tag) {
+                        final updated = state.labels.where((l) => l != tag).toList();
+                        cubit.updateLabels(updated);
+                      },
+                      onStartConversation: widget.conversationId == null
+                          ? () => _handleStartConversation(context, state.contact)
+                          : null,
+                    ),
+
+                    // 1: Calls
+                    ContactCallsTabView(isDark: isDark, isArabic: isArabic),
+
+                    // 2: AI Activity
+                    ContactAiActivityTabView(
+                      items: state.aiActivity,
+                      pagination: state.pagination['ai_activity'],
+                      isLoading: state.loadingSections.contains('ai_activity'),
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onRefresh: () => cubit.refreshSection('ai_activity'),
+                      onLoadMore: () => cubit.loadMoreSection('ai_activity'),
+                    ),
+
+                    // 3: Attachments
+                    ContactAttachmentsTabView(
+                      items: state.attachments,
+                      pagination: state.pagination['attachments'],
+                      isLoading: state.loadingSections.contains('attachments'),
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onLoadMore: () => cubit.loadMoreSection('attachments'),
+                    ),
+
+                    // 4: Activities
+                    ContactActivitiesTabView(
+                      items: state.activities,
+                      pagination: state.pagination['activities'],
+                      isLoading: state.loadingSections.contains('activities'),
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onLoadMore: () => cubit.loadMoreSection('activities'),
+                    ),
+
+                    // 5: Notes
+                    ContactNotesTabView(
+                      notes: state.notes,
+                      pagination: state.pagination['notes'],
+                      isLoading: state.loadingSections.contains('notes'),
+                      isSavingNote: state.isSavingNote,
+                      canAddNote: widget.conversationId != null && widget.conversationId! > 0,
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onLoadMore: () => cubit.loadMoreSection('notes'),
+                      onAddNote: (content) => cubit.addPrivateNote(content),
+                    ),
+
+                    // 6: Calendar
+                    ContactCalendarTabView(
+                      events: state.calendarEvents,
+                      activeBucket: state.calendarBucket,
+                      pagination: state.pagination['calendar'],
+                      isLoading: state.loadingSections.contains('calendar'),
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onSwitchBucket: (bucket) => cubit.switchCalendarBucket(bucket),
+                      onLoadMore: () => cubit.loadMoreSection('calendar'),
+                    ),
+
+                    // 7: Commerce (Shopify)
+                    ContactCommerceTabView(
+                      ecommerce: state.ecommerce,
+                      selectedStoreId: state.selectedStoreId,
+                      isLoading: state.loadingSections.contains('ecommerce'),
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onSelectStore: (storeId) => cubit.setSelectedStore(storeId),
+                      onRefresh: () => cubit.refreshSection('ecommerce'),
+                      onLoadMoreOrders: (store) => cubit.loadMoreEcommerceOrders(store),
+                    ),
+                  ],
                 ),
-                ContactAttributesTab(
-                  contact: contact,
-                  onCopy: _copyToClipboard,
-                ),
-                ContactConversationsTab(
-                  contact: contact,
-                  isStartingConversation: state.isStartingConversation,
-                  onStartNewConversation: () => _handleStartConversation(context, contact),
-                ),
-                ContactNotesTab(
-                  noteController: _noteController,
-                  notes: _notes,
-                  onAddNote: _addNote,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

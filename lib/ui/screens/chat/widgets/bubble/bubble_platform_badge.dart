@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../../data/models/message.dart';
+import '../../../../widgets/channel_logo_widget.dart';
 
 class BubblePlatformBadge extends StatelessWidget {
   final String channelName;
@@ -79,36 +80,9 @@ class BubblePlatformBadge extends StatelessWidget {
 
     // 3. Instagram
     if (lower.contains('instagram')) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.bottomLeft,
-            end: Alignment.topRight,
-            colors: [
-              Color(0xFFF58529),
-              Color(0xFFDD2A7B),
-              Color(0xFF8134AF),
-              Color(0xFF515BD4),
-            ],
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFDD2A7B).withValues(alpha: 0.35),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            Icons.camera_alt_rounded,
-            size: size * 0.55,
-            color: Colors.white,
-          ),
-        ),
+      return ChannelLogoWidget(
+        channelType: 'instagram',
+        size: size,
       );
     }
 

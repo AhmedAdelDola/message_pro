@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../../core/storage/local_cache_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../models/contact.dart';
+import '../models/contact_details_aggregate.dart';
 import '../models/conversation.dart';
 
 abstract class IContactRepository {
@@ -39,6 +40,19 @@ abstract class IContactRepository {
     String stage, {
     int? stageId,
     bool clearStage = false,
+  });
+  Future<Either<Failure, ContactDetailsAggregate>> getContactDetailsAggregate(
+    int contactId, {
+    int? conversationId,
+    List<String>? sections,
+    int? notesPage,
+    int? attachmentsPage,
+    int? activitiesPage,
+    int? aiActivityPage,
+    int? calendarPage,
+    String? calendarBucket,
+    Map<String, String>? ecommerceCursors,
+    Map<String, int>? ecommercePages,
   });
 }
 
@@ -256,5 +270,69 @@ class ContactRepository implements IContactRepository {
       clearLifecycleStage: clearStage,
       customAttributes: {'lifecycle_stage': stage, 'lead_status': stage},
     );
+  }
+
+  @override
+  Future<Either<Failure, ContactDetailsAggregate>> getContactDetailsAggregate(
+    int contactId, {
+    int? conversationId,
+    List<String>? sections,
+    int? notesPage,
+    int? attachmentsPage,
+    int? activitiesPage,
+    int? aiActivityPage,
+    int? calendarPage,
+    String? calendarBucket,
+    Map<String, String>? ecommerceCursors,
+    Map<String, int>? ecommercePages,
+  }) async {
+    try {
+      final params = <String, dynamic>{};
+      if (conversationId != null && conversationId > 0) {
+        params['conversation_id'] = conversationId;
+      }
+      if (sections != null && sections.isNotEmpty) {
+        params['sections'] = sections.join(',');
+      }
+      if (notesPage != null) params['notes_page'] = notesPage;
+      if (attachmentsPage != null) params['attachments_page'] = attachmentsPage;
+      if (activitiesPage != null) params['activities_page'] = activitiesPage;
+      if (aiActivityPage != null) params['ai_activity_page'] = aiActivityPage;
+      if (calendarPage != null) params['calendar_page'] = calendarPage;
+      if (calendarBucket != null && calendarBucket.isNotEmpty) {
+        params['calendar_bucket'] = calendarBucket;
+      }
+      if (ecommerceCursors != null && ecommerceCursors.isNotEmpty) {
+        ecommerceCursors.forEach((connId, cursor) {
+          params['ecommerce_cursors[$connId]'] = cursor;
+        });
+      }
+      if (ecommercePages != null && ecommercePages.isNotEmpty) {
+        ecommercePages.forEach((connId, page) {
+          params['ecommerce_pages[$connId]'] = page;
+        });
+      }
+
+      final response = await _api.get(
+        'contacts/$contactId/details',
+        queryParameters: params.isNotEmpty ? params : null,
+      );
+      final data = response.data;
+      if (data is Map) {
+        return Right(
+          ContactDetailsAggregate.fromJson(Map<String, dynamic>.from(data)),
+        );
+      }
+      return const Left(ServerFailure('تنسيق استجابة غير صالح'));
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return const Left(ServerFailure('الشات غير متاح أو لا يخص هذا العميل'));
+      }
+      final res = e.response?.data;
+      final msg = res is Map ? (res['message'] ?? res['error'])?.toString() : null;
+      return Left(ServerFailure(msg ?? e.message ?? 'فشل تحميل تفاصيل العميل'));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
   }
 }
