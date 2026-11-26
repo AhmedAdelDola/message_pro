@@ -126,7 +126,8 @@ jobs:
 
           print(f"Provisioning Profile Name: {name}")
           print(f"Provisioning Profile UUID: {uuid}")
-          print(f"Provisioning Profile aps-environment: {profile.get('Entitlements', {}).get('aps-environment', 'MISSING')}")
+          aps_env = profile.get("Entitlements", {}).get("aps-environment", "MISSING")
+          print(f"Provisioning Profile aps-environment: {aps_env}")
           print(f"Number of certificates in profile: {len(certs)}")
           print(f"Keychain identities:\n{keychain_identities.strip()}")
 
