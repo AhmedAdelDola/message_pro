@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:message_pro/core/constants/app_colors.dart';
+import 'package:message_pro/core/services/push_notification_service.dart';
 import 'package:message_pro/data/models/notification_settings.dart';
 import 'package:message_pro/logic/notification/notification_cubit.dart';
 import 'package:message_pro/ui/widgets/app_bar_progress_bar.dart';
@@ -273,10 +275,94 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       ),
                       const SizedBox(height: 16),
                       const ChatSoundsCard(),
+                      const SizedBox(height: 16),
+                      _buildPushDiagnosticsCard(isArabic, isDark),
                       const SizedBox(height: 30),
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildPushDiagnosticsCard(bool isArabic, bool isDark) {
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bug_report_outlined, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isArabic ? 'فحص حالة الإشعارات' : 'Push Diagnostics',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                Text(
+                  isArabic
+                      ? 'عرض حالة الإذن و APNs و FCM Token'
+                      : 'Check permission, APNs & FCM token',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textLightSecondary : AppColors.textDarkSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            onPressed: () async {
+              await PushNotificationService.registerDeviceToken();
+              final diag = await PushNotificationService.getDiagnostics();
+              if (!mounted) return;
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(isArabic ? 'حالة الإشعارات' : 'Push Diagnostics'),
+                  content: SelectableText(
+                    diag.entries.map((e) => '${e.key}: ${e.value}').join('\n\n'),
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                  actions: [
+                    if (diag['fcmToken'] != null &&
+                        diag['fcmToken'] != 'NULL' &&
+                        !diag['fcmToken']!.startsWith('error:'))
+                      TextButton(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: diag['fcmToken']!));
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(isArabic ? 'تم نسخ FCM Token' : 'FCM Token copied'),
+                            ),
+                          );
+                        },
+                        child: Text(isArabic ? 'نسخ التوكن' : 'Copy Token'),
+                      ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(isArabic ? 'إغلاق' : 'Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: Text(isArabic ? 'فحص' : 'Check'),
+          ),
+        ],
+      ),
     );
   }
 }

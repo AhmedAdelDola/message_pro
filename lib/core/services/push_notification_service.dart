@@ -48,6 +48,42 @@ class PushNotificationService {
   );
 
   static String? _lastRegisteredToken;
+  static String? _lastRegistrationError;
+
+  static Future<Map<String, String>> getDiagnostics() async {
+    final result = <String, String>{};
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      result['permission'] = settings.authorizationStatus.name;
+    } catch (e) {
+      result['permission'] = 'error: $e';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        final apns = await FirebaseMessaging.instance.getAPNSToken();
+        result['apnsToken'] = (apns != null && apns.isNotEmpty)
+            ? '${apns.substring(0, apns.length > 16 ? 16 : apns.length)}...'
+            : 'NULL (APNs not received from Apple)';
+      } catch (e) {
+        result['apnsToken'] = 'error: $e';
+      }
+    }
+
+    try {
+      // ignore: deprecated_member_use
+      final fcm = await FirebaseMessaging.instance.getToken();
+      result['fcmToken'] = (fcm != null && fcm.isNotEmpty) ? fcm : 'NULL';
+    } catch (e) {
+      result['fcmToken'] = 'error: $e';
+    }
+
+    result['backendRegistered'] = _lastRegisteredToken != null ? 'YES' : 'NO';
+    if (_lastRegistrationError != null) {
+      result['backendError'] = _lastRegistrationError!;
+    }
+    return result;
+  }
 
   /// Initialize Firebase, local notifications and listeners
   static Future<void> initialize() async {
@@ -452,9 +488,11 @@ class PushNotificationService {
       final result = await notifRepo.registerPushToken(token, deviceName: defaultTargetPlatform.name);
       result.fold(
         (failure) {
+          _lastRegistrationError = failure.message;
           debugPrint('[PushNotification] Failed to register push token: ${failure.message}');
         },
         (_) async {
+          _lastRegistrationError = null;
           debugPrint('[PushNotification] FCM token registered successfully with backend!');
           _lastRegisteredToken = token;
 
