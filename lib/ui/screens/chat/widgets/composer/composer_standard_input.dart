@@ -101,12 +101,16 @@ class ComposerStandardInput extends StatelessWidget {
                 children: [
                   ComposerChannelLogo(channelType: channelType, channelName: channelName, size: 15),
                   const SizedBox(width: 6),
-                  Text(
-                    channelName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: textPrimary,
+                  Flexible(
+                    child: Text(
+                      channelName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 3),

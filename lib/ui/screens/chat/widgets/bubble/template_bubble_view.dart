@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../../data/models/message.dart';
 import '../../../../../data/models/message_template_registry.dart';
 import '../clickable_text_with_links.dart';
@@ -8,6 +7,7 @@ import 'bubble_ad_referral_card.dart';
 import 'bubble_delivery_status.dart';
 import 'bubble_helpers.dart';
 import 'bubble_platform_badge.dart';
+import 'interactive_action_buttons.dart';
 import 'bubble_quoted_preview.dart';
 
 class TemplateBubbleView extends StatelessWidget {
@@ -122,7 +122,7 @@ class TemplateBubbleView extends StatelessWidget {
 
     String? headerText = template?.header;
     String? footerText = template?.footer;
-    String bodyText = message.content ?? '';
+    String bodyText = message.cleanContent;
 
     if (headerText != null && headerText.isNotEmpty && bodyText.startsWith(headerText)) {
       bodyText = bodyText.substring(headerText.length).trim();
@@ -278,73 +278,10 @@ class TemplateBubbleView extends StatelessWidget {
                         ],
                         if (actionButtons.isNotEmpty) ...[
                           const SizedBox(height: 10),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: buttonBg,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: buttonBorder,
-                                width: 0.9,
-                              ),
-                            ),
-                            child: Column(
-                              children: List.generate(actionButtons.length, (idx) {
-                                final btn = actionButtons[idx];
-                                final isLast = idx == actionButtons.length - 1;
-
-                                return InkWell(
-                                  onTap: () async {
-                                    if (btn.isUrl && btn.url != null) {
-                                      final uri = Uri.tryParse(btn.url!);
-                                      if (uri != null && await canLaunchUrl(uri)) {
-                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                      }
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.vertical(
-                                    top: idx == 0 ? const Radius.circular(8) : Radius.zero,
-                                    bottom: isLast ? const Radius.circular(8) : Radius.zero,
-                                  ),
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
-                                    decoration: BoxDecoration(
-                                      border: isLast
-                                          ? null
-                                          : Border(
-                                              bottom: BorderSide(
-                                                color: buttonBorder,
-                                                width: 0.8,
-                                              ),
-                                            ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          btn.isUrl ? Icons.open_in_new_rounded : Icons.reply_rounded,
-                                          size: 15,
-                                          color: const Color(0xFF2563EB),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Flexible(
-                                          child: Text(
-                                            btn.text,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF2563EB),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ),
+                          InteractiveActionButtons(
+                            buttons: actionButtons,
+                            backgroundColor: buttonBg,
+                            borderColor: buttonBorder,
                           ),
                         ],
                         if (message.isFailed) ...[

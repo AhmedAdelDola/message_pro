@@ -25,6 +25,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onToggleMute;
   final VoidCallback onCopyLink;
   final VoidCallback onCannedResponsesTap;
+  final VoidCallback onWorkflowShortcutsTap;
 
   const ChatAppBar({
     super.key,
@@ -43,6 +44,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onToggleMute,
     required this.onCopyLink,
     required this.onCannedResponsesTap,
+    required this.onWorkflowShortcutsTap,
   });
 
   @override
@@ -144,6 +146,16 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
           ),
+        // Workflow shortcuts (⚡) button
+        IconButton(
+          icon: Icon(
+            Icons.bolt_rounded,
+            size: 22.r,
+            color: const Color(0xFFD97706),
+          ),
+          tooltip: isArabic ? 'اختصارات الورك فلو' : 'Workflow shortcuts',
+          onPressed: onWorkflowShortcutsTap,
+        ),
         // Assignee avatar or button
         _buildAssigneeButton(context, isDark),
         // Collaborators button

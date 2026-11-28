@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import '../../../core/error/failures.dart';
 import '../../models/conversation.dart';
+import '../../models/workflow.dart';
 
 abstract class IConversationOperations {
   Future<Either<Failure, List<Conversation>>> getConversations({
@@ -44,5 +45,13 @@ abstract class IConversationOperations {
   Future<Either<Failure, void>> muteConversation(int conversationId);
   Future<Either<Failure, void>> unmuteConversation(int conversationId);
   Future<Either<Failure, void>> markAsRead(int conversationId);
+  Future<Either<Failure, List<WorkflowShortcut>>> getAvailableWorkflows(int conversationId);
+  Future<Either<Failure, List<WorkflowRun>>> getWorkflowRuns(int conversationId);
+  Future<Either<Failure, void>> startWorkflow(
+    int conversationId,
+    int workflowId, {
+    Map<String, dynamic> variables = const {},
+  });
+  Future<Either<Failure, void>> stopWorkflowRun(int conversationId, int workflowRunId);
   Future<List<Conversation>> getCachedConversations(int accountId) async => const [];
 }

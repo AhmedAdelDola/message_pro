@@ -237,20 +237,24 @@ class Inbox {
   final String name;
   final String channelType;
   final String? avatarUrl;
+  final String? phoneNumber;
 
   Inbox({
     required this.id,
     required this.name,
     required this.channelType,
     this.avatarUrl,
+    this.phoneNumber,
   });
 
   factory Inbox.fromJson(Map<String, dynamic> json) {
+    final rawPhone = json['phone_number']?.toString().trim();
     return Inbox(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
-      name: json['name'] ?? '',
-      channelType: json['channel_type'] ?? 'Channel::WebWidget',
-      avatarUrl: json['avatar_url'],
+      name: json['name']?.toString() ?? '',
+      channelType: json['channel_type']?.toString() ?? 'Channel::WebWidget',
+      avatarUrl: json['avatar_url']?.toString(),
+      phoneNumber: (rawPhone != null && rawPhone.isNotEmpty) ? rawPhone : null,
     );
   }
 }

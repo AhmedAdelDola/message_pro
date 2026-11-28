@@ -428,7 +428,14 @@ class Conversation {
 
     final rawInboxId = json['inbox_id'] ?? json['inbox']?['id'];
     final int inbId = rawInboxId is int ? rawInboxId : int.tryParse(rawInboxId?.toString() ?? '') ?? 0;
-    final String? inbName = json['inbox']?['name']?.toString() ?? json['meta']?['inbox']?['name']?.toString();
+    final rawInbName = (parsedInbox != null && parsedInbox.name.trim().isNotEmpty
+            ? parsedInbox.name
+            : null) ??
+        json['inbox']?['name']?.toString() ??
+        json['meta']?['inbox']?['name']?.toString() ??
+        json['inbox_name']?.toString();
+    final String? inbName =
+        (rawInbName != null && rawInbName.trim().isNotEmpty) ? rawInbName.trim() : null;
 
     final rawAccountId = json['account_id'] ?? json['account']?['id'];
     final int accId = rawAccountId is int ? rawAccountId : int.tryParse(rawAccountId?.toString() ?? '') ?? 0;

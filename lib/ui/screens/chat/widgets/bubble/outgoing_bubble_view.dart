@@ -10,6 +10,7 @@ import 'bubble_helpers.dart';
 import 'bubble_platform_badge.dart';
 import 'bubble_quoted_preview.dart';
 import 'bubble_reactions_pill.dart';
+import 'interactive_action_buttons.dart';
 
 class OutgoingBubbleView extends StatelessWidget {
   final Message message;
@@ -185,6 +186,22 @@ class OutgoingBubbleView extends StatelessWidget {
                                   ),
                                 );
                               },
+                            ),
+                          ],
+
+                          if (message.hasInteractiveButtons) ...[
+                            const SizedBox(height: 8),
+                            InteractiveActionButtons(
+                              buttons: message.templateActionButtons,
+                              backgroundColor: isDark
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : Colors.white.withValues(alpha: 0.92),
+                              borderColor: isDark
+                                  ? Colors.white.withValues(alpha: 0.18)
+                                  : Colors.white.withValues(alpha: 0.65),
+                              foregroundColor: isDark
+                                  ? const Color(0xFFBAE6FD)
+                                  : const Color(0xFF2563EB),
                             ),
                           ],
 

@@ -7,6 +7,7 @@ import '../models/contact.dart';
 import '../models/user.dart';
 import '../models/message_template.dart';
 import '../models/conversation_filter_options.dart';
+import '../models/workflow.dart';
 import 'interfaces/i_conversation_operations.dart';
 import 'interfaces/i_message_operations.dart';
 import 'interfaces/i_metadata_operations.dart';
@@ -287,6 +288,26 @@ class ConversationRepository implements IConversationRepository {
   @override
   Future<Either<Failure, void>> markAsRead(int conversationId) =>
       _conversationOps.markAsRead(conversationId);
+
+  @override
+  Future<Either<Failure, List<WorkflowShortcut>>> getAvailableWorkflows(int conversationId) =>
+      _conversationOps.getAvailableWorkflows(conversationId);
+
+  @override
+  Future<Either<Failure, List<WorkflowRun>>> getWorkflowRuns(int conversationId) =>
+      _conversationOps.getWorkflowRuns(conversationId);
+
+  @override
+  Future<Either<Failure, void>> startWorkflow(
+    int conversationId,
+    int workflowId, {
+    Map<String, dynamic> variables = const {},
+  }) =>
+      _conversationOps.startWorkflow(conversationId, workflowId, variables: variables);
+
+  @override
+  Future<Either<Failure, void>> stopWorkflowRun(int conversationId, int workflowRunId) =>
+      _conversationOps.stopWorkflowRun(conversationId, workflowRunId);
 
   // ---------------------------------------------------------------------------
   // Metadata Operations Delegation

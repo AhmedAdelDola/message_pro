@@ -7,6 +7,7 @@ import '../../../core/storage/local_cache_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/utils/background_json_parser.dart';
 import '../../models/conversation.dart';
+import '../../models/workflow.dart';
 import '../interfaces/i_conversation_operations.dart';
 
 class ConversationOperationsService implements IConversationOperations {
@@ -596,5 +597,93 @@ class ConversationOperationsService implements IConversationOperations {
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
+  }
+
+  @override
+  Future<Either<Failure, List<WorkflowShortcut>>> getAvailableWorkflows(
+    int conversationId,
+  ) async {
+    try {
+      final response = await _api.get(
+        'conversations/$conversationId/workflow_runs/available',
+      );
+      final data = response.data;
+      final list = <WorkflowShortcut>[];
+      if (data is List) {
+        for (final item in data) {
+          if (item is Map) {
+            list.add(WorkflowShortcut.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      }
+      return Right(list);
+    } catch (e) {
+      return Left(ServerFailure(_extractErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<WorkflowRun>>> getWorkflowRuns(
+    int conversationId,
+  ) async {
+    try {
+      final response = await _api.get(
+        'conversations/$conversationId/workflow_runs',
+      );
+      final data = response.data;
+      final list = <WorkflowRun>[];
+      if (data is List) {
+        for (final item in data) {
+          if (item is Map) {
+            list.add(WorkflowRun.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      }
+      return Right(list);
+    } catch (e) {
+      return Left(ServerFailure(_extractErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> startWorkflow(
+    int conversationId,
+    int workflowId, {
+    Map<String, dynamic> variables = const {},
+  }) async {
+    try {
+      await _api.post(
+        'conversations/$conversationId/workflow_runs/$workflowId/start',
+        data: {'variables': variables},
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(_extractErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> stopWorkflowRun(
+    int conversationId,
+    int workflowRunId,
+  ) async {
+    try {
+      await _api.post(
+        'conversations/$conversationId/workflow_runs/$workflowRunId/stop',
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(_extractErrorMessage(e)));
+    }
+  }
+
+  String _extractErrorMessage(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) {
+        return data['error'].toString();
+      }
+    }
+    return e.toString();
   }
 }

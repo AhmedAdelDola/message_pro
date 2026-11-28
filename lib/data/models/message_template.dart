@@ -19,9 +19,21 @@ class TemplateButton {
     if (item is TemplateButton) return item;
     if (item is String) return TemplateButton(text: item);
     if (item is Map) {
+      final reply = item['reply'];
+      final button = item['button'];
+      final nestedTitle = (reply is Map ? reply['title'] ?? reply['text'] : null) ??
+          (button is Map ? button['title'] ?? button['text'] : null);
+      final text = item['text']?.toString() ??
+          item['title']?.toString() ??
+          nestedTitle?.toString() ??
+          item['value']?.toString() ??
+          '';
+      var type = item['type']?.toString().toUpperCase() ??
+          (item['url'] != null ? 'URL' : 'QUICK_REPLY');
+      if (type == 'REPLY') type = 'QUICK_REPLY';
       return TemplateButton(
-        text: item['text']?.toString() ?? item['title']?.toString() ?? '',
-        type: item['type']?.toString().toUpperCase() ?? (item['url'] != null ? 'URL' : 'QUICK_REPLY'),
+        text: text,
+        type: type,
         url: item['url']?.toString(),
         phoneNumber: item['phone_number']?.toString(),
       );

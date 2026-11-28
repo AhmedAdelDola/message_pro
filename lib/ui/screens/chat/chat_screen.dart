@@ -10,6 +10,7 @@ import '../../../data/models/conversation.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/models/message.dart';
 import '../../../data/models/user.dart';
+import '../../../data/repositories/conversation_repository.dart';
 import '../../../logic/auth/auth_cubit.dart';
 import '../../../logic/chat/chat_cubit.dart';
 import '../../../logic/chat/chat_state.dart';
@@ -28,6 +29,7 @@ import 'widgets/chat_ai_takeover_area.dart';
 import 'widgets/dialogs/snooze_options_sheet.dart';
 import 'widgets/dialogs/edit_message_dialog.dart';
 import 'widgets/dialogs/message_reactions_sheet.dart';
+import 'widgets/dialogs/workflow_shortcuts_sheet.dart';
 
 class ChatScreen extends StatelessWidget {
   final Conversation conversation;
@@ -560,6 +562,20 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     );
   }
 
+  void _showWorkflowShortcutsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return WorkflowShortcutsSheet(
+          conversationId: widget.conversation.id,
+          repository: sl<IConversationRepository>(),
+        );
+      },
+    );
+  }
+
   void _showCollaboratorsSheet() {
     final agents = context.read<ConversationCubit>().state.agents;
     showModalBottomSheet(
@@ -723,6 +739,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
             onToggleMute: _toggleMute,
             onCopyLink: _copyConversationLink,
             onCannedResponsesTap: _showCannedResponses,
+            onWorkflowShortcutsTap: _showWorkflowShortcutsSheet,
           ),
           body: Column(
             children: [
@@ -776,13 +793,36 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
               // Bottom Area: AI Agent Takeover Banner IN PLACE OF Chat Composer when bot is handling
               Builder(
                 builder: (context) {
+                  final convCubit = context.read<ConversationCubit>();
+                  final inboxes = context.select<ConversationCubit, List<Inbox>>(
+                    (c) => c.state.inboxes,
+                  );
+                  final matchingInbox = inboxes
+                      .where((i) => i.id == widget.conversation.inboxId)
+                      .firstOrNull;
+
+                  final resolvedChannelType =
+                      (matchingInbox != null && matchingInbox.channelType.isNotEmpty)
+                          ? matchingInbox.channelType
+                          : widget.conversation.channelType;
+
+                  final rawName = widget.conversation.inboxName?.trim();
+                  final parsedName = widget.conversation.inbox?.name.trim();
+                  final matchingName = matchingInbox?.name.trim();
+                  final channelName =
+                      (rawName != null && rawName.isNotEmpty)
+                          ? rawName
+                          : (parsedName != null && parsedName.isNotEmpty)
+                              ? parsedName
+                              : (matchingName != null && matchingName.isNotEmpty)
+                                  ? matchingName
+                                  : (resolvedChannelType.toLowerCase().contains('whatsapp')
+                                      ? 'WhatsApp'
+                                      : resolvedChannelType);
+
                   final isAiHandling = _isAiAgentHandling(widget.conversation, chatState.messages);
                   if (isAiHandling) {
                     final aiAgentName = _getAiAgentName(widget.conversation, chatState.messages);
-                    final channelName = widget.conversation.inboxName ??
-                        (widget.conversation.channelType.toLowerCase().contains('whatsapp')
-                            ? 'Message-pro'
-                            : widget.conversation.channelType);
 
                     return ChatAiTakeoverArea(
                       channelName: channelName,
@@ -792,17 +832,13 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     );
                   }
 
-                  final convCubit = context.read<ConversationCubit>();
                   final workspaceAgents = convCubit.state.agents;
 
                   return ChatComposer(
                     key: _composerKey,
                     isSending: chatState.isSending,
-                    channelName: widget.conversation.inboxName ??
-                        (widget.conversation.channelType.toLowerCase().contains('whatsapp')
-                            ? 'Message-pro'
-                            : widget.conversation.channelType),
-                    channelType: widget.conversation.channelType,
+                    channelName: channelName,
+                    channelType: resolvedChannelType,
                     canReply: widget.conversation.canReply,
                     cannedResponses: chatState.cannedResponses,
                     agents: workspaceAgents,

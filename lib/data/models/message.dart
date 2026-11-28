@@ -597,10 +597,26 @@ class Message {
   }
 
   List<TemplateButton> get templateActionButtons {
-    final rawBtns = contentAttributes['buttons'] ??
-        contentAttributes['interactive']?['action']?['buttons'] ??
-        additionalAttributes['interactive']?['action']?['buttons'] ??
-        contentAttributes['items'];
+    final interactive =
+        contentAttributes['interactive'] ?? additionalAttributes['interactive'];
+    final action = interactive is Map ? interactive['action'] : null;
+
+    dynamic rawBtns = contentAttributes['buttons'] ??
+        additionalAttributes['buttons'] ??
+        (action is Map ? action['buttons'] : null) ??
+        contentAttributes['items'] ??
+        additionalAttributes['items'];
+
+    if (rawBtns == null && action is Map && action['sections'] is List) {
+      final rows = <dynamic>[];
+      for (final section in action['sections'] as List) {
+        if (section is Map && section['rows'] is List) {
+          rows.addAll(section['rows'] as List);
+        }
+      }
+      if (rows.isNotEmpty) rawBtns = rows;
+    }
+
     final rawList = rawBtns is List ? rawBtns : null;
 
     return MessageTemplateRegistry.getButtonsForMessage(
@@ -609,6 +625,8 @@ class Message {
       rawButtons: rawList,
     );
   }
+
+  bool get hasInteractiveButtons => templateActionButtons.isNotEmpty;
 
   List<String> get templateButtons =>
       templateActionButtons.map((b) => b.text).toList();
