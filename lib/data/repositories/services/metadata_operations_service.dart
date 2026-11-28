@@ -36,6 +36,22 @@ class MetadataOperationsService implements IMetadataOperations {
   MetadataOperationsService({ApiClient? api}) : _api = api ?? ApiClient();
 
   @override
+  void clearCache() {
+    _cachedInboxes = null;
+    _cachedInboxesTime = null;
+    _cachedLabels = null;
+    _cachedLabelsTime = null;
+    _cachedStages = null;
+    _cachedStagesTime = null;
+    _cachedTeams = null;
+    _cachedTeamsTime = null;
+    _cachedCannedResponses = null;
+    _cachedCannedResponsesTime = null;
+    _cachedFilterOptions = null;
+    _cachedFilterOptionsTime = null;
+  }
+
+  @override
   Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId) async {
     try {
       final response = await _api.get('contacts/$contactId/contactable_inboxes');

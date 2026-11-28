@@ -205,15 +205,14 @@ class WorkspacesBottomSheet extends StatelessWidget {
                 borderColor: borderColor,
                 onTap: () async {
                   if (account.id != currentAccountId) {
+                    final authCubit = context.read<AuthCubit>();
+                    final convCubit = context.read<ConversationCubit>();
+                    final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(context);
                     onWorkspaceSwitched();
-                    await context.read<AuthCubit>().switchAccount(account.id);
-                    if (!context.mounted) return;
-                    await context.read<ConversationCubit>().onWorkspaceSwitched(
-                      account.id,
-                    );
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    await authCubit.switchAccount(account.id);
+                    await convCubit.onWorkspaceSwitched(account.id);
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
                           isArabic

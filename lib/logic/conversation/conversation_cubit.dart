@@ -373,44 +373,53 @@ class ConversationCubit extends Cubit<ConversationState> {
     emit(const ConversationState());
   }
 
+  int? _switchingAccountId;
+
   Future<void> onWorkspaceSwitched(int newAccountId) async {
+    if (_switchingAccountId == newAccountId) return;
     if (_realtimeHandler.activeAccountId == newAccountId && state.conversations.isNotEmpty) {
       return;
     }
-    await PerformanceService.traceAsync('workspace_switch', () async {
-      _realtimeHandler.activeAccountId = newAccountId;
-      repo.clearCache();
+    _switchingAccountId = newAccountId;
+    try {
+      await PerformanceService.traceAsync('workspace_switch', () async {
+        _realtimeHandler.activeAccountId = newAccountId;
+        repo.clearCache();
 
-      emit(state.copyWith(
-        conversations: const [],
-        inboxes: const [],
-        labels: const [],
-        teams: const [],
-        agents: const [],
-        lifecycleStages: const [],
-        page: 1,
-        hasMore: true,
-        isLoading: true,
-        isLoadingFilters: true,
-        errorMessage: null,
-        status: 'all',
-        assigneeType: 'all',
-        clearInbox: true,
-        clearTeam: true,
-        clearLabel: true,
-        clearStage: true,
-        clearAssignee: true,
-        clearAgentBot: true,
-        filterOptions: const ConversationFilterOptions(),
-      ));
+        emit(state.copyWith(
+          conversations: const [],
+          inboxes: const [],
+          labels: const [],
+          teams: const [],
+          agents: const [],
+          lifecycleStages: const [],
+          page: 1,
+          hasMore: true,
+          isLoading: true,
+          isLoadingFilters: true,
+          errorMessage: null,
+          status: 'all',
+          assigneeType: 'all',
+          clearInbox: true,
+          clearTeam: true,
+          clearLabel: true,
+          clearStage: true,
+          clearAssignee: true,
+          clearAgentBot: true,
+          filterOptions: const ConversationFilterOptions(),
+        ));
 
-      await Future.wait([
-        loadAuxiliaryData(),
-        loadFilterOptions(),
-      ]);
-
-      await loadConversations(refresh: true);
-    }, attributes: {'account_id': newAccountId.toString()});
+        await Future.wait([
+          loadAuxiliaryData(),
+          loadFilterOptions(),
+          loadConversations(refresh: true),
+        ]);
+      }, attributes: {'account_id': newAccountId.toString()});
+    } finally {
+      if (_switchingAccountId == newAccountId) {
+        _switchingAccountId = null;
+      }
+    }
   }
 
   // --- Filters Management ---

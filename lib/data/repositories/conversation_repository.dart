@@ -52,7 +52,10 @@ class ConversationRepository implements IConversationRepository {
   // Message Operations Delegation
   // ---------------------------------------------------------------------------
   @override
-  void clearCache() => _messageOps.clearCache();
+  void clearCache() {
+    _messageOps.clearCache();
+    _metadataOps.clearCache();
+  }
 
   @override
   List<Message>? getCachedMessages(int conversationId) => _messageOps.getCachedMessages(conversationId);

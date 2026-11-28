@@ -15,4 +15,5 @@ abstract class IMetadataOperations {
   Future<Either<Failure, ConversationFilterOptions>> fetchFilterOptions();
   Future<Either<Failure, List<Map<String, dynamic>>>> getContactableInboxes(int contactId);
   Future<Either<Failure, List<Map<String, dynamic>>>> getPhoneDestinations({String? phoneNumber});
+  void clearCache() {}
 }
